@@ -14,6 +14,7 @@ class TimeEntry {
   final double? startLng;
   final double? endLat;
   final double? endLng;
+  final int travelMinutes;
   final bool isSynced;
   final DateTime createdAt;
 
@@ -31,11 +32,13 @@ class TimeEntry {
     this.startLng,
     this.endLat,
     this.endLng,
+    this.travelMinutes = 0,
     this.isSynced = false,
     required this.createdAt,
   });
 
   Duration get totalDuration {
+    if (workType.isAbsence) return Duration.zero;
     if (endTime == null) return Duration.zero;
     final raw = endTime!.difference(startTime);
     final net = raw - Duration(minutes: breakMinutes);
@@ -44,7 +47,7 @@ class TimeEntry {
 
   double get totalHours => totalDuration.inMinutes / 60.0;
 
-  bool get isActive => endTime == null;
+  bool get isActive => !workType.isAbsence && endTime == null;
 
   TimeEntry copyWith({
     String? id,
@@ -60,6 +63,7 @@ class TimeEntry {
     double? startLng,
     double? endLat,
     double? endLng,
+    int? travelMinutes,
     bool? isSynced,
     DateTime? createdAt,
   }) {
@@ -77,6 +81,7 @@ class TimeEntry {
       startLng: startLng ?? this.startLng,
       endLat: endLat ?? this.endLat,
       endLng: endLng ?? this.endLng,
+      travelMinutes: travelMinutes ?? this.travelMinutes,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -96,6 +101,7 @@ class TimeEntry {
     'start_lng': startLng,
     'end_lat': endLat,
     'end_lng': endLng,
+    'travel_minutes': travelMinutes,
     'is_synced': isSynced ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
   };
@@ -114,6 +120,7 @@ class TimeEntry {
     startLng: (m['start_lng'] as num?)?.toDouble(),
     endLat: (m['end_lat'] as num?)?.toDouble(),
     endLng: (m['end_lng'] as num?)?.toDouble(),
+    travelMinutes: m['travel_minutes'] as int? ?? 0,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
   );

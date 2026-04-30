@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../providers/time_entry_provider.dart';
+import '../services/holiday_service.dart';
 
 class EntryFormScreen extends StatefulWidget {
   final TimeEntry? entry;
@@ -26,6 +27,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late TextEditingController _breakCtrl;
 
   bool get _isNew => widget.entry == null;
+  bool get _isAbsence => _workType.isAbsence;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   }
 
   DayType _defaultDayType(DateTime d) {
+    if (HolidayService.instance.isHoliday(d)) return DayType.holiday;
     if (d.weekday == 6) return DayType.saturday;
     if (d.weekday == 7) return DayType.sunday;
     return DayType.workday;
@@ -83,11 +86,11 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
-    final bm = int.tryParse(_breakCtrl.text) ?? 0;
-    final km = double.tryParse(_kmCtrl.text.replaceAll(',', '.'));
+    final bm = _isAbsence ? 0 : (int.tryParse(_breakCtrl.text) ?? 0);
+    final km = _isAbsence ? null : double.tryParse(_kmCtrl.text.replaceAll(',', '.'));
     final start = _toDateTime(_startTime);
     DateTime? end;
-    if (_endTime != null) {
+    if (!_isAbsence && _endTime != null) {
       end = _toDateTime(_endTime!);
       if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     }
@@ -101,6 +104,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       dayType: _dayType,
       note: _noteCtrl.text.trim(),
       distanceKm: km,
+      travelMinutes: widget.entry?.travelMinutes ?? 0,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
     );
@@ -116,6 +120,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('EEE, d. MMMM yyyy', 'de_AT');
+    final holidayName = HolidayService.instance.holidayName(_date);
     return Scaffold(
       appBar: AppBar(
         title: Text(_isNew ? 'Neuer Eintrag' : 'Eintrag bearbeiten'),
@@ -152,11 +157,22 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
             ListTile(
               leading: const Icon(Icons.calendar_today_outlined),
               title: const Text('Datum'),
-              subtitle: Text(df.format(_date)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(df.format(_date)),
+                  if (holidayName != null)
+                    Text(holidayName,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade700,
+                            fontWeight: FontWeight.w500)),
+                ],
+              ),
               trailing: const Icon(Icons.edit_outlined),
               onTap: _pickDate,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              tileColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              tileColor: _dayTypeTileColor(context),
             ),
             const SizedBox(height: 8),
             // Day type
@@ -174,39 +190,6 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Times
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeTile(
-                    label: 'Beginn',
-                    time: _startTime,
-                    onTap: () => _pickTime(isStart: true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TimeTile(
-                    label: 'Ende',
-                    time: _endTime,
-                    onTap: () => _pickTime(isStart: false),
-                    placeholder: 'noch offen',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Break
-            TextFormField(
-              controller: _breakCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Pause (Minuten)',
-                prefixIcon: Icon(Icons.pause_circle_outline),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
             // Work type
             DropdownButtonFormField<WorkType>(
               value: _workType,
@@ -215,12 +198,97 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                 prefixIcon: Icon(Icons.work_outline),
                 border: OutlineInputBorder(),
               ),
-              items: WorkType.values.map((t) =>
-                DropdownMenuItem(value: t, child: Text(t.label))
-              ).toList(),
-              onChanged: (v) => setState(() => _workType = v!),
+              items: WorkType.values.map((t) => DropdownMenuItem(
+                value: t,
+                child: Row(
+                  children: [
+                    if (t.isAbsence) ...[
+                      Icon(Icons.calendar_today_outlined, size: 14,
+                          color: Colors.grey.shade600),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(t.label),
+                  ],
+                ),
+              )).toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _workType = v);
+              },
             ),
             const SizedBox(height: 12),
+            if (!_isAbsence) ...[
+              // Times
+              Row(
+                children: [
+                  Expanded(
+                    child: _TimeTile(
+                      label: 'Beginn',
+                      time: _startTime,
+                      onTap: () => _pickTime(isStart: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _TimeTile(
+                      label: 'Ende',
+                      time: _endTime,
+                      onTap: () => _pickTime(isStart: false),
+                      placeholder: 'noch offen',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Break
+              TextFormField(
+                controller: _breakCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Pause (Minuten)',
+                  prefixIcon: Icon(Icons.pause_circle_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Distance
+              TextFormField(
+                controller: _kmCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Fahrtstrecke (km)',
+                  prefixIcon: Icon(Icons.directions_car_outlined),
+                  border: OutlineInputBorder(),
+                  helperText: 'Nur für Fahrten relevant',
+                ),
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
+              // Absence info card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Abwesenheitstag – keine Zeiterfassung. Zählt nicht als Arbeitszeit.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSecondaryContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             // Note
             TextFormField(
               controller: _noteCtrl,
@@ -229,18 +297,6 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                 labelText: 'Notiz',
                 prefixIcon: Icon(Icons.notes_outlined),
                 border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Distance
-            TextFormField(
-              controller: _kmCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Fahrtstrecke (km)',
-                prefixIcon: Icon(Icons.directions_car_outlined),
-                border: OutlineInputBorder(),
-                helperText: 'Nur für Fahrten relevant',
               ),
             ),
             const SizedBox(height: 24),
@@ -253,6 +309,15 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
         ),
       ),
     );
+  }
+
+  Color? _dayTypeTileColor(BuildContext context) {
+    return switch (_dayType) {
+      DayType.saturday => Colors.amber.shade50,
+      DayType.sunday => Colors.orange.shade50,
+      DayType.holiday => Colors.red.shade50,
+      DayType.workday => Theme.of(context).colorScheme.surfaceContainerLow,
+    };
   }
 }
 

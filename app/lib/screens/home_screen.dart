@@ -6,6 +6,7 @@ import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
+import '../services/holiday_service.dart';
 import 'entries_screen.dart';
 import 'entry_form_screen.dart';
 import 'reports_screen.dart';
@@ -273,7 +274,9 @@ class _EntryTile extends StatelessWidget {
           child: Icon(_workTypeIcon(entry.workType), size: 18),
         ),
         title: Text(
-          '${df.format(entry.date)} ${tf.format(entry.startTime)}–${entry.endTime != null ? tf.format(entry.endTime!) : '...'}',
+          entry.workType.isAbsence
+              ? '${df.format(entry.date)} · ${entry.workType.label}'
+              : '${df.format(entry.date)} ${tf.format(entry.startTime)}–${entry.endTime != null ? tf.format(entry.endTime!) : '...'}',
         ),
         subtitle: entry.note.isNotEmpty ? Text(entry.note, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
         trailing: Column(
@@ -299,6 +302,9 @@ class _EntryTile extends StatelessWidget {
     WorkType.travel => Icons.directions_car_outlined,
     WorkType.office => Icons.business_outlined,
     WorkType.other => Icons.work_outline,
+    WorkType.vacation => Icons.beach_access_outlined,
+    WorkType.sick => Icons.sick_outlined,
+    WorkType.compensatoryLeave => Icons.event_available_outlined,
   };
 }
 
@@ -315,8 +321,16 @@ class _ClockInDialogState extends State<_ClockInDialog> {
   @override
   void initState() {
     super.initState();
-    final wd = DateTime.now().weekday;
-    _dayType = wd == 6 ? DayType.saturday : wd == 7 ? DayType.sunday : DayType.workday;
+    final now = DateTime.now();
+    if (HolidayService.instance.isHoliday(now)) {
+      _dayType = DayType.holiday;
+    } else if (now.weekday == 6) {
+      _dayType = DayType.saturday;
+    } else if (now.weekday == 7) {
+      _dayType = DayType.sunday;
+    } else {
+      _dayType = DayType.workday;
+    }
   }
 
   @override
@@ -329,7 +343,7 @@ class _ClockInDialogState extends State<_ClockInDialog> {
           DropdownButtonFormField<WorkType>(
             value: _workType,
             decoration: const InputDecoration(labelText: 'Tätigkeitsart', border: OutlineInputBorder()),
-            items: WorkType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.label))).toList(),
+            items: WorkType.values.where((t) => !t.isAbsence).map((t) => DropdownMenuItem(value: t, child: Text(t.label))).toList(),
             onChanged: (v) => setState(() => _workType = v!),
           ),
           const SizedBox(height: 12),

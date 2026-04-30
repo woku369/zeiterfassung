@@ -5,6 +5,7 @@ import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
+import '../services/holiday_service.dart';
 import 'entry_form_screen.dart';
 
 class EntriesScreen extends StatefulWidget {
@@ -84,7 +85,7 @@ class _EntriesScreenState extends State<EntriesScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text('Gesamt: ${hh}h ${mm.toString().padLeft(2, '0')}m',
+                            Text('Gesamt: ${hh}h ${mm.toString().padLeft(2, '0')}m',
                               style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
@@ -142,7 +143,7 @@ class _WeekChip extends StatelessWidget {
         color: over ? Colors.orange.shade100 : Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text('${hh}h ${mm.toString().padLeft(2, '0')}m',
+      child: Text('${hh}h ${mm.toString().padLeft(2, '0')}m',
         style: TextStyle(fontSize: 12, color: over ? Colors.orange.shade800 : null, fontWeight: FontWeight.w500)),
     );
   }
@@ -160,6 +161,8 @@ class _EntryRow extends StatelessWidget {
     final df = DateFormat('EE d.M.', 'de_AT');
     final hh = entry.totalHours.floor();
     final mm = ((entry.totalHours - hh) * 60).round();
+    final rowColor = _rowColor(context);
+
     return Dismissible(
       key: Key(entry.id),
       direction: DismissDirection.endToStart,
@@ -173,31 +176,113 @@ class _EntryRow extends StatelessWidget {
         color: Colors.red,
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
-      child: ListTile(
-        leading: Icon(_icon(entry.workType)),
-        title: Text('${df.format(entry.date)} ${tf.format(entry.startTime)}–${entry.endTime != null ? tf.format(entry.endTime!) : '...'}'),
-        subtitle: Row(
-          children: [
-            if (entry.dayType != DayType.workday)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Chip(label: Text(entry.dayType.label, style: const TextStyle(fontSize: 10)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              ),
-            if (entry.note.isNotEmpty) Expanded(child: Text(entry.note, maxLines: 1, overflow: TextOverflow.ellipsis)),
-          ],
+      child: Container(
+        color: rowColor,
+        child: ListTile(
+          leading: Icon(_icon(entry.workType), color: _iconColor(context)),
+          title: _buildTitle(df, tf),
+          subtitle: _buildSubtitle(context),
+          trailing: entry.workType.isAbsence
+              ? Chip(
+                  label: Text(entry.workType.label,
+                      style: const TextStyle(fontSize: 11)),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: _absenceChipColor(context),
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('${hh}h ${mm.toString().padLeft(2, '0')}m',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (entry.distanceKm != null && entry.distanceKm! > 0)
+                      Text('${entry.distanceKm!.toStringAsFixed(0)} km',
+                          style: const TextStyle(fontSize: 11)),
+                    if (entry.travelMinutes > 0)
+                      Text('${entry.travelMinutes} min Fahrt',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  ],
+                ),
+          onTap: onTap,
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text('${hh}h ${mm.toString().padLeft(2, '0')}m', style: const TextStyle(fontWeight: FontWeight.w600)),
-            if (entry.distanceKm != null && entry.distanceKm! > 0)
-              Text('${entry.distanceKm!.toStringAsFixed(0)} km', style: const TextStyle(fontSize: 11)),
-          ],
-        ),
-        onTap: onTap,
       ),
     );
+  }
+
+  Widget _buildTitle(DateFormat df, DateFormat tf) {
+    final dateStr = df.format(entry.date);
+    if (entry.workType.isAbsence) {
+      return Text(dateStr);
+    }
+    final startStr = tf.format(entry.startTime);
+    final endStr = entry.endTime != null ? tf.format(entry.endTime!) : '...';
+    return Text('$dateStr $startStr–$endStr');
+  }
+
+  Widget _buildSubtitle(BuildContext context) {
+    final holidayName = HolidayService.instance.holidayName(entry.date);
+    final chips = <Widget>[];
+    if (entry.dayType != DayType.workday) {
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Chip(
+          label: Text(entry.dayType.label, style: const TextStyle(fontSize: 10)),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ));
+    }
+    final texts = <String>[];
+    if (holidayName != null) texts.add(holidayName);
+    if (entry.note.isNotEmpty) texts.add(entry.note);
+    final subtitle = texts.join(' · ');
+    if (chips.isEmpty && subtitle.isEmpty) return const SizedBox.shrink();
+    return Row(
+      children: [
+        ...chips,
+        if (subtitle.isNotEmpty)
+          Expanded(
+            child: Text(subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12)),
+          ),
+      ],
+    );
+  }
+
+  Color? _rowColor(BuildContext context) {
+    if (entry.workType.isAbsence) {
+      return switch (entry.workType) {
+        WorkType.vacation => Colors.blue.shade50,
+        WorkType.sick => Colors.orange.shade50,
+        WorkType.compensatoryLeave => Colors.green.shade50,
+        _ => null,
+      };
+    }
+    return switch (entry.dayType) {
+      DayType.holiday => Colors.red.shade50,
+      DayType.sunday => Colors.orange.shade50,
+      DayType.saturday => Colors.amber.shade50,
+      DayType.workday => null,
+    };
+  }
+
+  Color? _iconColor(BuildContext context) {
+    return switch (entry.workType) {
+      WorkType.vacation => Colors.blue.shade600,
+      WorkType.sick => Colors.orange.shade700,
+      WorkType.compensatoryLeave => Colors.green.shade700,
+      _ => null,
+    };
+  }
+
+  Color? _absenceChipColor(BuildContext context) {
+    return switch (entry.workType) {
+      WorkType.vacation => Colors.blue.shade100,
+      WorkType.sick => Colors.orange.shade100,
+      WorkType.compensatoryLeave => Colors.green.shade100,
+      _ => null,
+    };
   }
 
   IconData _icon(WorkType t) => switch (t) {
@@ -207,5 +292,8 @@ class _EntryRow extends StatelessWidget {
     WorkType.travel => Icons.directions_car_outlined,
     WorkType.office => Icons.business_outlined,
     WorkType.other => Icons.work_outline,
+    WorkType.vacation => Icons.beach_access_outlined,
+    WorkType.sick => Icons.sick_outlined,
+    WorkType.compensatoryLeave => Icons.event_available_outlined,
   };
 }

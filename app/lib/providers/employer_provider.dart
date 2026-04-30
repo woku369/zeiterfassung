@@ -16,8 +16,12 @@ class EmployerProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> add(String name, double weeklyHours) async {
-    final e = Employer(id: const Uuid().v4(), name: name, weeklyHours: weeklyHours);
+  Future<void> add(String name, double weeklyHours, {int fiscalYearStartMonth = 4}) async {
+    final e = Employer(
+        id: const Uuid().v4(),
+        name: name,
+        weeklyHours: weeklyHours,
+        fiscalYearStartMonth: fiscalYearStartMonth);
     await DatabaseHelper.instance.insertEmployer(e);
     _employers.add(e);
     _active ??= e;
