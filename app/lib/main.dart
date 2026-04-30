@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'app.dart';
 import 'providers/employer_provider.dart';
 import 'providers/time_entry_provider.dart';
@@ -10,6 +12,12 @@ import 'services/tray_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // sqflite auf Desktop (Windows/Linux/macOS) benötigt FFI-Initialisierung.
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   await DatabaseHelper.instance.database;
   await GeofencingService.instance.init();
 
