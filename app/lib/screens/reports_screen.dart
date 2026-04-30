@@ -214,26 +214,28 @@ class _MonthTabState extends State<_MonthTab> {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            children: [
-              Text('Monatszusammenfassung',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const Divider(),
-              _SummaryRow('Ist-Stunden', _fmtH(monthHours)),
-              _SummaryRow('Soll-Stunden', _fmtH(monthTarget)),
-              _SummaryRow(
-                diff >= 0 ? 'Mehrarbeit' : 'Minderstunden',
-                '${diff >= 0 ? '+' : ''}${_fmtH(diff)}',
-                color: diff > 1
-                    ? Colors.orange.shade700
-                    : diff < -1
-                        ? Colors.red
-                        : null,
-              ),
-              _SummaryRow('Einträge', '${entries.length}'),
-              if (tp.totalKmForMonth() > 0)
-                _SummaryRow('Fahrtstrecke',
-                    '${tp.totalKmForMonth().toStringAsFixed(1)} km'),
-            ],
+            child: Column(
+              children: [
+                Text('Monatszusammenfassung',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const Divider(),
+                _SummaryRow('Ist-Stunden', _fmtH(monthHours)),
+                _SummaryRow('Soll-Stunden', _fmtH(monthTarget)),
+                _SummaryRow(
+                  diff >= 0 ? 'Mehrarbeit' : 'Minderstunden',
+                  '${diff >= 0 ? '+' : ''}${_fmtH(diff)}',
+                  color: diff > 1
+                      ? Colors.orange.shade700
+                      : diff < -1
+                          ? Colors.red
+                          : null,
+                ),
+                _SummaryRow('Einträge', '${entries.length}'),
+                if (tp.totalKmForMonth() > 0)
+                  _SummaryRow('Fahrtstrecke',
+                      '${tp.totalKmForMonth().toStringAsFixed(1)} km'),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -241,13 +243,15 @@ class _MonthTabState extends State<_MonthTab> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              children: [
-                Text('Nach Tätigkeitsart',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const Divider(),
-                ...byType.entries
-                    .map((kv) => _SummaryRow(kv.key.label, _fmtH(kv.value))),
-              ],
+              child: Column(
+                children: [
+                  Text('Nach Tätigkeitsart',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const Divider(),
+                  ...byType.entries
+                      .map((kv) => _SummaryRow(kv.key.label, _fmtH(kv.value))),
+                ],
+              ),
             ),
           ),
         const SizedBox(height: 12),
@@ -255,21 +259,23 @@ class _MonthTabState extends State<_MonthTab> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              children: [
-                Text('Besondere Tage',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const Divider(),
-                ...DayType.values
-                    .where((d) => d != DayType.workday)
-                    .map((d) {
-                  final h = entries
-                      .where((e) => e.dayType == d)
-                      .fold(0.0, (s, e) => s + e.totalHours);
-                  if (h == 0) return const SizedBox.shrink();
-                  return _SummaryRow(d.label, _fmtH(h),
-                      color: Colors.orange.shade700);
-                }),
-              ],
+              child: Column(
+                children: [
+                  Text('Besondere Tage',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const Divider(),
+                  ...DayType.values
+                      .where((d) => d != DayType.workday)
+                      .map((d) {
+                    final h = entries
+                        .where((e) => e.dayType == d)
+                        .fold(0.0, (s, e) => s + e.totalHours);
+                    if (h == 0) return const SizedBox.shrink();
+                    return _SummaryRow(d.label, _fmtH(h),
+                        color: Colors.orange.shade700);
+                  }),
+                ],
+              ),
             ),
           ),
         const SizedBox(height: 20),

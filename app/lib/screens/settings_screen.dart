@@ -22,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final employer = ep.active;
 
     return Scaffold(
-      appBar: const AppBar(title: Text('Einstellungen')),
+      appBar: AppBar(title: const Text('Einstellungen')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -143,14 +143,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              children: [
-                Text('Zeiterfassung für Android & Windows'),
-                SizedBox(height: 4),
-                Text('Keine automatischen Zuschlagsberechnungen.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                Text('Synchronisation via Tailscale + Next.js auf NAS.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Zeiterfassung für Android & Windows'),
+                  SizedBox(height: 4),
+                  Text('Keine automatischen Zuschlagsberechnungen.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('Synchronisation via Tailscale + Next.js auf NAS.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
             ),
           ),
         ],

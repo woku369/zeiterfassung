@@ -111,9 +111,9 @@ class HelpScreen extends StatelessWidget {
                 'überschrieben – immer der zuletzt gesyncte Stand gewinnt.',
               ),
               _SubHeading('Geräte-Übersicht'),
-              _KeyValue(key: 'Android', value: 'GPS, Geofencing, Benachrichtigungen'),
-              _KeyValue(key: 'Windows', value: 'System-Tray (nach Platform-Setup), IMAP-Sync'),
-              _KeyValue(key: 'NAS', value: 'Zentraler Datenspeicher, immer online'),
+              _KeyValue(label: 'Android', value: 'GPS, Geofencing, Benachrichtigungen'),
+              _KeyValue(label: 'Windows', value: 'System-Tray (nach Platform-Setup), IMAP-Sync'),
+              _KeyValue(label: 'NAS', value: 'Zentraler Datenspeicher, immer online'),
             ],
           ),
           SizedBox(height: 8),
@@ -132,9 +132,9 @@ class HelpScreen extends StatelessWidget {
               _Step(number: '3', text: 'Radius je nach Gelände: 100–500 m'),
               _Step(number: '4', text: 'Tracking oben rechts aktivieren'),
               _SubHeading('Standorte für dieses Projekt'),
-              _KeyValue(key: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · Arbeitstyp: Vor-Ort'),
-              _KeyValue(key: 'Wien (Büro)', value: 'Radius ~150 m · Arbeitstyp: Büro'),
-              _KeyValue(key: 'Salzburg (Lohnabfüller)', value: 'Radius ~200 m · Arbeitstyp: Dienstreise'),
+              _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · Arbeitstyp: Vor-Ort'),
+              _KeyValue(label: 'Wien (Büro)', value: 'Radius ~150 m · Arbeitstyp: Büro'),
+              _KeyValue(label: 'Salzburg (Lohnabfüller)', value: 'Radius ~200 m · Arbeitstyp: Dienstreise'),
               _Hint(
                 'Hintergrund-GPS: Android fragt beim ersten Start nach '
                 '"Immer erlauben". Ohne diese Berechtigung funktioniert '
@@ -159,9 +159,9 @@ class HelpScreen extends StatelessWidget {
               _Step(number: '4', text: 'Adressen der Gurktaler-Kontakte hinzufügen'),
               _Step(number: '5', text: 'Betreff-Schlüsselwörter hinzufügen (z. B. gurktaler, etiketten)'),
               _SubHeading('Was wird sortiert'),
-              _KeyValue(key: 'Von/An Adresse', value: 'Alle Mails von/an Adressen in der Liste'),
-              _KeyValue(key: 'Betreff-Match', value: 'Mails deren Betreff ein Schlüsselwort enthält'),
-              _KeyValue(key: 'Thread-Antworten', value: 'Re: / Fwd: Mails bei Betreff-Match automatisch mit'),
+              _KeyValue(label: 'Von/An Adresse', value: 'Alle Mails von/an Adressen in der Liste'),
+              _KeyValue(label: 'Betreff-Match', value: 'Mails deren Betreff ein Schlüsselwort enthält'),
+              _KeyValue(label: 'Thread-Antworten', value: 'Re: / Fwd: Mails bei Betreff-Match automatisch mit'),
               _Hint(
                 'Synchronisierung läuft manuell ("Jetzt synchronisieren"). '
                 'Einmal täglich reicht für saubere Dokumentation.',
@@ -206,9 +206,9 @@ class HelpScreen extends StatelessWidget {
             title: 'Monatsberichte & Export',
             children: [
               _Para('Berichte → Monat wählen → XLSX exportieren.'),
-              _KeyValue(key: 'Format', value: 'Excel (.xlsx) mit KW-Summen und Monatssumme'),
-              _KeyValue(key: 'Import', value: 'Kompatibel mit Stempeluhr 2.1'),
-              _KeyValue(key: 'Teilen', value: 'Direkt aus der App per Share-Dialog'),
+              _KeyValue(label: 'Format', value: 'Excel (.xlsx) mit KW-Summen und Monatssumme'),
+              _KeyValue(label: 'Import', value: 'Kompatibel mit Stempeluhr 2.1'),
+              _KeyValue(label: 'Teilen', value: 'Direkt aus der App per Share-Dialog'),
               _Hint(
                 'Für die Jahresauswertung jeden Monat exportieren oder '
                 'alle Daten einmal jährlich vom NAS-Backend abfragen.',
@@ -389,9 +389,9 @@ class _Code extends StatelessWidget {
 }
 
 class _KeyValue extends StatelessWidget {
-  final String key;
+  final String label;
   final String value;
-  const _KeyValue({required this.key, required this.value});
+  const _KeyValue({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -402,7 +402,7 @@ class _KeyValue extends StatelessWidget {
         children: [
           SizedBox(
             width: 130,
-            child: Text(key,
+            child: Text(label,
                 style: const TextStyle(
                     fontWeight: FontWeight.w500, fontSize: 13)),
           ),
