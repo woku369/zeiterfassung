@@ -20,7 +20,6 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 | Xiaomi Poco X7 Pro | Smartphone | HyperOS 3.0.5.0 (Android 16) | Mobil, GPS, Geofencing |
 | Surface Pro 8 | Tablet/Laptop Win11/64 | Windows 11 | Mobiler Windows-Einsatz |
 | Surface Pro 7 | Tablet/Laptop Win11/64 | Windows 11 | Büro Gurk |
-| Android Tablet | Tablet (geplant) | Android | zukünftig mobil |
 
 ---
 
@@ -78,7 +77,6 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Langfristig / Ideen
 - [ ] E-Mail-Zeitstempel als automatische Aktivitätshinweise im Dashboard anzeigen
 - [ ] IFTTT/Zapier-Webhook als alternativer Auslöser
-- [ ] Android Tablet: Layout-Optimierung für größere Bildschirme (ab 10")
 - [ ] Mehrsprachigkeit (DE/EN)
 
 ---
