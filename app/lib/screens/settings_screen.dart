@@ -161,7 +161,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _addEmployer(BuildContext context) async {
     final result = await _showEmployerDialog(context, null);
     if (result != null && context.mounted) {
-      await context.read<EmployerProvider>().add(result['name']!, result['hours']!);
+      await context.read<EmployerProvider>().add(
+            result['name']!,
+            result['hours']!,
+            fiscalYearStartMonth: result['fiscalMonth']!,
+          );
     }
   }
 
@@ -169,8 +173,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await _showEmployerDialog(context, employer);
     if (result != null && context.mounted) {
       await context.read<EmployerProvider>().update(
-        employer.copyWith(name: result['name'], weeklyHours: result['hours']),
-      );
+            employer.copyWith(
+              name: result['name'],
+              weeklyHours: result['hours'],
+              fiscalYearStartMonth: result['fiscalMonth'],
+            ),
+          );
     }
   }
 
@@ -179,48 +187,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final hoursCtrl =
         TextEditingController(text: existing?.weeklyHours.toString() ?? '40');
+    int fiscalMonth = existing?.fiscalYearStartMonth ?? 4;
+    const monthNames = [
+      'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    ];
     return showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(existing == null
-            ? 'Arbeitgeber hinzufügen'
-            : 'Arbeitgeber bearbeiten'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Name', border: OutlineInputBorder()),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: hoursCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                  labelText: 'Wochenstunden',
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(existing == null
+              ? 'Arbeitgeber hinzufügen'
+              : 'Arbeitgeber bearbeiten'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Name', border: OutlineInputBorder()),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: hoursCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Wochenstunden',
+                    border: OutlineInputBorder(),
+                    suffixText: 'h'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                value: fiscalMonth,
+                decoration: const InputDecoration(
+                  labelText: 'Wirtschaftsjahr beginnt im',
                   border: OutlineInputBorder(),
-                  suffixText: 'h'),
+                  helperText: 'z. B. April für WJ April–März',
+                ),
+                items: List.generate(
+                  12,
+                  (i) => DropdownMenuItem(
+                      value: i + 1, child: Text(monthNames[i])),
+                ),
+                onChanged: (v) => setState(() => fiscalMonth = v!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen')),
+            FilledButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final hours =
+                    double.tryParse(hoursCtrl.text.replaceAll(',', '.')) ?? 40.0;
+                if (name.isEmpty) return;
+                Navigator.pop(context,
+                    {'name': name, 'hours': hours, 'fiscalMonth': fiscalMonth});
+              },
+              child: const Text('Speichern'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Abbrechen')),
-          FilledButton(
-            onPressed: () {
-              final name = nameCtrl.text.trim();
-              final hours =
-                  double.tryParse(hoursCtrl.text.replaceAll(',', '.')) ?? 40.0;
-              if (name.isEmpty) return;
-              Navigator.pop(context, {'name': name, 'hours': hours});
-            },
-            child: const Text('Speichern'),
-          ),
-        ],
       ),
     );
   }

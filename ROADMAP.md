@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-04-30 – Hardware dokumentiert, iOS gestrichen
+> Letztes Update: 2026-04-30 – Soll/Ist-Report + Wirtschaftsjahr implementiert
 
 ---
 
@@ -57,6 +57,16 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Kollabierbare Sektionen mit Codeblöcken (Long-Press zum Kopieren)
 - [x] Einstellungen: Abschnitt „Automatische Erfassung"
 
+### v1.3 – Soll/Ist-Auswertung
+- [x] **Wirtschaftsjahr-Tab** im Berichte-Screen (Monat | Soll | Ist | Diff | Kumuliert)
+- [x] Wirtschaftsjahr konfigurierbar pro Arbeitgeber (Standard: April–März)
+- [x] Jahresnavigation (WJ 2024/25, WJ 2025/26, …)
+- [x] Farbkodierung: grün (ausgeglichen) · orange (Mehrarbeit) · rot (Minderstunden)
+- [x] Zukünftige Monate werden grau/ausgegraut dargestellt
+- [x] Soll-Berechnung: weeklyHours / 7 × Tage im Monat (kalenderproportional)
+- [x] DB-Migration v3: `fiscal_year_start_month` (employers), `subject_keywords` (imap_config)
+- [x] Wirtschaftsjahr-Monat im Arbeitgeber-Dialog konfigurierbar
+
 ---
 
 ## Offen / In Arbeit
@@ -70,8 +80,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Mittelfristig
 - [ ] **Telefonat-Tracking:** Anrufdauer bekannter Nummern erfassen, optional als Eintrag vorschlagen
 - [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
-- [ ] **Wochenstunden-Report:** Soll/Ist-Vergleich über mehrere Wochen (Basis für Vertragsanpassung)
-- [ ] Jahresexport: alle Monate in einer XLSX-Datei mit Jahresübersicht
+- [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
 
 ### Langfristig / Ideen
@@ -105,6 +114,7 @@ backend/
 **Datenbank-Versionen:**
 - v1: `employers`, `time_entries`
 - v2: + `tracked_locations`, `imap_config`
+- v3: + `fiscal_year_start_month` (employers), `subject_keywords` (imap_config)
 
 **Branches:**
 - `main` – stabiler Stand

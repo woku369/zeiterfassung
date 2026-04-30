@@ -14,7 +14,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 2, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 3, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -23,6 +23,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         weekly_hours REAL NOT NULL DEFAULT 40.0,
+        fiscal_year_start_month INTEGER NOT NULL DEFAULT 4,
         nas_url TEXT,
         nas_api_key TEXT
       )
@@ -52,6 +53,12 @@ class DatabaseHelper {
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createV2Tables(db);
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+          'ALTER TABLE employers ADD COLUMN fiscal_year_start_month INTEGER NOT NULL DEFAULT 4');
+      await db.execute(
+          "ALTER TABLE imap_config ADD COLUMN subject_keywords TEXT NOT NULL DEFAULT '[]'");
     }
   }
 
