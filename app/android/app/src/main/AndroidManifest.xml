@@ -1,11 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet für NAS-Sync -->
+    <!-- Internet für NAS-Sync und IMAP -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- GPS / Standort -->
+    <!-- GPS / Standort (Vordergrund) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- GPS im Hintergrund (Geofencing) – Android 10+ zeigt extra Dialog -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Benachrichtigungen für Geofencing-Events (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Datei-Zugriff für Export (Android 9 und älter) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"

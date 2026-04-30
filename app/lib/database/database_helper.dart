@@ -2,6 +2,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/time_entry.dart';
 import '../models/employer.dart';
+import '../models/tracked_location.dart';
+import '../models/imap_config.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -12,7 +14,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 1, onCreate: _create);
+    return openDatabase(path, version: 2, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -44,7 +46,44 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+    await _createV2Tables(db);
   }
+
+  Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createV2Tables(db);
+    }
+  }
+
+  Future<void> _createV2Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tracked_locations (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        radius_meters REAL NOT NULL DEFAULT 200.0,
+        work_type TEXT NOT NULL DEFAULT 'offsite',
+        is_active INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS imap_config (
+        id TEXT PRIMARY KEY,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 993,
+        use_ssl INTEGER NOT NULL DEFAULT 1,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        inbox_target_folder TEXT NOT NULL DEFAULT 'Gurktaler',
+        sent_target_folder TEXT NOT NULL DEFAULT 'Gurktaler/Gesendet',
+        watch_addresses TEXT NOT NULL DEFAULT '[]',
+        is_active INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+  }
+
+  // ── time_entries ──────────────────────────────────────────────────────────
 
   Future<void> insertEntry(TimeEntry e) async {
     final db = await database;
@@ -112,6 +151,8 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  // ── employers ─────────────────────────────────────────────────────────────
+
   Future<void> insertEmployer(Employer e) async {
     final db = await database;
     await db.insert('employers', e.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
@@ -131,5 +172,47 @@ class DatabaseHelper {
     final db = await database;
     final rows = await db.query('employers');
     return rows.map(Employer.fromMap).toList();
+  }
+
+  // ── tracked_locations ─────────────────────────────────────────────────────
+
+  Future<void> insertLocation(TrackedLocation loc) async {
+    final db = await database;
+    await db.insert('tracked_locations', loc.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateLocation(TrackedLocation loc) async {
+    final db = await database;
+    await db.update('tracked_locations', loc.toMap(), where: 'id = ?', whereArgs: [loc.id]);
+  }
+
+  Future<void> deleteLocation(String id) async {
+    final db = await database;
+    await db.delete('tracked_locations', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<TrackedLocation>> getLocations() async {
+    final db = await database;
+    final rows = await db.query('tracked_locations', orderBy: 'name ASC');
+    return rows.map(TrackedLocation.fromMap).toList();
+  }
+
+  // ── imap_config ───────────────────────────────────────────────────────────
+
+  Future<void> saveImapConfig(ImapConfig cfg) async {
+    final db = await database;
+    await db.insert('imap_config', cfg.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<ImapConfig?> getImapConfig() async {
+    final db = await database;
+    final rows = await db.query('imap_config', limit: 1);
+    if (rows.isEmpty) return null;
+    return ImapConfig.fromMap(rows.first);
+  }
+
+  Future<void> deleteImapConfig(String id) async {
+    final db = await database;
+    await db.delete('imap_config', where: 'id = ?', whereArgs: [id]);
   }
 }
