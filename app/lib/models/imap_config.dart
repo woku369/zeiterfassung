@@ -10,6 +10,7 @@ class ImapConfig {
   final String inboxTargetFolder;
   final String sentTargetFolder;
   final List<String> watchAddresses;
+  final List<String> subjectKeywords;
   final bool isActive;
 
   const ImapConfig({
@@ -22,6 +23,7 @@ class ImapConfig {
     this.inboxTargetFolder = 'Gurktaler',
     this.sentTargetFolder = 'Gurktaler/Gesendet',
     this.watchAddresses = const [],
+    this.subjectKeywords = const [],
     this.isActive = true,
   });
 
@@ -35,6 +37,7 @@ class ImapConfig {
     String? inboxTargetFolder,
     String? sentTargetFolder,
     List<String>? watchAddresses,
+    List<String>? subjectKeywords,
     bool? isActive,
   }) =>
       ImapConfig(
@@ -47,6 +50,7 @@ class ImapConfig {
         inboxTargetFolder: inboxTargetFolder ?? this.inboxTargetFolder,
         sentTargetFolder: sentTargetFolder ?? this.sentTargetFolder,
         watchAddresses: watchAddresses ?? this.watchAddresses,
+        subjectKeywords: subjectKeywords ?? this.subjectKeywords,
         isActive: isActive ?? this.isActive,
       );
 
@@ -60,6 +64,7 @@ class ImapConfig {
         'inbox_target_folder': inboxTargetFolder,
         'sent_target_folder': sentTargetFolder,
         'watch_addresses': jsonEncode(watchAddresses),
+        'subject_keywords': jsonEncode(subjectKeywords),
         'is_active': isActive ? 1 : 0,
       };
 
@@ -75,6 +80,9 @@ class ImapConfig {
             m['sent_target_folder'] as String? ?? 'Gurktaler/Gesendet',
         watchAddresses:
             (jsonDecode(m['watch_addresses'] as String? ?? '[]') as List)
+                .cast<String>(),
+        subjectKeywords:
+            (jsonDecode(m['subject_keywords'] as String? ?? '[]') as List)
                 .cast<String>(),
         isActive: (m['is_active'] as int? ?? 1) == 1,
       );

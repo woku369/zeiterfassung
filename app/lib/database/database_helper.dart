@@ -78,6 +78,7 @@ class DatabaseHelper {
         inbox_target_folder TEXT NOT NULL DEFAULT 'Gurktaler',
         sent_target_folder TEXT NOT NULL DEFAULT 'Gurktaler/Gesendet',
         watch_addresses TEXT NOT NULL DEFAULT '[]',
+        subject_keywords TEXT NOT NULL DEFAULT '[]',
         is_active INTEGER NOT NULL DEFAULT 1
       )
     ''');

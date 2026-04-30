@@ -56,6 +56,11 @@ class _ImapScreenState extends State<ImapScreen> {
                     onUpdate: _saveConfig,
                   ),
                   const SizedBox(height: 12),
+                  _KeywordCard(
+                    config: _config!,
+                    onUpdate: _saveConfig,
+                  ),
+                  const SizedBox(height: 12),
                   _SyncCard(
                     config: _config!,
                     syncing: _syncing,
@@ -333,6 +338,105 @@ class _AddressCardState extends State<_AddressCard> {
                           label: Text(addr, style: const TextStyle(fontSize: 12)),
                           deleteIcon: const Icon(Icons.close, size: 16),
                           onDeleted: () => _removeAddress(addr),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Keyword card ──────────────────────────────────────────────────────────
+
+class _KeywordCard extends StatefulWidget {
+  final ImapConfig config;
+  final Future<void> Function(ImapConfig) onUpdate;
+
+  const _KeywordCard({required this.config, required this.onUpdate});
+
+  @override
+  State<_KeywordCard> createState() => _KeywordCardState();
+}
+
+class _KeywordCardState extends State<_KeywordCard> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addKeyword() async {
+    final kw = _ctrl.text.trim().toLowerCase();
+    if (kw.isEmpty) return;
+    if (widget.config.subjectKeywords.contains(kw)) {
+      _ctrl.clear();
+      return;
+    }
+    final updated = widget.config.copyWith(
+      subjectKeywords: [...widget.config.subjectKeywords, kw],
+    );
+    await widget.onUpdate(updated);
+    _ctrl.clear();
+  }
+
+  Future<void> _removeKeyword(String kw) async {
+    final updated = widget.config.copyWith(
+      subjectKeywords:
+          widget.config.subjectKeywords.where((k) => k != kw).toList(),
+    );
+    await widget.onUpdate(updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Betreff-Schlüsselwörter',
+                style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 4),
+            const Text(
+              'Mails deren Betreff ein Schlüsselwort enthält werden sortiert – '
+              'auch Re:/Fwd:-Antworten im Thread.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  decoration: const InputDecoration(
+                    hintText: 'z. B. gurktaler, etiketten',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  textCapitalization: TextCapitalization.none,
+                  onSubmitted: (_) => _addKeyword(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                  onPressed: _addKeyword, child: const Text('Hinzufügen')),
+            ]),
+            if (widget.config.subjectKeywords.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: widget.config.subjectKeywords
+                    .map((kw) => Chip(
+                          label:
+                              Text(kw, style: const TextStyle(fontSize: 12)),
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () => _removeKeyword(kw),
                         ))
                     .toList(),
               ),

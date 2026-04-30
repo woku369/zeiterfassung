@@ -43,6 +43,7 @@ class ImapService {
         sourceFolder: 'INBOX',
         targetFolder: cfg.inboxTargetFolder,
         watchAddresses: cfg.watchAddresses,
+        subjectKeywords: cfg.subjectKeywords,
         matchSender: true,
         timestamps: timestamps,
       );
@@ -55,6 +56,7 @@ class ImapService {
           sourceFolder: sentFolder,
           targetFolder: cfg.sentTargetFolder,
           watchAddresses: cfg.watchAddresses,
+          subjectKeywords: cfg.subjectKeywords,
           matchSender: false,
           timestamps: timestamps,
         );
@@ -91,16 +93,18 @@ class ImapService {
     required String sourceFolder,
     required String targetFolder,
     required List<String> watchAddresses,
+    required List<String> subjectKeywords,
     required bool matchSender,
     required List<DateTime> timestamps,
   }) async {
-    if (watchAddresses.isEmpty) return 0;
+    if (watchAddresses.isEmpty && subjectKeywords.isEmpty) return 0;
 
     await client.selectMailbox(
       await _getOrCreateMailbox(client, sourceFolder),
     );
 
     final lowerAddresses = watchAddresses.map((a) => a.toLowerCase()).toList();
+    final lowerKeywords = subjectKeywords.map((k) => k.toLowerCase()).toList();
 
     // Search for unseen+all messages – we check headers ourselves for flexibility.
     final fetchResult = await client.fetchAllMessages(
@@ -112,7 +116,8 @@ class ImapService {
 
     int moved = 0;
     for (final msg in fetchResult.messages!) {
-      if (_matchesAddress(msg, lowerAddresses, matchSender)) {
+      if (_matchesAddress(msg, lowerAddresses, matchSender) ||
+          _matchesSubject(msg, lowerKeywords)) {
         final date = msg.envelope?.date;
         if (date != null) timestamps.add(date);
 
@@ -128,6 +133,15 @@ class ImapService {
       }
     }
     return moved;
+  }
+
+  bool _matchesSubject(MimeMessage msg, List<String> lowerKeywords) {
+    if (lowerKeywords.isEmpty) return false;
+    // Strip Re:/Fwd: prefixes so thread replies are caught too.
+    final subject = (msg.envelope?.subject ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'^(re|fwd|fw|aw|wg):\s*', caseSensitive: false), '');
+    return lowerKeywords.any((kw) => subject.contains(kw));
   }
 
   bool _matchesAddress(
