@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-04-30
+> Letztes Update: 2026-04-30 – Hardware dokumentiert, iOS gestrichen
 
 ---
 
@@ -12,6 +12,15 @@ Ziel: saubere Dokumentation der geleisteten Stunden gegenüber 8h/Woche Vertrag
 für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 **Stack:** Flutter (Android + Windows) · SQLite (lokal) · Next.js + SQLite (NAS-Backend) · Tailscale (VPN-Sync)
+
+**Hardware:**
+| Gerät | Typ | OS | Einsatz |
+|---|---|---|---|
+| Homeoffice-PC | Desktop Win11/64 | Windows 11 | Hauptarbeitsplatz |
+| Xiaomi Poco X7 Pro | Smartphone | HyperOS 3.0.5.0 (Android 16) | Mobil, GPS, Geofencing |
+| Surface Pro 8 | Tablet/Laptop Win11/64 | Windows 11 | Mobiler Windows-Einsatz |
+| Surface Pro 7 | Tablet/Laptop Win11/64 | Windows 11 | Büro Gurk |
+| Android Tablet | Tablet (geplant) | Android | zukünftig mobil |
 
 ---
 
@@ -69,7 +78,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Langfristig / Ideen
 - [ ] E-Mail-Zeitstempel als automatische Aktivitätshinweise im Dashboard anzeigen
 - [ ] IFTTT/Zapier-Webhook als alternativer Auslöser
-- [ ] iOS-Port (eingeschränkt: kein Anruf-Tracking, kein Geofencing im Hintergrund)
+- [ ] Android Tablet: Layout-Optimierung für größere Bildschirme (ab 10")
 - [ ] Mehrsprachigkeit (DE/EN)
 
 ---
@@ -110,7 +119,8 @@ backend/
 | Thema | Details |
 |---|---|
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
+| HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen, sonst kein Geofencing im Hintergrund |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
 | Windows Tray | Noch nicht fertig – Windows-Platform-Ordner fehlt |
-| iOS | Kein Geofencing im Hintergrund, kein Anruf-Tracking – nicht geplant |
+| iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge) |
