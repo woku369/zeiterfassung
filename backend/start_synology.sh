@@ -5,7 +5,7 @@
 
 sleep 30
 
-NODE=/var/packages/Node.js_v20/target/usr/bin/node
+NODE=/volume1/@appstore/Node.js_v20/usr/local/bin/node
 APP_DIR=/volume1/Gurktaler/zeiterfassung/backend
 LOG=$APP_DIR/server.log
 DATA_DIR=$APP_DIR/data
