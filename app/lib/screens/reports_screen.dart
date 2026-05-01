@@ -96,14 +96,23 @@ class _MonthTabState extends State<_MonthTab> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (importResult.period != null) ...[
+                Text('Zeitraum: ${importResult.period}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+              ],
               Text('${importResult.entries.length} Einträge gefunden'),
+              const SizedBox(height: 4),
+              const Text(
+                'Bereits vorhandene Einträge (gleicher Tag + Uhrzeit) werden übersprungen.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
               if (importResult.errors.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text('${importResult.errors.length} Warnung(en):',
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 ...importResult.errors.take(5).map((e) => Text(e,
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.orange))),
+                    style: const TextStyle(fontSize: 12, color: Colors.orange))),
               ],
             ],
           ),
@@ -120,14 +129,13 @@ class _MonthTabState extends State<_MonthTab> {
       );
 
       if (ok == true && mounted) {
-        final tp = context.read<TimeEntryProvider>();
-        for (final e in importResult.entries) {
-          await tp.addEntry(e);
-        }
+        // Use insertOrUpdateEntries for idempotent import (stable IDs = no dupes)
+        await DatabaseHelper.instance.insertOrUpdateEntries(importResult.entries);
+        await context.read<TimeEntryProvider>().refresh();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content:
-                  Text('${importResult.entries.length} Einträge importiert')));
+              content: Text(
+                  '${importResult.entries.length} Einträge importiert${importResult.period != null ? ' (${importResult.period})' : ''}')));
         }
       }
     } catch (e) {
