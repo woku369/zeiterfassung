@@ -25,7 +25,11 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => EmployerProvider()..load()),
-        ChangeNotifierProvider(create: (_) => TimeEntryProvider()),
+        // TimeEntryProvider reacts to active employer changes automatically.
+        ChangeNotifierProxyProvider<EmployerProvider, TimeEntryProvider>(
+          create: (_) => TimeEntryProvider(),
+          update: (_, emp, prev) => prev!..setActiveEmployer(emp.active?.id),
+        ),
         ChangeNotifierProvider(create: (_) => LocationProvider()..load()),
       ],
       child: const ZeiterfassungApp(),

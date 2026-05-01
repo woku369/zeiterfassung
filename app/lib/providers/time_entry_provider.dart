@@ -9,23 +9,35 @@ class TimeEntryProvider extends ChangeNotifier {
   TimeEntry? _activeEntry;
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
+  String? _employerId;
 
   List<TimeEntry> get entries => _entries;
   TimeEntry? get activeEntry => _activeEntry;
   int get selectedYear => _selectedYear;
   int get selectedMonth => _selectedMonth;
+  String? get employerId => _employerId;
+
+  /// Called by ProxyProvider when the active employer changes.
+  void setActiveEmployer(String? employerId) {
+    if (_employerId == employerId) return;
+    _employerId = employerId;
+    loadMonth(_selectedYear, _selectedMonth);
+  }
 
   Future<void> loadMonth(int year, int month) async {
     _selectedYear = year;
     _selectedMonth = month;
-    _entries = await DatabaseHelper.instance.getEntriesForMonth(year, month);
+    _entries = await DatabaseHelper.instance
+        .getEntriesForMonth(year, month, employerId: _employerId);
     _activeEntry = _entries.where((e) => e.isActive).firstOrNull;
     notifyListeners();
   }
 
   Future<void> refresh() => loadMonth(_selectedYear, _selectedMonth);
 
-  Future<TimeEntry> clockIn({WorkType workType = WorkType.homeoffice, DayType dayType = DayType.workday}) async {
+  Future<TimeEntry> clockIn(
+      {WorkType workType = WorkType.homeoffice,
+      DayType dayType = DayType.workday}) async {
     final now = DateTime.now();
     final entry = TimeEntry(
       id: const Uuid().v4(),
@@ -33,6 +45,7 @@ class TimeEntryProvider extends ChangeNotifier {
       startTime: now,
       workType: workType,
       dayType: dayType,
+      employerId: _employerId,
       createdAt: now,
     );
     await DatabaseHelper.instance.insertEntry(entry);
@@ -59,9 +72,13 @@ class TimeEntryProvider extends ChangeNotifier {
   }
 
   Future<void> addEntry(TimeEntry entry) async {
-    await DatabaseHelper.instance.insertEntry(entry);
-    if (entry.date.year == _selectedYear && entry.date.month == _selectedMonth) {
-      _entries.insert(0, entry);
+    final withEmployer = _employerId != null && entry.employerId == null
+        ? entry.copyWith(employerId: _employerId)
+        : entry;
+    await DatabaseHelper.instance.insertEntry(withEmployer);
+    if (withEmployer.date.year == _selectedYear &&
+        withEmployer.date.month == _selectedMonth) {
+      _entries.insert(0, withEmployer);
       _entries.sort((a, b) => b.startTime.compareTo(a.startTime));
     }
     notifyListeners();
@@ -71,7 +88,9 @@ class TimeEntryProvider extends ChangeNotifier {
     await DatabaseHelper.instance.updateEntry(entry);
     final idx = _entries.indexWhere((e) => e.id == entry.id);
     if (idx != -1) _entries[idx] = entry;
-    if (_activeEntry?.id == entry.id) _activeEntry = entry.isActive ? entry : null;
+    if (_activeEntry?.id == entry.id) {
+      _activeEntry = entry.isActive ? entry : null;
+    }
     notifyListeners();
   }
 
@@ -92,7 +111,8 @@ class TimeEntryProvider extends ChangeNotifier {
     return result;
   }
 
-  double totalHoursForMonth() => _entries.fold(0.0, (sum, e) => sum + e.totalHours);
+  double totalHoursForMonth() =>
+      _entries.fold(0.0, (sum, e) => sum + e.totalHours);
 
   double totalHoursForWeek(DateTime monday) {
     final sunday = monday.add(const Duration(days: 6));
@@ -101,5 +121,6 @@ class TimeEntryProvider extends ChangeNotifier {
         .fold(0.0, (sum, e) => sum + e.totalHours);
   }
 
-  double totalKmForMonth() => _entries.fold(0.0, (sum, e) => sum + (e.distanceKm ?? 0.0));
+  double totalKmForMonth() =>
+      _entries.fold(0.0, (sum, e) => sum + (e.distanceKm ?? 0.0));
 }

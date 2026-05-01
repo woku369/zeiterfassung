@@ -94,6 +94,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       end = _toDateTime(_endTime!);
       if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     }
+    final tp = context.read<TimeEntryProvider>();
     final entry = TimeEntry(
       id: widget.entry?.id ?? const Uuid().v4(),
       date: _date,
@@ -105,10 +106,10 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       note: _noteCtrl.text.trim(),
       distanceKm: km,
       travelMinutes: widget.entry?.travelMinutes ?? 0,
+      employerId: widget.entry?.employerId ?? tp.employerId,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
     );
-    final tp = context.read<TimeEntryProvider>();
     if (_isNew) {
       await tp.addEntry(entry);
     } else {

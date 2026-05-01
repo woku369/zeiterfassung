@@ -14,7 +14,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 4, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 5, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -44,6 +44,7 @@ class DatabaseHelper {
         end_lat REAL,
         end_lng REAL,
         travel_minutes INTEGER NOT NULL DEFAULT 0,
+        employer_id TEXT,
         is_synced INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
@@ -64,6 +65,9 @@ class DatabaseHelper {
     if (oldVersion < 4) {
       await db.execute(
           'ALTER TABLE time_entries ADD COLUMN travel_minutes INTEGER NOT NULL DEFAULT 0');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE time_entries ADD COLUMN employer_id TEXT');
     }
   }
 
@@ -113,36 +117,55 @@ class DatabaseHelper {
     await db.delete('time_entries', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<List<TimeEntry>> getEntriesForMonth(int year, int month) async {
+  Future<List<TimeEntry>> getEntriesForMonth(int year, int month,
+      {String? employerId}) async {
     final db = await database;
-    final start = '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-01';
+    final start =
+        '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-01';
     final endMonth = month == 12 ? 1 : month + 1;
     final endYear = month == 12 ? year + 1 : year;
-    final end = '${endYear.toString().padLeft(4, '0')}-${endMonth.toString().padLeft(2, '0')}-01';
-    final rows = await db.query(
-      'time_entries',
-      where: 'date >= ? AND date < ?',
-      whereArgs: [start, end],
-      orderBy: 'start_time DESC',
-    );
+    final end =
+        '${endYear.toString().padLeft(4, '0')}-${endMonth.toString().padLeft(2, '0')}-01';
+    final (where, whereArgs) = _employerFilter(
+        'date >= ? AND date < ?', [start, end], employerId);
+    final rows = await db.query('time_entries',
+        where: where, whereArgs: whereArgs, orderBy: 'start_time DESC');
     return rows.map(TimeEntry.fromMap).toList();
   }
 
-  Future<List<TimeEntry>> getEntriesForDateRange(DateTime from, DateTime to) async {
+  Future<List<TimeEntry>> getEntriesForDateRange(DateTime from, DateTime to,
+      {String? employerId}) async {
     final db = await database;
-    final rows = await db.query(
-      'time_entries',
-      where: 'date >= ? AND date <= ?',
-      whereArgs: [from.toIso8601String().substring(0, 10), to.toIso8601String().substring(0, 10)],
-      orderBy: 'start_time ASC',
-    );
+    final (where, whereArgs) = _employerFilter(
+        'date >= ? AND date <= ?',
+        [
+          from.toIso8601String().substring(0, 10),
+          to.toIso8601String().substring(0, 10)
+        ],
+        employerId);
+    final rows = await db.query('time_entries',
+        where: where, whereArgs: whereArgs, orderBy: 'start_time ASC');
     return rows.map(TimeEntry.fromMap).toList();
   }
 
-  Future<List<TimeEntry>> getUnsyncedEntries() async {
+  Future<List<TimeEntry>> getUnsyncedEntries({String? employerId}) async {
     final db = await database;
-    final rows = await db.query('time_entries', where: 'is_synced = 0');
+    final (where, whereArgs) =
+        _employerFilter('is_synced = 0', [], employerId);
+    final rows =
+        await db.query('time_entries', where: where, whereArgs: whereArgs);
     return rows.map(TimeEntry.fromMap).toList();
+  }
+
+  /// Returns (whereClause, whereArgs) with optional employer filter.
+  /// NULL employer_id entries are always included (legacy/unassigned entries).
+  (String, List<dynamic>) _employerFilter(
+      String base, List<dynamic> args, String? employerId) {
+    if (employerId == null) return (base, args);
+    return (
+      '$base AND (employer_id = ? OR employer_id IS NULL)',
+      [...args, employerId]
+    );
   }
 
   Future<void> markAsSynced(List<String> ids) async {

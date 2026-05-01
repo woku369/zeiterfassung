@@ -15,7 +15,7 @@ class ImportService {
   static final ImportService instance = ImportService._();
   ImportService._();
 
-  ImportResult importFromXlsx(List<int> bytes) {
+  ImportResult importFromXlsx(List<int> bytes, {String? employerId}) {
     final Excel excel;
     try {
       excel = Excel.decodeBytes(bytes);
@@ -29,16 +29,17 @@ class ImportService {
     if (rows.isEmpty) return ImportResult(entries: [], errors: ['Tabelle ist leer']);
 
     // Try Stempeluhr 2.1 format first
-    final stempeluhr = _parseStempeluhr21(rows);
+    final stempeluhr = _parseStempeluhr21(rows, employerId: employerId);
     if (stempeluhr != null) return stempeluhr;
 
     // Generic fallback
-    return _parseGeneric(rows);
+    return _parseGeneric(rows, employerId: employerId);
   }
 
   // ── Stempeluhr 2.1 ──────────────────────────────────────────────────────────
 
-  ImportResult? _parseStempeluhr21(List<List<Data?>> rows) {
+  ImportResult? _parseStempeluhr21(List<List<Data?>> rows,
+      {String? employerId}) {
     int? year, month;
     int headerRow = -1;
 
@@ -166,6 +167,7 @@ class ImportService {
         workType: workType,
         dayType: dayType,
         note: note,
+        employerId: employerId,
         createdAt: DateTime.now(),
       ));
     }
@@ -179,7 +181,7 @@ class ImportService {
 
   // ── Generic fallback ─────────────────────────────────────────────────────────
 
-  ImportResult _parseGeneric(List<List<Data?>> rows) {
+  ImportResult _parseGeneric(List<List<Data?>> rows, {String? employerId}) {
     final colMap = _detectColumnsGeneric(rows);
     if (colMap['date'] == null || colMap['start'] == null) {
       return ImportResult(
@@ -246,6 +248,7 @@ class ImportService {
           workType: WorkType.other,
           dayType: _deriveDayType(date),
           note: note,
+          employerId: employerId,
           createdAt: DateTime.now(),
         ));
       } catch (e) {

@@ -75,6 +75,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           if (ep.employers.length > 1) ...[
+            const SizedBox(height: 8),
+            Card(
+              color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz,
+                        color: Theme.of(context).colorScheme.secondary, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Aktiver Arbeitgeber bestimmt welche Einträge, '
+                        'Berichte und Importe angezeigt werden.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSecondaryContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 4),
             ...ep.employers
                 .where((e) => e.id != employer?.id)
@@ -82,7 +105,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: ListTile(
                         leading: const Icon(Icons.business_outlined),
                         title: Text(e.name),
-                        subtitle: const Text('Antippen um zu wechseln'),
+                        subtitle: Text(
+                            '${e.weeklyHours}h/Woche · WJ ab ${_monthName(e.fiscalYearStartMonth)}'),
+                        trailing: FilledButton.tonal(
+                          onPressed: () => ep.setActive(e),
+                          child: const Text('Wechseln'),
+                        ),
                         onTap: () => ep.setActive(e),
                       ),
                     )),
@@ -159,6 +187,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  String _monthName(int m) {
+    const names = [
+      '', 'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+    ];
+    return m >= 1 && m <= 12 ? names[m] : '$m';
   }
 
   Future<void> _addEmployer(BuildContext context) async {

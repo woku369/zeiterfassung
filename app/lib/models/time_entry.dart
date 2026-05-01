@@ -15,6 +15,7 @@ class TimeEntry {
   final double? endLat;
   final double? endLng;
   final int travelMinutes;
+  final String? employerId;
   final bool isSynced;
   final DateTime createdAt;
 
@@ -33,6 +34,7 @@ class TimeEntry {
     this.endLat,
     this.endLng,
     this.travelMinutes = 0,
+    this.employerId,
     this.isSynced = false,
     required this.createdAt,
   });
@@ -64,6 +66,7 @@ class TimeEntry {
     double? endLat,
     double? endLng,
     int? travelMinutes,
+    String? employerId,
     bool? isSynced,
     DateTime? createdAt,
   }) {
@@ -82,6 +85,7 @@ class TimeEntry {
       endLat: endLat ?? this.endLat,
       endLng: endLng ?? this.endLng,
       travelMinutes: travelMinutes ?? this.travelMinutes,
+      employerId: employerId ?? this.employerId,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -102,6 +106,7 @@ class TimeEntry {
     'end_lat': endLat,
     'end_lng': endLng,
     'travel_minutes': travelMinutes,
+    'employer_id': employerId,
     'is_synced': isSynced ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
   };
@@ -121,6 +126,7 @@ class TimeEntry {
     endLat: (m['end_lat'] as num?)?.toDouble(),
     endLng: (m['end_lng'] as num?)?.toDouble(),
     travelMinutes: m['travel_minutes'] as int? ?? 0,
+    employerId: m['employer_id'] as String?,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
   );

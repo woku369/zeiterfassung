@@ -84,8 +84,10 @@ class _MonthTabState extends State<_MonthTab> {
         setState(() => _importing = false);
         return;
       }
-      final importResult =
-          ImportService.instance.importFromXlsx(result.files.single.bytes!);
+      final employer = context.read<EmployerProvider>().active;
+      final importResult = ImportService.instance.importFromXlsx(
+          result.files.single.bytes!,
+          employerId: employer?.id);
       if (!mounted) return;
 
       final ok = await showDialog<bool>(
@@ -379,7 +381,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
     final from = _fyStart;
     final to = DateTime(_fyEnd.year, _fyEnd.month, 0); // last day before end
     final entries =
-        await DatabaseHelper.instance.getEntriesForDateRange(from, to);
+        await DatabaseHelper.instance.getEntriesForDateRange(from, to,
+            employerId: _employer?.id);
     for (var i = 0; i < 12; i++) {
       _monthHours[i] = 0.0;
     }

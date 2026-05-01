@@ -26,7 +26,15 @@ class _EntriesScreenState extends State<EntriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(df.format(DateTime(tp.selectedYear, tp.selectedMonth))),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(df.format(DateTime(tp.selectedYear, tp.selectedMonth))),
+            if (employer != null)
+              Text(employer.name,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
@@ -45,7 +53,10 @@ class _EntriesScreenState extends State<EntriesScreen> {
         ],
       ),
       body: byWeek.isEmpty
-          ? const Center(child: Text('Keine Einträge in diesem Monat'))
+          ? Center(
+              child: Text(employer != null
+                  ? 'Keine Einträge für ${employer.name}'
+                  : 'Keine Einträge in diesem Monat'))
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
               itemCount: sortedWeeks.length,
