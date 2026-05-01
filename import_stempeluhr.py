@@ -51,10 +51,8 @@ def ort_to_work_type(ort: str) -> str:
     o = ort.lower().strip()
     if "home" in o or o == "ho":
         return "homeoffice"
-    if "mobil" in o or "außen" in o:
-        return "travel"
     if o:
-        return "offsite"
+        return "offsite"   # Mobil/Außen/Gurk = Außer-Haus, nicht Fahrt
     return "other"
 
 def cell_str(row, col: int) -> str:

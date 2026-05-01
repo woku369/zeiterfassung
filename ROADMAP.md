@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-04-30 – Soll/Ist-Report + Wirtschaftsjahr implementiert
+> Letztes Update: 2026-05-01 – Arbeitgeber-Trennung, Abwesenheitstypen, Stempeluhr-Import
 
 ---
 
@@ -33,7 +33,6 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Tagtypen: Werktag, Samstag, Sonntag, Feiertag (österr. Feiertage vorberechnet)
 - [x] GPS-Erfassung (Start/End-Koordinaten, km-Distanz)
 - [x] XLSX-Export (Monatsbericht mit KW-Summen, Monatsumme, Formatierung)
-- [x] XLSX-Import (kompatibel mit Stempeluhr 2.1, Datumsformat-Autoerkennung)
 - [x] Mehrere Arbeitgeber, Wochenstunden-Konfiguration
 - [x] NAS-Sync via Tailscale + Next.js REST-API (Upsert, bidirektional)
 - [x] API-Key-Authentifizierung (optional)
@@ -63,24 +62,47 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Jahresnavigation (WJ 2024/25, WJ 2025/26, …)
 - [x] Farbkodierung: grün (ausgeglichen) · orange (Mehrarbeit) · rot (Minderstunden)
 - [x] Zukünftige Monate werden grau/ausgegraut dargestellt
-- [x] Soll-Berechnung: weeklyHours / 7 × Tage im Monat (kalenderproportional)
+- [x] Soll-Berechnung: `weeklyHours × 4.33` (Monatsdurchschnitt)
 - [x] DB-Migration v3: `fiscal_year_start_month` (employers), `subject_keywords` (imap_config)
 - [x] Wirtschaftsjahr-Monat im Arbeitgeber-Dialog konfigurierbar
+
+### v1.4 – Mehrarbeitgeber & Abwesenheiten
+- [x] **Arbeitgeber-Trennung:** `employer_id` auf allen Einträgen, alle Abfragen gefiltert
+- [x] `ChangeNotifierProxyProvider` – Einträge/Berichte wechseln reaktiv bei Arbeitgeberwechsel
+- [x] **Abwesenheitstypen:** Urlaubstag, Krankenstandstag, Zeitausgleich
+- [x] Abwesenheitseinträge: keine Zeiterfassung, zählen nicht als Arbeitszeit
+- [x] Feiertag-Erkennung im Eintrag-Formular (Farbe, Name, Auto-Tagtyp)
+- [x] Vordef. Standorte: Homeoffice Glantscha, Labegg, Brückl, Gurk (3 Standorte)
+- [x] DB-Migration v4 (`travel_minutes`), v5 (`employer_id`)
+- [x] **Stempeluhr 2.1 Import:** Format-Erkennung, Duplikatschutz (UUID v5), E-Ort→Arbeitstyp
+- [x] Import-Periodenanzeige ("April 2026 – 22 Einträge")
+- [x] **Python-Import-Script** (`import_stempeluhr.py`): direkt in SQLite schreiben, ohne App
+- [x] Urlaubsstatistik im Wirtschaftsjahr-Report (Tage Urlaub/Krankenstand/ZA)
 
 ---
 
 ## Offen / In Arbeit
 
-### Kurzfristig
+### Kurzfristig – Datenqualität
+- [ ] **Tätigkeitsart-Konzept überarbeiten:** Aktuell vermischt WorkType Arbeitsort und Tätigkeit
+  - Trennung in **Arbeitsort** (Homeoffice, Gurk, Außer Haus, Sonstiges) und **Tätigkeit** (Freitext + Projektzuordnung)
+  - Bestehende Einträge per Skript migrieren
+- [ ] **Korrektur-Script für importierte Einträge** (`fix_worktypes.py` liegt bereits vor):
+  - `travel` ohne km/Minuten → `offsite` korrigieren
+  - Gurk-Einträge identifizieren und sauber zuordnen
+- [ ] Import-Script: Gurk/Außen/Mobil differenzierter mappen (nicht alles `offsite`)
+- [ ] **Fahrzeit-Konzept klären:** Fahrzeit als separates Feld vs. eigener Eintragstyp
+
+### Kurzfristig – Plattform
 - [ ] **Windows-Platform aktivieren:** `flutter create --platforms=windows .` ausführen
 - [ ] **Tray-Widget fertigstellen:** Auskommentierte Zeilen in `tray_service.dart` aktivieren, `assets/tray_icon.ico` hinzufügen
 - [ ] IMAP: `subject_keywords`-Spalte in DB-Migration v3 ergänzen (für bestehende Installationen)
-- [ ] Geofencing: „Immer erlauben"-Dialog für Hintergrund-GPS führen Nutzer durch
 
-### Mittelfristig
+### Mittelfristig – Auswertung
+- [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
+- [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] **Telefonat-Tracking:** Anrufdauer bekannter Nummern erfassen, optional als Eintrag vorschlagen
 - [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
-- [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
 
 ### Langfristig / Ideen
@@ -102,23 +124,28 @@ app/
                      imap_service, tray_service
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help
-    database/        database_helper (SQLite v2)
+    database/        database_helper (SQLite v5)
   android/           ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS
   windows/           (noch nicht generiert – flutter create --platforms=windows .)
 
 backend/
   pages/api/         health, entries/index, entries/sync, entries/[id]
   lib/               db.ts (SQLite + WAL), auth.ts (API-Key)
+
+import_stempeluhr.py   Einmal-Import Stempeluhr 2.1 XLSX → SQLite (Python)
+fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 ```
 
 **Datenbank-Versionen:**
 - v1: `employers`, `time_entries`
 - v2: + `tracked_locations`, `imap_config`
 - v3: + `fiscal_year_start_month` (employers), `subject_keywords` (imap_config)
+- v4: + `travel_minutes` (time_entries)
+- v5: + `employer_id` (time_entries)
 
 **Branches:**
-- `main` – stabiler Stand
-- `feature/geofencing-imap-tray` – aktueller Entwicklungsstand (v1.1 + v1.2)
+- `main` – stabiler Stand (v1.2)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.4)
 
 ---
 
@@ -126,8 +153,10 @@ backend/
 
 | Thema | Details |
 |---|---|
+| Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant (v1.5) |
+| Stempeluhr-Import E-Ort | „Mobil" wurde initial als Fahrt importiert – Korrektur via `fix_worktypes.py` |
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
-| HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen, sonst kein Geofencing im Hintergrund |
+| HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
 | Windows Tray | Noch nicht fertig – Windows-Platform-Ordner fehlt |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
