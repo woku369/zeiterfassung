@@ -263,11 +263,18 @@ def insert_entries(db_path: Path, entries: list):
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    # Datenbank finden
-    db_path = find_db()
+    # Datenbank finden — optionaler Pfad als erstes Argument
+    if len(sys.argv) > 1:
+        db_path = Path(sys.argv[1])
+        if not db_path.exists():
+            print(f"Datenbank nicht gefunden: {db_path}")
+            sys.exit(1)
+    else:
+        db_path = find_db()
     if db_path is None:
-        print("Datenbank nicht gefunden. Bitte DB_CANDIDATES im Script anpassen.")
-        print("Gesucht in:")
+        print("Datenbank nicht gefunden. App einmal starten damit die DB angelegt wird,")
+        print("dann: python import_stempeluhr.py C:\\Pfad\\zur\\zeiterfassung.db")
+        print("\nGesucht in:")
         for p in DB_CANDIDATES:
             print(f"  {p}")
         sys.exit(1)
