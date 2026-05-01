@@ -14,7 +14,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 5, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 6, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -25,7 +25,8 @@ class DatabaseHelper {
         weekly_hours REAL NOT NULL DEFAULT 40.0,
         fiscal_year_start_month INTEGER NOT NULL DEFAULT 4,
         nas_url TEXT,
-        nas_api_key TEXT
+        nas_api_key TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     ''');
     await db.execute('''
@@ -49,6 +50,12 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE sync_state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
     await _createV2Tables(db);
   }
 
@@ -69,6 +76,17 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE time_entries ADD COLUMN employer_id TEXT');
     }
+    if (oldVersion < 6) {
+      await db.execute("ALTER TABLE employers ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+      await db.execute("ALTER TABLE tracked_locations ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+      await db.execute("ALTER TABLE tracked_locations ADD COLUMN employer_id TEXT");
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sync_state (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   Future<void> _createV2Tables(Database db) async {
@@ -80,7 +98,9 @@ class DatabaseHelper {
         longitude REAL NOT NULL,
         radius_meters REAL NOT NULL DEFAULT 200.0,
         work_type TEXT NOT NULL DEFAULT 'offsite',
-        is_active INTEGER NOT NULL DEFAULT 1
+        is_active INTEGER NOT NULL DEFAULT 1,
+        employer_id TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     ''');
     await db.execute('''
@@ -237,6 +257,47 @@ class DatabaseHelper {
     final db = await database;
     final rows = await db.rawQuery('SELECT COUNT(*) as c FROM tracked_locations');
     return (rows.first['c'] as int? ?? 0) > 0;
+  }
+
+  Future<void> upsertLocationsFromServer(List<TrackedLocation> locations) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final loc in locations) {
+      batch.insert('tracked_locations', loc.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<TrackedLocation>> getAllLocations() async {
+    final db = await database;
+    final rows = await db.query('tracked_locations', orderBy: 'name ASC');
+    return rows.map(TrackedLocation.fromMap).toList();
+  }
+
+  // ── sync_state ────────────────────────────────────────────────────────────
+
+  Future<String?> getSyncState(String key) async {
+    final db = await database;
+    final rows = await db.query('sync_state', where: 'key = ?', whereArgs: [key]);
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> setSyncState(String key, String value) async {
+    final db = await database;
+    await db.insert('sync_state', {'key': key, 'value': value},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> upsertEmployersFromServer(List<Employer> employers) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final e in employers) {
+      batch.insert('employers', e.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 
   // ── imap_config ───────────────────────────────────────────────────────────

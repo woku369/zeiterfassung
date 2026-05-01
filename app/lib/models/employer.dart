@@ -5,15 +5,17 @@ class Employer {
   final int fiscalYearStartMonth;
   final String? nasUrl;
   final String? nasApiKey;
+  final String updatedAt;
 
-  const Employer({
+  Employer({
     required this.id,
     required this.name,
     this.weeklyHours = 40.0,
     this.fiscalYearStartMonth = 4,
     this.nasUrl,
     this.nasApiKey,
-  });
+    String? updatedAt,
+  }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   Employer copyWith({
     String? id,
@@ -30,6 +32,7 @@ class Employer {
         fiscalYearStartMonth: fiscalYearStartMonth ?? this.fiscalYearStartMonth,
         nasUrl: nasUrl ?? this.nasUrl,
         nasApiKey: nasApiKey ?? this.nasApiKey,
+        updatedAt: DateTime.now().toIso8601String(),
       );
 
   Map<String, dynamic> toMap() => {
@@ -39,6 +42,7 @@ class Employer {
         'fiscal_year_start_month': fiscalYearStartMonth,
         'nas_url': nasUrl,
         'nas_api_key': nasApiKey,
+        'updated_at': updatedAt,
       };
 
   factory Employer.fromMap(Map<String, dynamic> m) => Employer(
@@ -48,6 +52,7 @@ class Employer {
         fiscalYearStartMonth: m['fiscal_year_start_month'] as int? ?? 4,
         nasUrl: m['nas_url'] as String?,
         nasApiKey: m['nas_api_key'] as String?,
+        updatedAt: m['updated_at'] as String?,
       );
 
   Map<String, dynamic> toJson() => toMap();

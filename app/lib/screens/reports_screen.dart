@@ -165,6 +165,7 @@ class _MonthTabState extends State<_MonthTab> {
           : 'Fehler: ${result.errors.first}';
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(msg)));
+      await context.read<EmployerProvider>().reload();
       await context.read<TimeEntryProvider>().refresh();
     } finally {
       if (mounted) setState(() => _syncing = false);
