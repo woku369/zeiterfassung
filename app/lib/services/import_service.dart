@@ -32,8 +32,8 @@ class ImportService {
     final stempeluhr = _parseStempeluhr21(rows, employerId: employerId);
     if (stempeluhr != null) return stempeluhr;
 
-    // Generic fallback
-    return _parseGeneric(rows, employerId: employerId);
+    // Stempeluhr detection failed — return debug dump of first 12 rows
+    return _debugDump(rows);
   }
 
   // ── Stempeluhr 2.1 ──────────────────────────────────────────────────────────
@@ -194,6 +194,24 @@ class ImportService {
         : null;
 
     return ImportResult(entries: entries, errors: errors, period: period);
+  }
+
+  // ── Debug dump (shown when format not recognized) ────────────────────────────
+
+  ImportResult _debugDump(List<List<Data?>> rows) {
+    final lines = <String>['FORMAT NICHT ERKANNT – Zellinhalte (erste 12 Zeilen):'];
+    for (var ri = 0; ri < rows.length.clamp(0, 12); ri++) {
+      final row = rows[ri];
+      final cells = <String>[];
+      for (var ci = 0; ci < row.length.clamp(0, 8); ci++) {
+        final v = row[ci]?.value;
+        final type = v == null ? 'null' : v.runtimeType.toString().replaceAll('CellValue', '');
+        final s = _cellStr(row, ci);
+        cells.add('[$ci:$type="${s.length > 15 ? s.substring(0, 15) : s}"]');
+      }
+      lines.add('Z${ri + 1}: ${cells.join(' ')}');
+    }
+    return ImportResult(entries: [], errors: lines);
   }
 
   // ── Generic fallback ─────────────────────────────────────────────────────────
