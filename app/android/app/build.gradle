@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.zeiterfassung"
-        minSdk flutter.minSdkVersion
+        minSdk 26
         targetSdk flutter.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
