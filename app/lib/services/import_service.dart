@@ -42,59 +42,83 @@ class ImportService {
       {String? employerId}) {
     int? year, month;
     int headerRow = -1;
+    int firstDataRow = -1;
 
-    // Scan up to row 15 for Abrechnungszeitraum and header
-    for (var ri = 0; ri < rows.length.clamp(0, 15); ri++) {
+    // Pattern: "01 Mi", "5 Sa", "29 Fr" — day number + space + weekday abbrev
+    final dayRowPattern = RegExp(r'^\d{1,2}\s+[A-Za-zÄÖÜäöü]', unicode: true);
+
+    // Scan ALL rows to find first data row matching the day pattern
+    for (var ri = 0; ri < rows.length; ri++) {
+      final col0 = rows[ri].isNotEmpty
+          ? (rows[ri][0]?.value?.toString() ?? '').trim()
+          : '';
+
+      if (dayRowPattern.hasMatch(col0)) {
+        firstDataRow = ri;
+        headerRow = ri - 1; // row immediately before first data row is the header
+        break;
+      }
+    }
+
+    if (firstDataRow < 0) return null; // Not Stempeluhr 2.1
+    // If data starts on row 0, there's no header row — use positional defaults
+    if (headerRow < 0) headerRow = -1;
+
+    // Scan all rows before the data for Abrechnungszeitraum (MM.YYYY pattern)
+    final mmYyyyPattern = RegExp(r'(\d{2})\.(\d{4})');
+    for (var ri = 0; ri < firstDataRow; ri++) {
       final cells = rows[ri].map((c) => c?.value?.toString() ?? '').toList();
-      final rowText = cells.join(' ').toLowerCase();
-
-      if (rowText.contains('abrechnungszeitraum') || rowText.contains('zeitraum')) {
-        // Extract "MM.YYYY" — e.g. "04.2026" from "04.2026 - 30.04.2026"
-        final m = RegExp(r'(\d{2})\.(\d{4})').firstMatch(rowText);
-        if (m != null) {
-          month = int.parse(m.group(1)!);
-          year = int.parse(m.group(2)!);
+      final rowText = cells.join(' ');
+      final m = mmYyyyPattern.firstMatch(rowText);
+      if (m != null) {
+        final candidateMonth = int.parse(m.group(1)!);
+        final candidateYear = int.parse(m.group(2)!);
+        if (candidateMonth >= 1 && candidateMonth <= 12 &&
+            candidateYear >= 2000 && candidateYear <= 2100) {
+          month = candidateMonth;
+          year = candidateYear;
+          break;
         }
       }
+    }
 
-      // Header row: must contain "kommen" or "beginn"
-      if ((rowText.contains('kommen') || rowText.contains('beginn')) &&
-          rowText.contains('tag')) {
-        headerRow = ri;
+    // Detect column indices from header row; fall back to Stempeluhr positional defaults
+    int colTag = 0;
+    int? colOrt, colKommen, colGehen, colPause, colNotiz;
+
+    if (headerRow >= 0) {
+      final hRow = rows[headerRow];
+      for (var ci = 0; ci < hRow.length; ci++) {
+        final v = hRow[ci]?.value?.toString().toLowerCase().trim() ?? '';
+        if (v.contains('tag')) colTag = ci;
+        if ((v.contains('e-ort') || v.contains('einsatzort') || v.contains('ort')) &&
+            colOrt == null) colOrt = ci;
+        if ((v.contains('kommen') || v.contains('beginn') || v.contains('start')) &&
+            colKommen == null) colKommen = ci;
+        if ((v.contains('gehen') || v.contains('ende') || v == 'bis') &&
+            colGehen == null) colGehen = ci;
+        if (v.contains('pause') && colPause == null) colPause = ci;
+        if ((v.contains('notiz') || v.contains('bemerkung') || v.contains('tätigkeit')) &&
+            colNotiz == null) colNotiz = ci;
       }
     }
 
-    if (headerRow < 0) return null; // Not Stempeluhr 2.1
-
-    // Detect column indices from header row
-    final hRow = rows[headerRow];
-    int? colTag, colOrt, colKommen, colGehen, colPause, colNotiz;
-
-    for (var ci = 0; ci < hRow.length; ci++) {
-      final v = hRow[ci]?.value?.toString().toLowerCase().trim() ?? '';
-      if (v.contains('tag') && colTag == null) colTag = ci;
-      if ((v.contains('e-ort') || v.contains('einsatzort') || v.contains('ort')) &&
-          colOrt == null) colOrt = ci;
-      if ((v.contains('kommen') || v.contains('beginn') || v.contains('start')) &&
-          colKommen == null) colKommen = ci;
-      if ((v.contains('gehen') || v.contains('ende') || v == 'bis') &&
-          colGehen == null) colGehen = ci;
-      if (v.contains('pause') && colPause == null) colPause = ci;
-      if ((v.contains('notiz') || v.contains('bemerkung') || v.contains('tätigkeit')) &&
-          colNotiz == null) colNotiz = ci;
-    }
-
-    if (colTag == null || colKommen == null) return null;
+    // If header scan didn't find time columns, use Stempeluhr 2.1 positional defaults
+    // Typical layout: Tag | E-Ort | Kommen | Gehen | Pause | (net) | Notiz
+    final int colKommenFinal = colKommen ?? 2;
+    final int colGehenFinal = colGehen ?? 3;
+    final int colPauseFinal = colPause ?? 4;
+    final int colNotizFinal = colNotiz ?? 6;
 
     final entries = <TimeEntry>[];
     final errors = <String>[];
     final seenKeys = <String>{}; // deduplication within this file
 
-    for (var ri = headerRow + 1; ri < rows.length; ri++) {
+    for (var ri = firstDataRow; ri < rows.length; ri++) {
       final row = rows[ri];
       if (row.isEmpty) continue;
 
-      final tagStr = _cellStr(row, colTag!).trim();
+      final tagStr = _cellStr(row, colTag).trim();
       if (tagStr.isEmpty) continue;
 
       // "01 Mi", "29 Mi", "5 Sa" → extract leading day number
@@ -118,7 +142,7 @@ class ImportService {
         continue;
       }
 
-      final kommenStr = _cellStr(row, colKommen!).trim();
+      final kommenStr = _cellStr(row, colKommenFinal).trim();
       if (kommenStr.isEmpty) continue; // No work this day
 
       final startTime = _parseTime(date, kommenStr);
@@ -128,23 +152,16 @@ class ImportService {
       }
 
       DateTime? endTime;
-      if (colGehen != null) {
-        final gehenStr = _cellStr(row, colGehen!).trim();
-        if (gehenStr.isNotEmpty) {
-          endTime = _parseTime(date, gehenStr);
-          if (endTime != null && endTime.isBefore(startTime)) {
-            endTime = endTime.add(const Duration(days: 1));
-          }
+      final gehenStr = _cellStr(row, colGehenFinal).trim();
+      if (gehenStr.isNotEmpty) {
+        endTime = _parseTime(date, gehenStr);
+        if (endTime != null && endTime.isBefore(startTime)) {
+          endTime = endTime.add(const Duration(days: 1));
         }
       }
 
-      final breakMinutes = colPause != null
-          ? _parseBreakDecimal(_cellStr(row, colPause!))
-          : 0;
-
-      final note =
-          colNotiz != null ? _cellStr(row, colNotiz!).trim() : '';
-
+      final breakMinutes = _parseBreakDecimal(_cellStr(row, colPauseFinal));
+      final note = _cellStr(row, colNotizFinal).trim();
       final ortRaw = colOrt != null ? _cellStr(row, colOrt!).trim() : '';
       final workType = _ortToWorkType(ortRaw);
       final dayType = _deriveDayType(date);
