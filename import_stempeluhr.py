@@ -51,8 +51,10 @@ def ort_to_work_type(ort: str) -> str:
     o = ort.lower().strip()
     if "home" in o or o == "ho":
         return "homeoffice"
+    if "gurk" in o:
+        return "office"    # Gurk = Büro
     if o:
-        return "offsite"   # Mobil/Außen/Gurk = Außer-Haus, nicht Fahrt
+        return "offsite"   # Mobil/Außen = Außer-Haus
     return "other"
 
 def cell_str(row, col: int) -> str:
@@ -236,11 +238,17 @@ def find_db() -> Path | None:
 def insert_entries(db_path: Path, entries: list):
     con = sqlite3.connect(db_path)
     cur = con.cursor()
-    inserted = skipped = 0
+    inserted = updated = 0
     for e in entries:
-        cur.execute("SELECT 1 FROM time_entries WHERE id = ?", (e["id"],))
-        if cur.fetchone():
-            skipped += 1
+        cur.execute("SELECT work_type FROM time_entries WHERE id = ?", (e["id"],))
+        row = cur.fetchone()
+        if row:
+            if row[0] != e["work_type"]:
+                cur.execute(
+                    "UPDATE time_entries SET work_type=?, is_synced=0 WHERE id=?",
+                    (e["work_type"], e["id"]),
+                )
+                updated += 1
             continue
         cur.execute("""
             INSERT INTO time_entries
@@ -256,7 +264,7 @@ def insert_entries(db_path: Path, entries: list):
         inserted += 1
     con.commit()
     con.close()
-    return inserted, skipped
+    return inserted, updated
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -308,12 +316,12 @@ def main():
         if not entries:
             print("  (keine Einträge)")
             continue
-        new, skip = insert_entries(db_path, entries)
-        print(f"  {new} neu, {skip} bereits vorhanden")
+        new, upd = insert_entries(db_path, entries)
+        print(f"  {new} neu, {upd} korrigiert")
         total_new += new
-        total_skip += skip
+        total_skip += upd
 
-    print(f"\nFertig: {total_new} neue Einträge, {total_skip} übersprungen.")
+    print(f"\nFertig: {total_new} neue Einträge, {total_skip} Tätigkeitsart korrigiert.")
 
 if __name__ == "__main__":
     main()
