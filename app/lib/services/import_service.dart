@@ -43,21 +43,24 @@ class ImportService {
     int? year, month;
     int headerRow = -1;
     int firstDataRow = -1;
+    int colTag = 0;
 
     // Pattern: "01 Mi", "5 Sa", "29 Fr" — day number + space + weekday abbrev
     final dayRowPattern = RegExp(r'^\d{1,2}\s+[A-Za-zÄÖÜäöü]', unicode: true);
 
-    // Scan ALL rows to find first data row matching the day pattern
+    // Scan ALL rows, ALL columns — find first cell matching day+weekday pattern
     for (var ri = 0; ri < rows.length; ri++) {
-      final col0 = rows[ri].isNotEmpty
-          ? (rows[ri][0]?.value?.toString() ?? '').trim()
-          : '';
-
-      if (dayRowPattern.hasMatch(col0)) {
-        firstDataRow = ri;
-        headerRow = ri - 1; // row immediately before first data row is the header
-        break;
+      final row = rows[ri];
+      for (var ci = 0; ci < row.length; ci++) {
+        final cell = (row[ci]?.value?.toString() ?? '').trim();
+        if (dayRowPattern.hasMatch(cell)) {
+          firstDataRow = ri;
+          headerRow = ri - 1;
+          colTag = ci; // remember which column holds the day+weekday
+          break;
+        }
       }
+      if (firstDataRow >= 0) break;
     }
 
     if (firstDataRow < 0) return null; // Not Stempeluhr 2.1
@@ -83,7 +86,7 @@ class ImportService {
     }
 
     // Detect column indices from header row; fall back to Stempeluhr positional defaults
-    int colTag = 0;
+    // colTag already set during row detection above
     int? colOrt, colKommen, colGehen, colPause, colNotiz;
 
     if (headerRow >= 0) {
@@ -105,10 +108,10 @@ class ImportService {
 
     // If header scan didn't find time columns, use Stempeluhr 2.1 positional defaults
     // Typical layout: Tag | E-Ort | Kommen | Gehen | Pause | (net) | Notiz
-    final int colKommenFinal = colKommen ?? 2;
-    final int colGehenFinal = colGehen ?? 3;
-    final int colPauseFinal = colPause ?? 4;
-    final int colNotizFinal = colNotiz ?? 6;
+    final int colKommenFinal = colKommen ?? (colTag + 2);
+    final int colGehenFinal = colGehen ?? (colTag + 3);
+    final int colPauseFinal = colPause ?? (colTag + 4);
+    final int colNotizFinal = colNotiz ?? (colTag + 6);
 
     final entries = <TimeEntry>[];
     final errors = <String>[];
