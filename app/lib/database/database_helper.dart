@@ -77,8 +77,8 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE time_entries ADD COLUMN employer_id TEXT');
     }
     if (oldVersion < 6) {
-      await db.execute("ALTER TABLE employers ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
-      await db.execute("ALTER TABLE tracked_locations ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+      await db.execute("ALTER TABLE employers ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
+      await db.execute("ALTER TABLE tracked_locations ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
       await db.execute("ALTER TABLE tracked_locations ADD COLUMN employer_id TEXT");
       await db.execute('''
         CREATE TABLE IF NOT EXISTS sync_state (
