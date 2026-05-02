@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/employer_provider.dart';
+import '../providers/activity_provider.dart';
 import '../models/employer.dart';
 import '../services/sync_service.dart';
 import '../services/holiday_service.dart';
+import '../services/activity_tracking_service.dart';
 import 'locations_screen.dart';
 import 'imap_screen.dart';
+import 'activity_timeline_screen.dart';
 import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -156,6 +159,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ]),
           ),
+
+          // ── Aktivitäts-Tracking ────────────────────────────────────────
+          if (context.watch<ActivityProvider>().isSupported) ...[
+            const SizedBox(height: 20),
+            Text('Aktivitäts-Tracking',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _ActivityTrackingCard(),
+          ],
 
           // ── Feiertage ─────────────────────────────────────────────────
           const SizedBox(height: 20),
@@ -357,6 +369,152 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor:
           ok ? Colors.green : Theme.of(context).colorScheme.error,
     ));
+  }
+}
+
+class _ActivityTrackingCard extends StatefulWidget {
+  @override
+  State<_ActivityTrackingCard> createState() => _ActivityTrackingCardState();
+}
+
+class _ActivityTrackingCardState extends State<_ActivityTrackingCard> {
+  @override
+  Widget build(BuildContext context) {
+    final ap = context.watch<ActivityProvider>();
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.history_outlined),
+            title: const Text('Aktivitäts-Timeline öffnen'),
+            subtitle: const Text('App-Nutzung als Zeiteintrag übernehmen'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ActivityTimelineScreen()),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Mindestdauer'),
+            subtitle: Text('${ap.minDurationMinutes} Minuten'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove),
+                  onPressed: ap.minDurationMinutes > 1
+                      ? () async {
+                          ap.setMinDuration(ap.minDurationMinutes - 1);
+                          await ap.saveSettings();
+                        }
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: ap.minDurationMinutes < 15
+                      ? () async {
+                          ap.setMinDuration(ap.minDurationMinutes + 1);
+                          await ap.saveSettings();
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.wifi_off_outlined),
+            title: const Text('Leerlauf-Schwelle (Windows)'),
+            subtitle: Text('${ap.idleThresholdMinutes} Minuten ohne Eingabe → Pause'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove),
+                  onPressed: ap.idleThresholdMinutes > 1
+                      ? () async {
+                          ap.setIdleThreshold(ap.idleThresholdMinutes - 1);
+                          await ap.saveSettings();
+                        }
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: ap.idleThresholdMinutes < 30
+                      ? () async {
+                          ap.setIdleThreshold(ap.idleThresholdMinutes + 1);
+                          await ap.saveSettings();
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.filter_list_outlined),
+            title: const Text('Whitelist bearbeiten'),
+            subtitle: Text('${ap.whitelist.length} Einträge aktiv'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _editWhitelist(context, ap),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editWhitelist(BuildContext context, ActivityProvider ap) async {
+    final ctrl = TextEditingController(text: ap.whitelist.join('\n'));
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Whitelist'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ein Eintrag pro Zeile. Titel/App-Name muss einen '
+              'dieser Begriffe enthalten (Groß-/Kleinschreibung egal).',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLines: 10,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          TextButton(
+            onPressed: () => Navigator.pop(
+                context,
+                defaultWhitelist.join('\n')),
+            child: const Text('Standard'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (saved != null) {
+      final list = saved
+          .split('\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      ap.setWhitelist(list);
+      await ap.saveSettings();
+    }
   }
 }
 

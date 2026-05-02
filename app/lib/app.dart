@@ -1,13 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/home_screen.dart';
+import 'screens/activity_timeline_screen.dart';
 
-class ZeiterfassungApp extends StatelessWidget {
-  const ZeiterfassungApp({super.key});
+class ZeiterfassungApp extends StatefulWidget {
+  final MethodChannel navChannel;
+  const ZeiterfassungApp({super.key, required this.navChannel});
+
+  @override
+  State<ZeiterfassungApp> createState() => _ZeiterfassungAppState();
+}
+
+class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.navChannel.setMethodCallHandler((call) async {
+      if (call.method == 'openTimeline') {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const ActivityTimelineScreen()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'Zeiterfassung',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

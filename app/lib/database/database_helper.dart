@@ -4,6 +4,7 @@ import '../models/time_entry.dart';
 import '../models/employer.dart';
 import '../models/tracked_location.dart';
 import '../models/imap_config.dart';
+import '../models/activity_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -14,7 +15,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 6, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 7, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -57,6 +58,7 @@ class DatabaseHelper {
       )
     ''');
     await _createV2Tables(db);
+    await _createV7Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -87,6 +89,9 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 7) {
+      await _createV7Tables(db);
+    }
   }
 
   Future<void> _createV2Tables(Database db) async {
@@ -116,6 +121,18 @@ class DatabaseHelper {
         watch_addresses TEXT NOT NULL DEFAULT '[]',
         subject_keywords TEXT NOT NULL DEFAULT '[]',
         is_active INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+  }
+
+  Future<void> _createV7Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id TEXT PRIMARY KEY,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        title TEXT NOT NULL,
+        app_name TEXT NOT NULL
       )
     ''');
   }
@@ -317,5 +334,41 @@ class DatabaseHelper {
   Future<void> deleteImapConfig(String id) async {
     final db = await database;
     await db.delete('imap_config', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ── activity_log ──────────────────────────────────────────────────────────
+
+  Future<void> insertActivityLog(ActivityLog log) async {
+    final db = await database;
+    await db.insert('activity_log', log.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<ActivityLog>> getActivityLogsForDate(DateTime date) async {
+    final db = await database;
+    final dayStart = DateTime(date.year, date.month, date.day).toIso8601String();
+    final dayEnd = DateTime(date.year, date.month, date.day, 23, 59, 59).toIso8601String();
+    final rows = await db.query(
+      'activity_log',
+      where: 'start_time >= ? AND start_time <= ?',
+      whereArgs: [dayStart, dayEnd],
+      orderBy: 'start_time ASC',
+    );
+    return rows.map(ActivityLog.fromMap).toList();
+  }
+
+  Future<void> deleteActivityLogsForDate(DateTime date) async {
+    final db = await database;
+    final dayStart = DateTime(date.year, date.month, date.day).toIso8601String();
+    final dayEnd = DateTime(date.year, date.month, date.day, 23, 59, 59).toIso8601String();
+    await db.delete(
+      'activity_log',
+      where: 'start_time >= ? AND start_time <= ?',
+      whereArgs: [dayStart, dayEnd],
+    );
+  }
+
+  Future<void> deleteAllActivityLogs() async {
+    final db = await database;
+    await db.delete('activity_log');
   }
 }

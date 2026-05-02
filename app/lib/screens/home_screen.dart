@@ -11,6 +11,8 @@ import 'entries_screen.dart';
 import 'entry_form_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
+import 'activity_timeline_screen.dart';
+import '../providers/activity_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -107,10 +109,16 @@ class _DashboardTabState extends State<_DashboardTab> {
     return '$h:$m:$s';
   }
 
+  Future<void> _openTimeline() async {
+    await Navigator.push(
+      context, MaterialPageRoute(builder: (_) => const ActivityTimelineScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TimeEntryProvider>();
     final employer = context.watch<EmployerProvider>().active;
+    final ap = context.watch<ActivityProvider>();
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final weeklyTarget = employer?.weeklyHours ?? 40.0;
@@ -237,6 +245,34 @@ class _DashboardTabState extends State<_DashboardTab> {
                   title: const Text('Fahrtstrecke (Monat)'),
                   trailing: Text('${tp.totalKmForMonth().toStringAsFixed(1)} km',
                     style: Theme.of(context).textTheme.titleMedium),
+                ),
+              ),
+            const SizedBox(height: 8),
+            // ── Aktivitäts-Tracking ──────────────────────────────────────
+            if (ap.isSupported)
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: ap.isTracking
+                        ? Colors.green.withOpacity(0.15)
+                        : null,
+                    child: Icon(
+                      Icons.history_outlined,
+                      color: ap.isTracking ? Colors.green : null,
+                    ),
+                  ),
+                  title: const Text('Aktivitäts-Timeline'),
+                  subtitle: Text(
+                    ap.isTracking
+                        ? 'Tracking aktiv'
+                        : 'App-Nutzung als Zeiteintrag übernehmen',
+                    style: TextStyle(
+                      color: ap.isTracking ? Colors.green : null,
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openTimeline,
                 ),
               ),
             const SizedBox(height: 16),
