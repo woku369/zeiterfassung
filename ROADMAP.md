@@ -102,6 +102,38 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] **Telefonat-Tracking:** Anrufdauer bekannter Nummern erfassen, optional als Eintrag vorschlagen
+
+### Mittelfristig – Optionales Activity Tracking (Konzept)
+
+Ziel: Recherche- und Arbeitszeit die "nebenbei" passiert nachträglich dokumentierbar machen —
+ohne dauerhaften Overhead, ohne Cloud, ohne Zwang.
+
+**Funktionsprinzip:**
+- Manuell aktivierbar per Button ("Recherche-Modus starten") in der App oder im Tray-Widget
+- Während aktiv: lokales Protokoll von Fenster-Titeln + Zeitstempeln (Windows) bzw. App-Namen (Android)
+- Idle-Erkennung: Protokoll pausiert nach X Minuten ohne Aktivität automatisch
+- Am Ende: Timeline-Ansicht zeigt was wann aktiv war — Nutzer wählt relevante Blöcke aus
+- Ausgewählte Blöcke werden als Zeiteintrag mit vorausgefüllter Notiz (Fenster-Titel) vorgeschlagen
+- Alles lokal, nichts wird automatisch gespeichert oder gesendet
+
+**Technische Umsetzung Windows:**
+- Win32 API `GetForegroundWindow` + `GetWindowText` → aktiver Fenster-Titel alle 30s abfragen
+- Lokale SQLite-Tabelle `activity_log` (start, end, title, app_name)
+- Tray-Widget startet/stoppt das Tracking per Klick
+
+**Technische Umsetzung Android:**
+- `UsageStatsManager` → App-Nutzung mit Zeitstempeln (erfordert `PACKAGE_USAGE_STATS`-Permission)
+- Weniger granular als Windows (nur App-Name, kein Dokument-Titel)
+
+**Datenschutz / Kontrolle:**
+- Kein Autostart, immer manuell aktivieren
+- Protokoll wird nach Übernahme in Zeiteintrag gelöscht (oder auf Wunsch behalten)
+- Browser-Tabs/URLs werden bewusst NICHT erfasst (zu sensitiv)
+
+**Offene Fragen vor Implementierung:**
+- [ ] Welche Apps/Fenster sollen ignoriert werden? (Whitelist/Blacklist)
+- [ ] Minimale Aktivitätsdauer für Vorschlag (z.B. nur Blöcke > 5 Minuten)
+- [ ] Soll die Timeline in der App oder als separater Screen erscheinen?
 - [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
 - [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
 
