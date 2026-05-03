@@ -6,10 +6,27 @@ import '../database/database_helper.dart';
 
 class LocationProvider extends ChangeNotifier {
   List<TrackedLocation> _locations = [];
+  String? _activeEmployerId;
 
   List<TrackedLocation> get locations => _locations;
-  List<TrackedLocation> get activeLocations =>
-      _locations.where((l) => l.isActive).toList();
+
+  /// Locations that are active AND belong to the current employer.
+  /// employer_id == null means shared across all employers (e.g. Homeoffice).
+  List<TrackedLocation> get activeLocations => _locations
+      .where((l) => l.isActive && _matchesEmployer(l))
+      .toList();
+
+  bool _matchesEmployer(TrackedLocation l) {
+    if (l.employerId == null) return true;
+    if (_activeEmployerId == null) return true;
+    return l.employerId == _activeEmployerId;
+  }
+
+  void setActiveEmployer(String? employerId) {
+    if (_activeEmployerId == employerId) return;
+    _activeEmployerId = employerId;
+    notifyListeners();
+  }
 
   Future<void> load() async {
     _locations = await DatabaseHelper.instance.getLocations();
@@ -26,6 +43,7 @@ class LocationProvider extends ChangeNotifier {
         longitude: 14.0824,
         radiusMeters: 150,
         workType: WorkType.homeoffice,
+        // employer_id = null → gilt für alle Arbeitgeber
       ),
       TrackedLocation(
         id: const Uuid().v4(),
@@ -80,6 +98,7 @@ class LocationProvider extends ChangeNotifier {
     required double longitude,
     double radiusMeters = 200.0,
     WorkType workType = WorkType.offsite,
+    String? employerId,
   }) async {
     final loc = TrackedLocation(
       id: const Uuid().v4(),
@@ -88,6 +107,7 @@ class LocationProvider extends ChangeNotifier {
       longitude: longitude,
       radiusMeters: radiusMeters,
       workType: workType,
+      employerId: employerId,
     );
     await DatabaseHelper.instance.insertLocation(loc);
     _locations.add(loc);

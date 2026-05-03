@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/tracked_location.dart';
 import '../models/work_type.dart';
+import '../models/employer.dart';
 import '../providers/location_provider.dart';
+import '../providers/employer_provider.dart';
 import '../services/geofencing_service.dart';
 
 class LocationsScreen extends StatefulWidget {
@@ -83,6 +85,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
         longitude: result.longitude,
         radiusMeters: result.radiusMeters,
         workType: result.workType,
+        employerId: result.employerId,
       );
     } else {
       await lp.update(existing.copyWith(
@@ -91,6 +94,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
         longitude: result.longitude,
         radiusMeters: result.radiusMeters,
         workType: result.workType,
+        employerId: result.employerId,
       ));
     }
     if (_tracking) {
@@ -181,6 +185,13 @@ class _LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final employers = context.read<EmployerProvider>().employers;
+    final employer = location.employerId == null
+        ? null
+        : employers.firstWhere((e) => e.id == location.employerId,
+            orElse: () => employers.first);
+    final employerLabel = employer == null ? 'Alle Arbeitgeber' : employer.name;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -192,7 +203,7 @@ class _LocationCard extends StatelessWidget {
         ),
         title: Text(location.name),
         subtitle: Text(
-          '${location.workType.label} · ${location.radiusMeters.toInt()} m Radius\n'
+          '${location.workType.label} · ${location.radiusMeters.toInt()} m · $employerLabel\n'
           '${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
         ),
         isThreeLine: true,
@@ -225,6 +236,7 @@ class _LocationFormResult {
   final double longitude;
   final double radiusMeters;
   final WorkType workType;
+  final String? employerId;
 
   _LocationFormResult({
     required this.name,
@@ -232,6 +244,7 @@ class _LocationFormResult {
     required this.longitude,
     required this.radiusMeters,
     required this.workType,
+    this.employerId,
   });
 }
 
@@ -249,6 +262,7 @@ class _LocationDialogState extends State<_LocationDialog> {
   late final TextEditingController _lngCtrl;
   late final TextEditingController _radiusCtrl;
   late WorkType _workType;
+  String? _employerId; // null = alle Arbeitgeber
   bool _loadingGps = false;
 
   @override
@@ -263,6 +277,7 @@ class _LocationDialogState extends State<_LocationDialog> {
     _radiusCtrl =
         TextEditingController(text: (e?.radiusMeters ?? 200.0).toInt().toString());
     _workType = e?.workType ?? WorkType.offsite;
+    _employerId = e?.employerId;
   }
 
   @override
@@ -308,12 +323,14 @@ class _LocationDialogState extends State<_LocationDialog> {
         longitude: lng,
         radiusMeters: radius,
         workType: _workType,
+        employerId: _employerId,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final employers = context.read<EmployerProvider>().employers;
     return AlertDialog(
       title: Text(
           widget.existing == null ? 'Standort hinzufügen' : 'Standort bearbeiten'),
@@ -383,6 +400,26 @@ class _LocationDialogState extends State<_LocationDialog> {
                       value: w, child: Text(w.label)))
                   .toList(),
               onChanged: (v) => setState(() => _workType = v!),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: _employerId,
+              decoration: const InputDecoration(
+                labelText: 'Arbeitgeber',
+                border: OutlineInputBorder(),
+                helperText: 'Alle = wird für jeden Arbeitgeber überwacht',
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Alle Arbeitgeber'),
+                ),
+                ...employers.map((e) => DropdownMenuItem<String?>(
+                      value: e.id,
+                      child: Text(e.name),
+                    )),
+              ],
+              onChanged: (v) => setState(() => _employerId = v),
             ),
           ],
         ),
