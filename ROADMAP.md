@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-01 – Arbeitgeber-Trennung, Abwesenheitstypen, Stempeluhr-Import
+> Letztes Update: 2026-05-03 – Aktivitäts-Tracking implementiert (Android + Windows)
 
 ---
 
@@ -11,7 +11,7 @@ Arbeitszeiterfassung für Teilzeitarbeit an wechselnden Orten und Geräten.
 Ziel: saubere Dokumentation der geleisteten Stunden gegenüber 8h/Woche Vertrag
 für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
-**Stack:** Flutter (Android + Windows) · SQLite (lokal) · Next.js + SQLite (NAS-Backend) · Tailscale (VPN-Sync)
+**Stack:** Flutter (Android + Windows) · SQLite (lokal) · Node.js + SQLite (NAS-Backend) · Tailscale (VPN-Sync)
 
 **Hardware:**
 | Gerät | Typ | OS | Einsatz |
@@ -34,9 +34,8 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] GPS-Erfassung (Start/End-Koordinaten, km-Distanz)
 - [x] XLSX-Export (Monatsbericht mit KW-Summen, Monatsumme, Formatierung)
 - [x] Mehrere Arbeitgeber, Wochenstunden-Konfiguration
-- [x] NAS-Sync via Tailscale + Next.js REST-API (Upsert, bidirektional)
+- [x] NAS-Sync via Tailscale + REST-API (Upsert, bidirektional)
 - [x] API-Key-Authentifizierung (optional)
-- [x] Next.js-Backend mit Docker-Support (Synology NAS)
 - [x] Material 3, Dark Mode, DE/AT-Lokalisierung
 
 ### v1.1 – Automatische Erfassung
@@ -79,6 +78,36 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] **Python-Import-Script** (`import_stempeluhr.py`): direkt in SQLite schreiben, ohne App
 - [x] Urlaubsstatistik im Wirtschaftsjahr-Report (Tage Urlaub/Krankenstand/ZA)
 
+### v1.5 – NAS-Backend & Bidirektionaler Sync
+- [x] **Backend-Rewrite:** Next.js → standalone Node.js (`server.js`, kein Build-Schritt nötig)
+- [x] Endpoint `POST /api/sync`: alle Tabellen bidirektional (employers, entries, locations, imap)
+- [x] Last-write-wins via `updated_at`-Vergleich in SQLite UPSERT
+- [x] `sync_state`-Tabelle für delta-Sync (`last_sync_at`)
+- [x] DB-Migration v6: `updated_at` (employers, tracked_locations), `employer_id` (locations), `sync_state`
+- [x] **Synology-Deployment:** `start_synology.sh` für Task Scheduler, `backup_synology.sh`
+- [x] Automatisches tägliches Backup (30 Tage Aufbewahrung)
+- [x] Android-Build vollständig eingerichtet (AGP 8.6.0, Kotlin 2.1.0, Java 17, minSdk 26)
+- [x] Adaptive Launcher-Icons (mipmap-anydpi-v26)
+- [x] Core library desugaring für flutter_local_notifications
+
+### v1.6 – Aktivitäts-Tracking
+- [x] **ActivityLog-Modell** + DB-Migration v7 (`activity_log`-Tabelle, Windows-seitig)
+- [x] **ActivityTrackingService:**
+  - Windows: Win32 FFI (`GetForegroundWindow`, `GetWindowTextW`, `GetLastInputInfo`) – Poll alle 30s
+  - Android: `UsageStatsManager` via MethodChannel (historische Daten, kein Hintergrunddienst)
+- [x] **ActivityProvider:** start/stop Tracking, Sessions laden, Einstellungen via SharedPreferences
+- [x] **ActivityTimelineScreen:** Datumspicker, Sitzungsliste mit Checkboxen, Übernehmen-Dialog
+- [x] Whitelist-basierte Filterung (Browser, Office, PDF, E-Mail, Kommunikation)
+- [x] Mindestdauer konfigurierbar (Standard 3 Min., 1–60 Min.)
+- [x] Leerlauf-Schwelle Windows konfigurierbar (Standard 5 Min., 1–30 Min.)
+- [x] **Android Quick-Settings-Tile** (`ActivityTrackingTileService.kt`) öffnet Timeline direkt
+- [x] `PACKAGE_USAGE_STATS`-Berechtigung mit In-App-Erklärung und Settings-Deep-Link
+- [x] Whitelist-Editor in Einstellungen (ein Eintrag pro Zeile, Reset auf Standard)
+- [x] App-Icon-Mapping in Timeline (Browser, Office, PDF, Mail, Kommunikation)
+- [x] Karte „Aktivitäts-Timeline" auf Dashboard (mit Tracking-Status-Indikator)
+- [x] Handbuch aktualisiert (NAS-Backend Node.js, Windows-Build, Aktivitäts-Tracking)
+- [x] `ffi: ^2.1.3` in pubspec.yaml
+
 ---
 
 ## Offen / In Arbeit
@@ -96,70 +125,22 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Kurzfristig – Plattform
 - [ ] **Windows-Platform aktivieren:** `flutter create --platforms=windows .` ausführen
 - [ ] **Tray-Widget fertigstellen:** Auskommentierte Zeilen in `tray_service.dart` aktivieren, `assets/tray_icon.ico` hinzufügen
-- [ ] IMAP: `subject_keywords`-Spalte in DB-Migration v3 ergänzen (für bestehende Installationen)
+- [ ] NAS-Verbindungstest auf Windows/Android erfolgreich abschließen (URL + API-Key prüfen)
 
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] **Telefonat-Tracking:** Anrufdauer bekannter Nummern erfassen, optional als Eintrag vorschlagen
 
-### Mittelfristig – Optionales Activity Tracking (Konzept)
-
-Ziel: Recherche- und Arbeitszeit die "nebenbei" passiert nachträglich dokumentierbar machen —
-ohne dauerhaften Overhead, ohne Cloud, ohne Zwang.
-
-**Funktionsprinzip:**
-- Manuell aktivierbar — kein Autostart, kein Dauerbetrieb
-- Während aktiv: lokales Protokoll von Fenster-Titeln + Zeitstempeln (Windows) bzw. App-Namen (Android)
-- Idle-Erkennung: Protokoll pausiert nach 5 Minuten ohne Eingabe automatisch
-- Am Ende: Timeline-Ansicht zeigt was wann aktiv war — Nutzer wählt relevante Blöcke aus
-- Ausgewählte Blöcke → Zeiteintrag mit vorausgefüllter Notiz (Fenster-Titel / App-Name)
-- Alles lokal, nichts wird automatisch gespeichert oder gesendet
-
-**UI-Position:**
-- Windows: Tray-Icon (Taskleiste) → Rechtsklick → "Recherche-Modus starten/stoppen"
-  - Icon-Farbe wechselt während Tracking aktiv (grün = läuft, grau = inaktiv)
-- Android: Quick Settings Tile (Schnelleinstellungen, Wischgeste von oben)
-  - `TileService` in Android-Manifest registrieren
-  - Alternativ: persistente Benachrichtigung mit Start/Stop-Button
-
-**Technische Umsetzung Windows:**
-- Win32 API `GetForegroundWindow` + `GetWindowText` → aktiver Fenster-Titel alle 30s
-- Lokale SQLite-Tabelle `activity_log` (start, end, title, app_name)
-- Flutter FFI oder Methodchannel für Win32-Zugriff
-
-**Technische Umsetzung Android:**
-- `UsageStatsManager` → App-Nutzung mit Zeitstempeln
-- Permission: `PACKAGE_USAGE_STATS` (muss manuell in Einstellungen erteilt werden)
-- Weniger granular als Windows (App-Name, kein Dokument-Titel)
-
-**Whitelist — erfasste Apps:**
-Standard-Whitelist (vordefiniert, erweiterbar in Einstellungen):
-| Kategorie | Apps |
-|---|---|
-| Browser | Chrome, Edge, Firefox, Opera |
-| Office | Word, Excel, PowerPoint, LibreOffice |
-| PDF | Acrobat, Foxit, Sumatra |
-| E-Mail | Outlook, Thunderbird |
-| Kommunikation | Teams, Zoom, Slack |
-| Eigene Ergänzungen | frei konfigurierbar |
-
-Alles außerhalb der Whitelist wird stillschweigend ignoriert (kein Protokolleintrag).
-Fenster-Titel die nur den App-Namen enthalten (z.B. leerer Browser) werden ebenfalls ignoriert.
-
-**Mindestdauer:** 3 Minuten
-- Blöcke unter 3 Minuten werden in der Timeline nicht zur Übernahme angeboten
-- Konfigurierbar zwischen 1 und 15 Minuten in den Einstellungen
-- Begründung: Kurze Wechsel (Kalender öffnen, Mail checken) erzeugen sonst zu viel Rauschen
-
-**Datenschutz:**
-- Browser-URLs/Tabs werden bewusst NICHT erfasst
-- Protokoll wird nach Übernahme in Zeiteintrag automatisch gelöscht
-- Option: Protokoll dauerhaft behalten für spätere Nachkontrolle
-- [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
-- [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
+### Mittelfristig – Aktivitäts-Tracking Erweiterungen
+- [ ] Windows Tray-Icon-Farbe während Tracking aktiv (grün = läuft, grau = inaktiv)
+- [ ] Windows: Prozessname zusätzlich zum Fenstertitel für genauere Whitelist-Prüfung
+- [ ] Android: App-Icon in Timeline anzeigen (PackageManager.getApplicationIcon)
+- [ ] Timeline: Blöcke manuell zusammenführen (mehrere kurze Sitzungen gleicher App)
 
 ### Langfristig / Ideen
+- [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
+- [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
 - [ ] E-Mail-Zeitstempel als automatische Aktivitätshinweise im Dashboard anzeigen
 - [ ] IFTTT/Zapier-Webhook als alternativer Auslöser
 - [ ] Mehrsprachigkeit (DE/EN)
@@ -171,20 +152,29 @@ Fenster-Titel die nur den App-Namen enthalten (z.B. leerer Browser) werden ebenf
 ```
 app/
   lib/
-    models/          time_entry, employer, tracked_location, imap_config, work_type
-    providers/       time_entry_provider, employer_provider, location_provider
+    models/          time_entry, employer, tracked_location, imap_config,
+                     work_type, activity_log
+    providers/       time_entry_provider, employer_provider, location_provider,
+                     activity_provider
     services/        sync_service, export_service, import_service,
                      gps_service, holiday_service, geofencing_service,
-                     imap_service, tray_service
+                     imap_service, tray_service,
+                     activity_tracking_service, activity_tracking_win32
     screens/         home, entries, entry_form, reports, settings,
-                     locations, imap, help
-    database/        database_helper (SQLite v5)
-  android/           ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS
+                     locations, imap, help, activity_timeline
+    database/        database_helper (SQLite v7)
+  android/
+    kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService
+                     Permissions: ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS,
+                                  PACKAGE_USAGE_STATS
   windows/           (noch nicht generiert – flutter create --platforms=windows .)
 
 backend/
-  pages/api/         health, entries/index, entries/sync, entries/[id]
-  lib/               db.ts (SQLite + WAL), auth.ts (API-Key)
+  server.js          Standalone Node.js, kein Build-Schritt
+  package.json       Abhängigkeit: better-sqlite3
+  start_synology.sh  Synology Task Scheduler Startskript
+  backup_synology.sh Tägliches DB-Backup (30 Tage)
+  data/              zeiterfassung.db (SQLite, WAL-Modus)
 
 import_stempeluhr.py   Einmal-Import Stempeluhr 2.1 XLSX → SQLite (Python)
 fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
@@ -196,10 +186,12 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v3: + `fiscal_year_start_month` (employers), `subject_keywords` (imap_config)
 - v4: + `travel_minutes` (time_entries)
 - v5: + `employer_id` (time_entries)
+- v6: + `updated_at` (employers, tracked_locations), `employer_id` (tracked_locations), `sync_state`
+- v7: + `activity_log`
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.4)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.6)
 
 ---
 
@@ -207,11 +199,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 | Thema | Details |
 |---|---|
-| Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant (v1.5) |
+| Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant (v1.7) |
 | Stempeluhr-Import E-Ort | „Mobil" wurde initial als Fahrt importiert – Korrektur via `fix_worktypes.py` |
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
 | HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
-| Windows Tray | Noch nicht fertig – Windows-Platform-Ordner fehlt |
+| Windows Tray | Noch nicht fertig – Windows-Platform-Ordner fehlt noch |
+| Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig nach `flutter create --platforms=windows .` |
+| Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge) |

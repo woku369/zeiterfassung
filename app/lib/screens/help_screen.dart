@@ -55,33 +55,31 @@ class HelpScreen extends StatelessWidget {
             title: 'NAS – Backend einrichten',
             children: [
               _Para(
-                'Das Backend ist eine Next.js-App die als Docker-Container '
-                'auf dem NAS läuft. Sie nimmt Sync-Anfragen der App entgegen '
-                'und speichert Einträge in einer SQLite-Datenbank.',
+                'Das Backend ist ein Node.js-Server (server.js) der auf der '
+                'Synology läuft. Er nimmt Sync-Anfragen entgegen und speichert '
+                'Daten in einer SQLite-Datenbank.',
               ),
-              _SubHeading('Docker Compose (Synology)'),
+              _SubHeading('Synology-Setup (einmalig)'),
+              _Step(number: '1', text: 'Node.js v20 über den Synology Package Manager installieren'),
+              _Step(number: '2', text: 'Verzeichnis /volume1/Gurktaler/zeiterfassung/backend anlegen'),
+              _Step(number: '3', text: 'Dateien server.js, package.json per SSH übertragen'),
+              _Step(number: '4', text: 'npm install im backend-Verzeichnis ausführen'),
+              _Step(number: '5', text: 'start_synology.sh als Aufgabe beim Systemstart eintragen'),
+              _SubHeading('Aufgabenplaner (Systemstart)'),
               _Code(
-                'services:\n'
-                '  zeiterfassung:\n'
-                '    image: node:20-alpine\n'
-                '    working_dir: /app\n'
-                '    volumes:\n'
-                '      - ./backend:/app\n'
-                '      - ./data:/app/data\n'
-                '    command: sh -c "npm install && npm start"\n'
-                '    ports:\n'
-                '      - "3000:3000"\n'
-                '    restart: unless-stopped',
+                '# Systemsteuerung → Aufgabenplaner → Erstellen\n'
+                '# Benutzer: admin · Typ: Beim Systemstart\n'
+                'sh /volume1/Gurktaler/zeiterfassung/backend/start_synology.sh',
               ),
+              _SubHeading('Verbindung testen'),
+              _Code('curl -H "x-api-key: ZE-Gurktaler-2026" \\\n  http://100.121.103.107:3000/api/health'),
               _SubHeading('In der App konfigurieren'),
               _Step(number: '1', text: 'Einstellungen → Arbeitgeber → NAS-URL'),
-              _Step(number: '2', text: 'URL: http://100.x.x.x:3000'),
-              _Step(number: '3', text: 'API-Key eintragen (falls in .env gesetzt)'),
+              _Step(number: '2', text: 'URL: http://100.121.103.107:3000'),
+              _Step(number: '3', text: 'API-Key: ZE-Gurktaler-2026'),
               _Step(number: '4', text: '"Verbindung testen" bestätigt die Erreichbarkeit'),
-              _SubHeading('API-Key setzen (optional aber empfohlen)'),
-              _Code('# backend/.env\nAPI_KEY=dein-geheimes-passwort'),
-              _Hint('Ohne API-Key ist das Backend für jeden im Tailscale-Netz '
-                  'erreichbar. Bei mehreren Personen im Netzwerk empfehlenswert.'),
+              _Hint('Backup läuft automatisch täglich via Aufgabenplaner → '
+                  'backup_synology.sh (30 Tage Aufbewahrung).'),
             ],
           ),
           SizedBox(height: 8),
@@ -171,32 +169,100 @@ class HelpScreen extends StatelessWidget {
           SizedBox(height: 8),
           _Section(
             icon: Icons.laptop_outlined,
-            title: 'Windows Tray-Widget (Setup)',
+            title: 'Windows – App bauen',
             children: [
               _Para(
-                'Das Windows Tray-Widget ermöglicht 1-Klick-Zeiterfassung '
-                'aus der Taskleiste heraus, ohne die App zu öffnen. '
-                'Einmalige Einrichtung erforderlich.',
+                'Die App läuft nativ auf Windows. Einmalig muss die '
+                'Windows-Platform generiert werden, danach mit flutter build windows.',
               ),
-              _SubHeading('Windows-Platform aktivieren'),
+              _SubHeading('Ersteinrichtung'),
               _Code(
-                '# Im Verzeichnis /app ausführen:\n'
-                'flutter create --platforms=windows .',
+                'cd app\n'
+                'flutter create --platforms=windows .\n'
+                'flutter pub get',
               ),
-              _Step(number: '1', text: 'Obigen Befehl im app/-Verzeichnis ausführen'),
+              _SubHeading('Bauen & Starten'),
+              _Code(
+                '# Starten (Entwicklung):\n'
+                'flutter run -d windows\n\n'
+                '# Release-Build:\n'
+                'flutter build windows\n'
+                '# → build\\windows\\x64\\runner\\Release\\zeiterfassung.exe',
+              ),
+              _SubHeading('Aktivitäts-Tracking auf Windows'),
+              _Step(number: '1', text: 'App starten → Übersicht → Aktivitäts-Timeline'),
+              _Step(number: '2', text: '"Start" drücken – läuft im Vordergrund'),
+              _Step(number: '3', text: 'Aktives Fenster wird alle 30 Sek. geprüft'),
+              _Step(number: '4', text: 'Whitelist-Treffer werden als Blöcke aufgezeichnet'),
+              _Step(number: '5', text: 'Blöcke auswählen → "Übernehmen" → Zeiteintrag'),
+              _Hint(
+                'Windows-Tray (1-Klick-Einstempeln) ist vorbereitet in '
+                'tray_service.dart – Aktivierung nach flutter create --platforms=windows '
+                'und Hinzufügen eines 32×32 tray_icon.ico.',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.history_outlined,
+            title: 'Aktivitäts-Tracking',
+            children: [
+              _Para(
+                'Erfasst welche Apps und Fenster aktiv waren und erlaubt '
+                'die nachträgliche Übernahme als Zeiteintrag. '
+                'Kein Autostart – nur wenn manuell aktiviert.',
+              ),
+              _SubHeading('Android – Nutzungsstatistiken'),
+              _Step(number: '1', text: 'Übersicht → Aktivitäts-Timeline antippen'),
               _Step(
                 number: '2',
-                text: 'In tray_service.dart die auskommentierten Zeilen aktivieren',
+                text: '"Berechtigung erteilen" → Einstellungen öffnen sich',
               ),
               _Step(
                 number: '3',
-                text: 'Ein 32×32 Pixel Icon als assets/tray_icon.ico hinzufügen',
+                text: 'Zeiterfassung in der Liste suchen → Zugriff aktivieren',
               ),
-              _Step(number: '4', text: 'flutter build windows'),
+              _Step(number: '4', text: 'Zurück in die App → Timeline lädt automatisch'),
+              _Para(
+                'Android zeigt App-Namen und Nutzungszeiträume für den '
+                'gewählten Tag. Daten kommen direkt vom System '
+                '(UsageStatsManager) – nichts wird separat gespeichert.',
+              ),
+              _SubHeading('Android – Quick-Settings-Tile'),
+              _Step(number: '1', text: 'Schnelleinstellungen von oben nach unten wischen'),
+              _Step(number: '2', text: 'Kacheln bearbeiten → "Aktivitäts-Timeline" hinzufügen'),
+              _Step(number: '3', text: 'Tippen auf Kachel öffnet den Timeline-Screen direkt'),
+              _SubHeading('Windows – Tracking'),
+              _Step(number: '1', text: 'Timeline öffnen → "Start" drücken'),
+              _Step(number: '2', text: 'Aktives Fenster wird alle 30 Sek. geloggt'),
+              _Step(
+                number: '3',
+                text: 'Nach 5 Min. ohne Eingabe (Idle) pausiert die Aufzeichnung',
+              ),
+              _Step(number: '4', text: '"Stopp" → alle Blöcke erscheinen in der Timeline'),
+              _SubHeading('Whitelist'),
+              _Para('Nur Titel/Apps die einen Whitelist-Begriff enthalten werden aufgezeichnet.'),
+              _KeyValue(label: 'Browser', value: 'Chrome, Firefox, Edge, Opera, Brave'),
+              _KeyValue(label: 'Office', value: 'Word, Excel, PowerPoint, LibreOffice'),
+              _KeyValue(label: 'PDF', value: 'Acrobat, Foxit, Sumatra'),
+              _KeyValue(label: 'E-Mail', value: 'Outlook, Thunderbird'),
+              _KeyValue(label: 'Komm.', value: 'Teams, Zoom, Slack'),
               _Hint(
-                'Der Tray-Service ist im Code bereits vollständig vorbereitet '
-                '(lib/services/tray_service.dart). Nur die Platform-Initialisierung '
-                'fehlt noch.',
+                'Whitelist anpassen: Einstellungen → Aktivitäts-Tracking → '
+                'Whitelist bearbeiten. Mindestdauer (Standard 3 Min.) und '
+                'Leerlauf-Schwelle (Standard 5 Min.) sind ebenfalls konfigurierbar.',
+              ),
+              _SubHeading('Blöcke übernehmen'),
+              _Step(number: '1', text: 'Checkboxen der gewünschten Blöcke aktivieren'),
+              _Step(
+                number: '2',
+                text: '"X übernehmen" → Dialog mit Start/Ende, Tätigkeitsart, Pause, Notiz',
+              ),
+              _Step(number: '3', text: 'Bestätigen → Zeiteintrag wird angelegt'),
+              _Hint(
+                'Datenschutz: Browser-URLs werden nicht erfasst. '
+                'Nur Fenster-Titel bzw. App-Name. '
+                'Windows-Protokoll kann über "Protokoll löschen" entfernt werden.',
               ),
             ],
           ),
