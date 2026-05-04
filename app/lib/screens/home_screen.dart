@@ -183,13 +183,6 @@ class _DashboardTabState extends State<_DashboardTab> {
     return Scaffold(
       appBar: AppBar(
         title: Text(DateFormat('MMMM yyyy', 'de_AT').format(now)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Manuell hinzufügen',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EntryFormScreen())),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: tp.refresh,
@@ -237,14 +230,30 @@ class _DashboardTabState extends State<_DashboardTab> {
                         label: const Text('Einstempeln'),
                       ),
                       const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _quickPhoneCall,
-                        icon: const Icon(Icons.phone_outlined, size: 18),
-                        label: const Text('Telefonat erfassen'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: cs.onSurface.withOpacity(0.7),
-                          textStyle: const TextStyle(fontSize: 13),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const EntryFormScreen())),
+                            icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+                            label: const Text('Manuell'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: cs.onSurface.withOpacity(0.7),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton.icon(
+                            onPressed: _quickPhoneCall,
+                            icon: const Icon(Icons.phone_outlined, size: 18),
+                            label: const Text('Telefonat'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: cs.onSurface.withOpacity(0.7),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],
