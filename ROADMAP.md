@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-03 – Aktivitäts-Tracking implementiert (Android + Windows)
+> Letztes Update: 2026-05-04 – Telefonat-Schnellerfassung, Backup/Restore, Arbeitgeber-Switcher
 
 ---
 
@@ -90,6 +90,14 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Adaptive Launcher-Icons (mipmap-anydpi-v26)
 - [x] Core library desugaring für flutter_local_notifications
 
+### v1.7 – UX-Verbesserungen & Backup
+- [x] **Telefonat-Schnellerfassung:** Button auf Dashboard, Dialog mit Dauer (+/−5 Min.), Arbeitgeber-Auswahl, Notiz; Start = jetzt−Dauer
+- [x] **Arbeitgeber-Switcher auf Dashboard:** ChoiceChip-Leiste (ab 2 Arbeitgebern), sofortiger Wechsel per Tap
+- [x] **Arbeitgeber löschen:** PopupMenuButton auf jeder Arbeitgeber-Karte (Einstellungen), Bestätigungsdialog, Schutz vor Löschen des letzten Arbeitgebers
+- [x] **Backup & Restore (Windows):** JSON-Export aller Tabellen + SharedPreferences via Datei-Dialog; Restore mit Bestätigungsdialog + Transaktion
+- [x] **Arbeitgeber-Auswahl pro Eintrag:** Dropdown im Eintrag-Formular und Timeline-Übernehmen-Dialog
+- [x] **Geofencing-Richtung:** Standort betreten → Arbeitgeber wechselt automatisch (war umgekehrt)
+
 ### v1.6 – Aktivitäts-Tracking
 - [x] **ActivityLog-Modell** + DB-Migration v7 (`activity_log`-Tabelle, Windows-seitig)
 - [x] **ActivityTrackingService:**
@@ -130,7 +138,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
-- [ ] **Telefonat-Tracking:** Anrufdauer bekannter Nummern erfassen, optional als Eintrag vorschlagen
+- [ ] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe anzeigen und direkt als Eintrag übernehmen
 
 ### Mittelfristig – Aktivitäts-Tracking Erweiterungen
 - [ ] Windows Tray-Icon-Farbe während Tracking aktiv (grün = läuft, grau = inaktiv)
@@ -158,7 +166,7 @@ app/
                      activity_provider
     services/        sync_service, export_service, import_service,
                      gps_service, holiday_service, geofencing_service,
-                     imap_service, tray_service,
+                     imap_service, tray_service, backup_service,
                      activity_tracking_service, activity_tracking_win32
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline

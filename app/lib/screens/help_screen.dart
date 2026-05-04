@@ -204,6 +204,26 @@ class HelpScreen extends StatelessWidget {
           ),
           SizedBox(height: 8),
           _Section(
+            icon: Icons.phone_outlined,
+            title: 'Telefonat schnell erfassen',
+            children: [
+              _Para(
+                'Für Telefonate – besonders mit einem zweiten Arbeitgeber – '
+                'gibt es auf der Übersicht einen direkten Schnellerfassungs-Button.',
+              ),
+              _Step(number: '1', text: 'Übersicht → „Telefonat erfassen" antippen'),
+              _Step(number: '2', text: 'Dauer in 5-Minuten-Schritten einstellen (+/−)'),
+              _Step(number: '3', text: 'Arbeitgeber wählen (Standard: aktiver Arbeitgeber)'),
+              _Step(number: '4', text: 'Optionale Notiz eingeben → Speichern'),
+              _Hint(
+                'Start = jetzt minus Dauer, Ende = jetzt. '
+                'Der Eintrag erscheint sofort in der Eintrags-Liste '
+                'mit Tätigkeitsart „Telefonat".',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
             icon: Icons.history_outlined,
             title: 'Aktivitäts-Tracking',
             children: [

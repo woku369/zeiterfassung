@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../models/employer.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../services/holiday_service.dart';
@@ -94,6 +96,52 @@ class _DashboardTabState extends State<_DashboardTab> {
       breakMinutes: result['breakMinutes'] as int,
       note: result['note'] as String,
     );
+  }
+
+  Future<void> _quickPhoneCall() async {
+    final ep = context.read<EmployerProvider>();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _PhoneCallDialog(
+        initialEmployerId: ep.active?.id,
+        employers: ep.employers,
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    final now = DateTime.now();
+    final durationMinutes = result['durationMinutes'] as int;
+    final start = now.subtract(Duration(minutes: durationMinutes));
+    final date = DateTime(start.year, start.month, start.day);
+    final dayType = HolidayService.instance.isHoliday(date)
+        ? DayType.holiday
+        : date.weekday == 6
+            ? DayType.saturday
+            : date.weekday == 7
+                ? DayType.sunday
+                : DayType.workday;
+
+    final entry = TimeEntry(
+      id: const Uuid().v4(),
+      date: date,
+      startTime: start,
+      endTime: now,
+      breakMinutes: 0,
+      workType: WorkType.phoneCall,
+      dayType: dayType,
+      note: result['note'] as String,
+      employerId: result['employerId'] as String?,
+      createdAt: now,
+    );
+    await context.read<TimeEntryProvider>().addEntry(entry);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Telefonat ($durationMinutes Min.) gespeichert'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   String _hhmm(double h) {
@@ -187,6 +235,16 @@ class _DashboardTabState extends State<_DashboardTab> {
                         onPressed: _clockIn,
                         icon: const Icon(Icons.play_arrow_rounded),
                         label: const Text('Einstempeln'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _quickPhoneCall,
+                        icon: const Icon(Icons.phone_outlined, size: 18),
+                        label: const Text('Telefonat erfassen'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: cs.onSurface.withOpacity(0.7),
+                          textStyle: const TextStyle(fontSize: 13),
+                        ),
                       ),
                     ],
                   ],
@@ -471,6 +529,124 @@ class _ClockOutDialogState extends State<_ClockOutDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
         FilledButton(onPressed: () => Navigator.pop(context, {'breakMinutes': _breakMinutes, 'note': _noteCtrl.text.trim()}), child: const Text('Ausstempeln')),
+      ],
+    );
+  }
+}
+
+class _PhoneCallDialog extends StatefulWidget {
+  final String? initialEmployerId;
+  final List<Employer> employers;
+  const _PhoneCallDialog({required this.initialEmployerId, required this.employers});
+
+  @override
+  State<_PhoneCallDialog> createState() => _PhoneCallDialogState();
+}
+
+class _PhoneCallDialogState extends State<_PhoneCallDialog> {
+  int _minutes = 15;
+  late String? _employerId;
+  final _noteCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _employerId = widget.initialEmployerId;
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final start = now.subtract(Duration(minutes: _minutes));
+    final tf = DateFormat('HH:mm');
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.phone_outlined, size: 20),
+          SizedBox(width: 8),
+          Text('Telefonat erfassen'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${tf.format(start)} – ${tf.format(now)}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Text('Dauer:'),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: _minutes > 5 ? () => setState(() => _minutes -= 5) : null,
+              ),
+              SizedBox(
+                width: 52,
+                child: Text(
+                  '$_minutes Min.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () => setState(() => _minutes += 5),
+              ),
+            ],
+          ),
+          if (widget.employers.length > 1) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String?>(
+              value: _employerId,
+              decoration: const InputDecoration(
+                labelText: 'Arbeitgeber',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Kein Arbeitgeber')),
+                ...widget.employers.map((e) => DropdownMenuItem<String?>(
+                      value: e.id,
+                      child: Text(e.name),
+                    )),
+              ],
+              onChanged: (v) => setState(() => _employerId = v),
+            ),
+          ],
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Notiz (optional)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            maxLines: 2,
+            autofocus: widget.employers.length <= 1,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, {
+            'durationMinutes': _minutes,
+            'employerId': _employerId,
+            'note': _noteCtrl.text.trim(),
+          }),
+          child: const Text('Speichern'),
+        ),
       ],
     );
   }
