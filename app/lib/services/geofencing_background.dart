@@ -9,7 +9,7 @@ Future<void> configureGeofencingBackground() async {
   await FlutterBackgroundService().configure(
     androidConfiguration: AndroidConfiguration(
       onStart: _onStart,
-      autoStart: false,
+      autoStart: true,
       isForegroundMode: true,
       notificationChannelId: 'geofence_service',
       initialNotificationTitle: 'Standort-Erkennung aktiv',
