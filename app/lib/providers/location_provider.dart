@@ -20,6 +20,9 @@ class LocationProvider extends ChangeNotifier {
   }
 
   Future<void> _seedDefaultLocations() async {
+    // Skip seeding if any employer has a NAS URL – data will come from sync.
+    final employers = await DatabaseHelper.instance.getEmployers();
+    if (employers.any((e) => e.nasUrl?.isNotEmpty == true)) return;
     final seeds = [
       TrackedLocation(
         id: const Uuid().v4(),

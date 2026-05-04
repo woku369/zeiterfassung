@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/employer_provider.dart';
 import 'providers/time_entry_provider.dart';
+import 'providers/location_provider.dart';
 import 'providers/sync_provider.dart';
 import 'services/geofencing_service.dart';
 import 'screens/home_screen.dart';
@@ -36,12 +37,16 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
     });
   }
 
-  void _setupSync() {
+  Future<void> _setupSync() async {
     final sp = context.read<SyncProvider>();
     final tp = context.read<TimeEntryProvider>();
+    final lp = context.read<LocationProvider>();
     tp.setSyncTrigger(sp.triggerSync);
     sp.startPeriodicSync();
-    sp.syncNow(); // startup sync (fire-and-forget)
+    await sp.syncNow(); // startup sync – NAS hat Vorrang
+    // Reload providers so they pick up any data pulled from NAS.
+    await lp.load();
+    await tp.refresh();
   }
 
   void _setupGeofenceCallback() {
