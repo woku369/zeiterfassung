@@ -32,6 +32,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── NAS-Verbindung ─────────────────────────────────────────────
+          Text('NAS-Verbindung', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _NasCard(),
+          const SizedBox(height: 20),
+
           // ── Arbeitgeber ────────────────────────────────────────────────
           Text('Arbeitgeber', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -55,29 +61,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     onTap: () => _editEmployer(context, employer),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.link_outlined),
-                    title: const Text('NAS-URL (Next.js)'),
-                    subtitle: Text(
-                      employer.nasUrl?.isNotEmpty == true
-                          ? employer.nasUrl!
-                          : 'Nicht konfiguriert',
-                      style: TextStyle(
-                        color: employer.nasUrl?.isNotEmpty == true
-                            ? null
-                            : Colors.grey,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.edit_outlined),
-                    onTap: () => _editNas(context, employer),
-                  ),
-                  if (employer.nasUrl?.isNotEmpty == true)
-                    ListTile(
-                      leading: const Icon(Icons.wifi_tethering_outlined),
-                      title: const Text('Verbindung testen'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _testConnection(context, employer),
-                    ),
                 ],
               ),
             )
@@ -375,6 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ignore: unused_element – kept for potential future per-employer override
   Future<void> _editNas(BuildContext context, Employer employer) async {
     final urlCtrl = TextEditingController(text: employer.nasUrl ?? '');
     final keyCtrl = TextEditingController(text: employer.nasApiKey ?? '');
@@ -437,6 +421,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
       backgroundColor:
           ok ? Colors.green : Theme.of(context).colorScheme.error,
     ));
+  }
+}
+
+class _NasCard extends StatefulWidget {
+  @override
+  State<_NasCard> createState() => _NasCardState();
+}
+
+class _NasCardState extends State<_NasCard> {
+  bool _testing = false;
+
+  Future<void> _edit() async {
+    final sp = context.read<SyncProvider>();
+    final urlCtrl = TextEditingController(text: sp.nasUrl);
+    final keyCtrl = TextEditingController(text: sp.nasApiKey);
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('NAS-Verbindung'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: urlCtrl,
+              decoration: const InputDecoration(
+                labelText: 'URL (z. B. http://100.x.x.x:3000)',
+                border: OutlineInputBorder(),
+                helperText: 'Tailscale-IP des NAS',
+              ),
+              keyboardType: TextInputType.url,
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: keyCtrl,
+              decoration: const InputDecoration(
+                labelText: 'API-Key (optional)',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+                context, {'url': urlCtrl.text, 'key': keyCtrl.text}),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && context.mounted) {
+      await context.read<SyncProvider>().saveNasConfig(
+            result['url']!,
+            result['key']!,
+          );
+    }
+  }
+
+  Future<void> _test() async {
+    setState(() => _testing = true);
+    final ok = await context.read<SyncProvider>().testConnection();
+    if (!mounted) return;
+    setState(() => _testing = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'),
+      backgroundColor: ok ? Colors.green : Theme.of(context).colorScheme.error,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SyncProvider>();
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: Text(
+              sp.nasUrl.isEmpty ? 'Nicht konfiguriert' : sp.nasUrl,
+              style: TextStyle(
+                color: sp.nasUrl.isEmpty ? Colors.grey : null,
+                fontSize: sp.nasUrl.isEmpty ? null : 13,
+              ),
+            ),
+            subtitle:
+                sp.nasUrl.isEmpty ? null : const Text('NAS-URL · Tailscale'),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: _edit,
+          ),
+          if (sp.hasNasConfig) ...[
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            ListTile(
+              leading: _testing
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.wifi_tethering_outlined),
+              title: const Text('Verbindung testen'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _testing ? null : _test,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

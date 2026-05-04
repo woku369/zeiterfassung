@@ -48,10 +48,7 @@ void main() async {
         ),
         ChangeNotifierProvider(create: (_) => LocationProvider()..load()),
         ChangeNotifierProvider.value(value: activityProvider),
-        ChangeNotifierProxyProvider<EmployerProvider, SyncProvider>(
-          create: (_) => syncProvider,
-          update: (_, emp, prev) => prev!..updateEmployers(emp.employers),
-        ),
+        ChangeNotifierProvider.value(value: syncProvider),
       ],
       child: ZeiterfassungApp(navChannel: navChannel),
     ),

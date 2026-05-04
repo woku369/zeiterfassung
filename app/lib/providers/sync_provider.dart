@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/employer.dart';
 import '../services/sync_service.dart';
 
 class SyncProvider extends ChangeNotifier {
   static const _prefInterval = 'sync_interval_minutes';
+  static const _prefNasUrl   = 'global_nas_url';
+  static const _prefNasKey   = 'global_nas_api_key';
   static const _defaultInterval = 30;
 
-  List<Employer> _employers = [];
   bool _isSyncing = false;
   DateTime? _lastSyncAt;
   String? _lastError;
   int _intervalMinutes = _defaultInterval;
+  String _nasUrl = '';
+  String _nasApiKey = '';
   Timer? _periodicTimer;
   Timer? _debounceTimer;
 
@@ -20,18 +22,32 @@ class SyncProvider extends ChangeNotifier {
   DateTime? get lastSyncAt => _lastSyncAt;
   String? get lastError => _lastError;
   int get intervalMinutes => _intervalMinutes;
-
-  bool get hasNasConfig =>
-      _employers.any((e) => e.nasUrl?.isNotEmpty == true);
+  String get nasUrl => _nasUrl;
+  String get nasApiKey => _nasApiKey;
+  bool get hasNasConfig => _nasUrl.isNotEmpty;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _intervalMinutes = prefs.getInt(_prefInterval) ?? _defaultInterval;
+    _nasUrl  = prefs.getString(_prefNasUrl)  ?? '';
+    _nasApiKey = prefs.getString(_prefNasKey) ?? '';
   }
 
-  /// Called by ProxyProvider when employer list changes.
-  void updateEmployers(List<Employer> employers) {
-    _employers = employers;
+  Future<void> saveNasConfig(String url, String apiKey) async {
+    _nasUrl    = url.trim();
+    _nasApiKey = apiKey.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefNasUrl, _nasUrl);
+    await prefs.setString(_prefNasKey, _nasApiKey);
+    notifyListeners();
+  }
+
+  Future<bool> testConnection() async {
+    if (!hasNasConfig) return false;
+    return SyncService.instance.testConnection(
+      baseUrl: _nasUrl,
+      apiKey: _nasApiKey.isEmpty ? null : _nasApiKey,
+    );
   }
 
   /// Immediate sync – called on startup or manual button.
@@ -40,14 +56,13 @@ class SyncProvider extends ChangeNotifier {
     await _doSync();
   }
 
-  /// Debounced sync – called after data writes (3 s delay to batch rapid ops).
+  /// Debounced sync after data writes (3 s delay to batch rapid ops).
   void triggerSync() {
     if (!hasNasConfig) return;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(seconds: 3), _doSync);
   }
 
-  /// Start repeating timer. Call once after app is ready.
   void startPeriodicSync() {
     _periodicTimer?.cancel();
     if (_intervalMinutes <= 0) return;
@@ -66,35 +81,24 @@ class SyncProvider extends ChangeNotifier {
   }
 
   Future<void> _doSync() async {
-    final configured =
-        _employers.where((e) => e.nasUrl?.isNotEmpty == true).toList();
-    if (configured.isEmpty || _isSyncing) return;
-
+    if (!hasNasConfig || _isSyncing) return;
     _isSyncing = true;
     _lastError = null;
     notifyListeners();
 
-    final errors = <String>[];
-    for (final emp in configured) {
-      try {
-        final result = await SyncService.instance.sync(
-          baseUrl: emp.nasUrl!,
-          apiKey: emp.nasApiKey,
-        );
-        if (result.errors.isNotEmpty) errors.addAll(result.errors);
-      } catch (e) {
-        errors.add('${emp.name}: $e');
-      }
+    try {
+      final result = await SyncService.instance.sync(
+        baseUrl: _nasUrl,
+        apiKey: _nasApiKey.isEmpty ? null : _nasApiKey,
+      );
+      _lastError = result.errors.isEmpty ? null : result.errors.first;
+      if (_lastError == null) _lastSyncAt = DateTime.now();
+    } catch (e) {
+      _lastError = e.toString();
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
-
-    _isSyncing = false;
-    if (errors.isEmpty) {
-      _lastSyncAt = DateTime.now();
-      _lastError = null;
-    } else {
-      _lastError = errors.first;
-    }
-    notifyListeners();
   }
 
   @override
