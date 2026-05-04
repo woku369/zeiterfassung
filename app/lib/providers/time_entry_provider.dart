@@ -10,12 +10,15 @@ class TimeEntryProvider extends ChangeNotifier {
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
   String? _employerId;
+  VoidCallback? _syncTrigger;
 
   List<TimeEntry> get entries => _entries;
   TimeEntry? get activeEntry => _activeEntry;
   int get selectedYear => _selectedYear;
   int get selectedMonth => _selectedMonth;
   String? get employerId => _employerId;
+
+  void setSyncTrigger(VoidCallback trigger) => _syncTrigger = trigger;
 
   /// Called by ProxyProvider when the active employer changes.
   void setActiveEmployer(String? employerId) {
@@ -54,6 +57,7 @@ class TimeEntryProvider extends ChangeNotifier {
       _entries.insert(0, entry);
     }
     notifyListeners();
+    _syncTrigger?.call();
     return entry;
   }
 
@@ -69,6 +73,7 @@ class TimeEntryProvider extends ChangeNotifier {
     if (idx != -1) _entries[idx] = updated;
     _activeEntry = null;
     notifyListeners();
+    _syncTrigger?.call();
   }
 
   Future<void> addEntry(TimeEntry entry) async {
@@ -82,6 +87,7 @@ class TimeEntryProvider extends ChangeNotifier {
       _entries.sort((a, b) => b.startTime.compareTo(a.startTime));
     }
     notifyListeners();
+    _syncTrigger?.call();
   }
 
   Future<void> updateEntry(TimeEntry entry) async {
@@ -92,6 +98,7 @@ class TimeEntryProvider extends ChangeNotifier {
       _activeEntry = entry.isActive ? entry : null;
     }
     notifyListeners();
+    _syncTrigger?.call();
   }
 
   Future<void> deleteEntry(String id) async {
@@ -99,6 +106,7 @@ class TimeEntryProvider extends ChangeNotifier {
     _entries.removeWhere((e) => e.id == id);
     if (_activeEntry?.id == id) _activeEntry = null;
     notifyListeners();
+    _syncTrigger?.call();
   }
 
   Map<String, List<TimeEntry>> get entriesByWeek {

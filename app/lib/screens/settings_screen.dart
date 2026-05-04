@@ -7,6 +7,7 @@ import '../providers/activity_provider.dart';
 import '../models/employer.dart';
 import '../services/sync_service.dart';
 import '../services/backup_service.dart';
+import '../providers/sync_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/activity_tracking_service.dart';
 import 'locations_screen.dart';
@@ -145,6 +146,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _addEmployer(context),
             ),
           ),
+
+          // ── Synchronisation ───────────────────────────────────────────
+          const SizedBox(height: 20),
+          Text('Synchronisation', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _SyncCard(),
 
           // ── Automatische Erfassung ─────────────────────────────────────
           const SizedBox(height: 20),
@@ -622,6 +629,87 @@ class _HolidayCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SyncCard extends StatelessWidget {
+  static const _intervalOptions = [0, 15, 30, 60];
+  static const _intervalLabels = ['Aus', '15 Min', '30 Min', '60 Min'];
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SyncProvider>();
+    final tf = DateFormat('HH:mm', 'de_AT');
+
+    String statusText;
+    Color? statusColor;
+    if (sp.isSyncing) {
+      statusText = 'Synchronisierung läuft…';
+      statusColor = null;
+    } else if (sp.lastError != null) {
+      statusText = 'Fehler: ${sp.lastError}';
+      statusColor = Theme.of(context).colorScheme.error;
+    } else if (sp.lastSyncAt != null) {
+      statusText = 'Zuletzt: ${tf.format(sp.lastSyncAt!)}';
+      statusColor = Colors.green;
+    } else {
+      statusText = sp.hasNasConfig ? 'Noch nicht synchronisiert' : 'Kein NAS konfiguriert';
+      statusColor = Colors.grey;
+    }
+
+    final currentIdx = _intervalOptions.indexOf(sp.intervalMinutes);
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: sp.isSyncing
+                ? const SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(
+                    sp.lastError != null
+                        ? Icons.sync_problem_outlined
+                        : Icons.sync_outlined,
+                    color: statusColor,
+                  ),
+            title: Text(statusText,
+                style: TextStyle(color: statusColor, fontSize: 14)),
+            trailing: FilledButton.tonal(
+              onPressed: sp.isSyncing || !sp.hasNasConfig
+                  ? null
+                  : () => sp.syncNow(),
+              child: const Text('Jetzt'),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const Text('Auto-Sync'),
+                const Spacer(),
+                SegmentedButton<int>(
+                  segments: List.generate(
+                    _intervalOptions.length,
+                    (i) => ButtonSegment(
+                      value: _intervalOptions[i],
+                      label: Text(_intervalLabels[i],
+                          style: const TextStyle(fontSize: 11)),
+                    ),
+                  ),
+                  selected: {currentIdx >= 0 ? sp.intervalMinutes : 30},
+                  onSelectionChanged: (s) => sp.setInterval(s.first),
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
