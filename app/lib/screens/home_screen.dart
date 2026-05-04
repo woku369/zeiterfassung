@@ -117,7 +117,8 @@ class _DashboardTabState extends State<_DashboardTab> {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TimeEntryProvider>();
-    final employer = context.watch<EmployerProvider>().active;
+    final ep = context.watch<EmployerProvider>();
+    final employer = ep.active;
     final ap = context.watch<ActivityProvider>();
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
@@ -147,6 +148,9 @@ class _DashboardTabState extends State<_DashboardTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
+            if (ep.employers.length > 1)
+              _EmployerChipBar(ep: ep),
+            const SizedBox(height: 4),
             Card(
               color: active != null ? cs.primaryContainer : cs.surfaceContainerLow,
               child: Padding(
@@ -285,6 +289,32 @@ class _DashboardTabState extends State<_DashboardTab> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmployerChipBar extends StatelessWidget {
+  final EmployerProvider ep;
+  const _EmployerChipBar({required this.ep});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: ep.employers.map((e) {
+          final active = ep.active?.id == e.id;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(e.name),
+              selected: active,
+              onSelected: (_) => ep.setActive(e),
+              avatar: active ? const Icon(Icons.check, size: 16) : null,
+            ),
+          );
+        }).toList(),
       ),
     );
   }
