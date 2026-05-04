@@ -6,27 +6,12 @@ import '../database/database_helper.dart';
 
 class LocationProvider extends ChangeNotifier {
   List<TrackedLocation> _locations = [];
-  String? _activeEmployerId;
 
   List<TrackedLocation> get locations => _locations;
 
-  /// Locations that are active AND belong to the current employer.
-  /// employer_id == null means shared across all employers (e.g. Homeoffice).
-  List<TrackedLocation> get activeLocations => _locations
-      .where((l) => l.isActive && _matchesEmployer(l))
-      .toList();
-
-  bool _matchesEmployer(TrackedLocation l) {
-    if (l.employerId == null) return true;
-    if (_activeEmployerId == null) return true;
-    return l.employerId == _activeEmployerId;
-  }
-
-  void setActiveEmployer(String? employerId) {
-    if (_activeEmployerId == employerId) return;
-    _activeEmployerId = employerId;
-    notifyListeners();
-  }
+  /// All active locations – entering one auto-switches the active employer.
+  List<TrackedLocation> get activeLocations =>
+      _locations.where((l) => l.isActive).toList();
 
   Future<void> load() async {
     _locations = await DatabaseHelper.instance.getLocations();

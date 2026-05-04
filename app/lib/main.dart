@@ -38,10 +38,7 @@ void main() async {
           create: (_) => TimeEntryProvider(),
           update: (_, emp, prev) => prev!..setActiveEmployer(emp.active?.id),
         ),
-        ChangeNotifierProxyProvider<EmployerProvider, LocationProvider>(
-          create: (_) => LocationProvider()..load(),
-          update: (_, emp, prev) => prev!..setActiveEmployer(emp.active?.id),
-        ),
+        ChangeNotifierProvider(create: (_) => LocationProvider()..load()),
         ChangeNotifierProvider.value(value: activityProvider),
       ],
       child: ZeiterfassungApp(navChannel: navChannel),

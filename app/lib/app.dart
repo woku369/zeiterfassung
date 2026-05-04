@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
+import 'providers/employer_provider.dart';
+import 'services/geofencing_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/activity_timeline_screen.dart';
 
@@ -25,6 +28,17 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
         );
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setupGeofenceCallback());
+  }
+
+  void _setupGeofenceCallback() {
+    GeofencingService.instance.onZoneChange = (location, entered) {
+      if (!entered || location.employerId == null) return;
+      final ep = context.read<EmployerProvider>();
+      final employers = ep.employers;
+      final idx = employers.indexWhere((e) => e.id == location.employerId);
+      if (idx != -1) ep.setActive(employers[idx]);
+    };
   }
 
   @override

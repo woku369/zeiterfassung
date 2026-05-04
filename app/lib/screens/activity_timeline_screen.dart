@@ -64,7 +64,6 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
     final result = await _showConvertDialog(earliest, latest, titles);
     if (result == null || !mounted) return;
 
-    final employer = context.read<EmployerProvider>().active;
     final date = DateTime(earliest.year, earliest.month, earliest.day);
     final dayType = HolidayService.instance.isHoliday(date)
         ? DayType.holiday
@@ -83,7 +82,7 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
       workType: result['workType'] as WorkType,
       dayType: dayType,
       note: result['note'] as String,
-      employerId: employer?.id,
+      employerId: result['employerId'] as String?,
       createdAt: DateTime.now(),
     );
 
@@ -102,6 +101,8 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
     final noteCtrl = TextEditingController(text: titles);
     int breakMinutes = 0;
     final tf = DateFormat('HH:mm');
+    final employers = context.read<EmployerProvider>().employers;
+    String? employerId = context.read<EmployerProvider>().active?.id;
 
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -134,6 +135,27 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                       .toList(),
                   onChanged: (v) => setState(() => workType = v!),
                 ),
+                if (employers.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    value: employerId,
+                    decoration: const InputDecoration(
+                      labelText: 'Arbeitgeber',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Kein Arbeitgeber'),
+                      ),
+                      ...employers.map((e) => DropdownMenuItem<String?>(
+                            value: e.id,
+                            child: Text(e.name),
+                          )),
+                    ],
+                    onChanged: (v) => setState(() => employerId = v),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -172,6 +194,7 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                 'workType': workType,
                 'break': breakMinutes,
                 'note': noteCtrl.text.trim(),
+                'employerId': employerId,
               }),
               child: const Text('Übernehmen'),
             ),

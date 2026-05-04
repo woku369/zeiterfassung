@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../providers/time_entry_provider.dart';
+import '../providers/employer_provider.dart';
 import '../services/holiday_service.dart';
 
 class EntryFormScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late TextEditingController _noteCtrl;
   late TextEditingController _kmCtrl;
   late TextEditingController _breakCtrl;
+  String? _employerId;
 
   bool get _isNew => widget.entry == null;
   bool get _isAbsence => _workType.isAbsence;
@@ -40,6 +42,8 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     _breakMinutes = e?.breakMinutes ?? 0;
     _workType = e?.workType ?? WorkType.homeoffice;
     _dayType = e?.dayType ?? _defaultDayType(_date);
+    _employerId = e?.employerId ??
+        Provider.of<TimeEntryProvider>(context, listen: false).employerId;
     _noteCtrl = TextEditingController(text: e?.note ?? '');
     _kmCtrl = TextEditingController(text: e?.distanceKm?.toString() ?? '');
     _breakCtrl = TextEditingController(text: _breakMinutes.toString());
@@ -106,7 +110,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       note: _noteCtrl.text.trim(),
       distanceKm: km,
       travelMinutes: widget.entry?.travelMinutes ?? 0,
-      employerId: widget.entry?.employerId ?? tp.employerId,
+      employerId: _employerId,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
     );
@@ -120,6 +124,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final employers = context.read<EmployerProvider>().employers;
     final df = DateFormat('EEE, d. MMMM yyyy', 'de_AT');
     final holidayName = HolidayService.instance.holidayName(_date);
     return Scaffold(
@@ -216,6 +221,27 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                 if (v != null) setState(() => _workType = v);
               },
             ),
+            const SizedBox(height: 12),
+            if (employers.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                value: _employerId,
+                decoration: const InputDecoration(
+                  labelText: 'Arbeitgeber',
+                  prefixIcon: Icon(Icons.business_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Kein Arbeitgeber'),
+                  ),
+                  ...employers.map((e) => DropdownMenuItem<String?>(
+                        value: e.id,
+                        child: Text(e.name),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _employerId = v),
+              ),
             const SizedBox(height: 12),
             if (!_isAbsence) ...[
               // Times
