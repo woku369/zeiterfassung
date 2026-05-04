@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/export_service.dart';
 import '../services/import_service.dart';
 import '../services/sync_service.dart';
@@ -148,16 +149,16 @@ class _MonthTabState extends State<_MonthTab> {
   }
 
   Future<void> _sync() async {
-    final employer = context.read<EmployerProvider>().active;
-    if (employer?.nasUrl == null || employer!.nasUrl!.isEmpty) {
+    final sp = context.read<SyncProvider>();
+    if (!sp.hasNasConfig) {
       _showError('Bitte NAS-URL in den Einstellungen konfigurieren.');
       return;
     }
     setState(() => _syncing = true);
     try {
       final result = await SyncService.instance.sync(
-        baseUrl: employer.nasUrl!,
-        apiKey: employer.nasApiKey,
+        baseUrl: sp.nasUrl,
+        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
       );
       if (!mounted) return;
       final msg = result.errors.isEmpty
@@ -321,8 +322,8 @@ class _MonthTabState extends State<_MonthTab> {
         _ActionTile(
           icon: Icons.sync,
           title: 'Mit NAS synchronisieren',
-          subtitle: employer?.nasUrl != null
-              ? employer!.nasUrl!
+          subtitle: context.watch<SyncProvider>().hasNasConfig
+              ? context.watch<SyncProvider>().nasUrl
               : 'NAS-URL in Einstellungen konfigurieren',
           loading: _syncing,
           onTap: _sync,
