@@ -21,10 +21,11 @@ class HelpScreen extends StatelessWidget {
                 'dem jeweiligen Gerät und werden optional mit dem NAS '
                 'synchronisiert.',
               ),
-              _Step(number: '1', text: 'Arbeitgeber unter Einstellungen anlegen'),
-              _Step(number: '2', text: 'NAS-URL eintragen (oder ohne Sync nutzen)'),
-              _Step(number: '3', text: 'Standorte definieren für automatische Erfassung'),
-              _Step(number: '4', text: 'IMAP-Konto einrichten für E-Mail-Sortierung'),
+              _Step(number: '1', text: 'NAS-URL eintragen: Einstellungen → NAS-Verbindung (ganz oben)'),
+              _Step(number: '2', text: '"Verbinden" – Arbeitgeber und Einträge werden automatisch synchronisiert'),
+              _Step(number: '3', text: 'Arbeitgeber anlegen falls noch keiner vorhanden (oder per Sync erhalten)'),
+              _Step(number: '4', text: 'Standorte definieren für automatische Arbeitgeber-Erkennung'),
+              _Step(number: '5', text: 'IMAP-Konto einrichten für E-Mail-Sortierung'),
             ],
           ),
           SizedBox(height: 8),
@@ -74,12 +75,16 @@ class HelpScreen extends StatelessWidget {
               _SubHeading('Verbindung testen'),
               _Code('curl -H "x-api-key: ZE-Gurktaler-2026" \\\n  http://100.121.103.107:3000/api/health'),
               _SubHeading('In der App konfigurieren'),
-              _Step(number: '1', text: 'Einstellungen → Arbeitgeber → NAS-URL'),
+              _Step(number: '1', text: 'Einstellungen → NAS-Verbindung (ganz oben, vor Arbeitgebern)'),
               _Step(number: '2', text: 'URL: http://100.121.103.107:3000'),
               _Step(number: '3', text: 'API-Key: ZE-Gurktaler-2026'),
               _Step(number: '4', text: '"Verbindung testen" bestätigt die Erreichbarkeit'),
-              _Hint('Backup läuft automatisch täglich via Aufgabenplaner → '
-                  'backup_synology.sh (30 Tage Aufbewahrung).'),
+              _Hint(
+                'NAS-Konfiguration ist unabhängig von Arbeitgebern – '
+                'NAS zuerst einrichten, dann synchronisieren. '
+                'Backup läuft automatisch täglich via Aufgabenplaner → '
+                'backup_synology.sh (30 Tage Aufbewahrung).',
+              ),
             ],
           ),
           SizedBox(height: 8),
@@ -89,28 +94,34 @@ class HelpScreen extends StatelessWidget {
             children: [
               _Para(
                 'Die App funktioniert auf jedem Gerät unabhängig. '
-                'Synchronisierung ist optional und erfolgt manuell.',
+                'Synchronisierung läuft automatisch – beim Start, '
+                'periodisch und nach jeder Datenänderung.',
               ),
+              _SubHeading('Automatische Synchronisierung'),
+              _KeyValue(label: 'Beim Start', value: 'NAS-Daten werden sofort geladen (NAS hat Vorrang)'),
+              _KeyValue(label: 'Periodisch', value: 'Alle 15 / 30 / 60 Min. (in Einstellungen wählbar)'),
+              _KeyValue(label: 'Nach Änderung', value: '3 Sek. nach jedem Speichern/Löschen'),
               _SubHeading('Empfohlener Workflow'),
               _Step(
                 number: '1',
-                text: 'Auf Gerät A Einträge erfassen (auch offline möglich)',
+                text: 'NAS-URL einmalig einrichten – fertig. Sync läuft automatisch.',
               ),
               _Step(
                 number: '2',
-                text: 'Einträge → Sync: sendet ungesyncte Einträge ans NAS',
+                text: 'Einträge auf Gerät A erfassen (auch offline möglich)',
               ),
               _Step(
                 number: '3',
-                text: 'Auf Gerät B: Sync → holt alle Einträge vom NAS',
+                text: 'Gerät B öffnen → beim Start werden alle Einträge geladen',
               ),
               _Hint(
                 'Konflikte: Einträge mit derselben ID werden per Upsert '
-                'überschrieben – immer der zuletzt gesyncte Stand gewinnt.',
+                'überschrieben – immer der zuletzt gesyncte Stand gewinnt. '
+                'Manueller Sync jederzeit: Einstellungen → Sync-Status → Jetzt.',
               ),
               _SubHeading('Geräte-Übersicht'),
-              _KeyValue(label: 'Android', value: 'GPS, Geofencing, Benachrichtigungen'),
-              _KeyValue(label: 'Windows', value: 'System-Tray (nach Platform-Setup), IMAP-Sync'),
+              _KeyValue(label: 'Android', value: 'GPS, Geofencing (Foreground-Service), automatischer Sync'),
+              _KeyValue(label: 'Windows', value: 'Aktivitäts-Tracking, IMAP-Sync, Backup/Restore'),
               _KeyValue(label: 'NAS', value: 'Zentraler Datenspeicher, immer online'),
             ],
           ),
@@ -120,23 +131,31 @@ class HelpScreen extends StatelessWidget {
             title: 'Geofencing – Standorte',
             children: [
               _Para(
-                'Die App erkennt automatisch, wenn du einen definierten '
-                'Standort betrittst oder verlässt, und schlägt vor, '
-                'die Arbeitszeit zu starten bzw. zu beenden.',
+                'Das Geofencing läuft als permanenter Android-Foreground-Service '
+                'im Hintergrund – auch wenn die App geschlossen ist. '
+                'Beim Betreten eines Standorts wird automatisch der zugehörige '
+                'Arbeitgeber aktiviert.',
               ),
-              _SubHeading('Standort anlegen'),
+              _SubHeading('Einrichtung'),
               _Step(number: '1', text: 'Einstellungen → Automatische Erfassung → Standorte'),
               _Step(number: '2', text: '"Aktuelle Position verwenden" vor Ort antippen'),
               _Step(number: '3', text: 'Radius je nach Gelände: 100–500 m'),
-              _Step(number: '4', text: 'Tracking oben rechts aktivieren'),
+              _Step(number: '4', text: 'Arbeitgeber dem Standort zuordnen'),
+              _Step(number: '5', text: 'Tracking oben rechts aktivieren – läuft ab sofort permanent'),
+              _SubHeading('Automatische Arbeitgeber-Erkennung'),
+              _Para(
+                'Standort betreten → Arbeitgeber wechselt automatisch auf den '
+                'zugeordneten Arbeitgeber. Ein Stempeluhr-Einstempeln '
+                'läuft dann unter dem richtigen Arbeitgeber.',
+              ),
               _SubHeading('Standorte für dieses Projekt'),
-              _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · Arbeitstyp: Vor-Ort'),
-              _KeyValue(label: 'Wien (Büro)', value: 'Radius ~150 m · Arbeitstyp: Büro'),
-              _KeyValue(label: 'Salzburg (Lohnabfüller)', value: 'Radius ~200 m · Arbeitstyp: Dienstreise'),
+              _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · AG: Gurktaler'),
+              _KeyValue(label: 'Wien (Büro)', value: 'Radius ~150 m · AG: Gurktaler Wien'),
+              _KeyValue(label: 'Homeoffice', value: 'Radius ~100 m · manuell einstempeln'),
               _Hint(
                 'Hintergrund-GPS: Android fragt beim ersten Start nach '
-                '"Immer erlauben". Ohne diese Berechtigung funktioniert '
-                'Geofencing nur wenn die App geöffnet ist.',
+                '"Immer erlauben". HyperOS/MIUI: Akkuoptimierung für Zeiterfassung '
+                'auf "Keine Einschränkungen" setzen, damit der Service dauerhaft läuft.',
               ),
             ],
           ),
@@ -219,6 +238,51 @@ class HelpScreen extends StatelessWidget {
                 'Start = jetzt minus Dauer, Ende = jetzt. '
                 'Der Eintrag erscheint sofort in der Eintrags-Liste '
                 'mit Tätigkeitsart „Telefonat".',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.sync_outlined,
+            title: 'Automatische Synchronisierung',
+            children: [
+              _Para(
+                'Die Synchronisierung mit dem NAS läuft vollautomatisch '
+                'und muss nicht manuell ausgelöst werden.',
+              ),
+              _KeyValue(label: 'Beim App-Start', value: 'Sofort – NAS-Daten haben Vorrang vor lokalen Daten'),
+              _KeyValue(label: 'Nach Änderungen', value: '3 Sekunden nach jedem Speichern oder Löschen'),
+              _KeyValue(label: 'Periodisch', value: 'Alle 15, 30 oder 60 Minuten (einstellbar)'),
+              _SubHeading('Einstellungen'),
+              _Step(number: '1', text: 'Einstellungen → Sync-Status → Intervall wählen (Aus / 15 / 30 / 60 Min.)'),
+              _Step(number: '2', text: '"Jetzt" für manuellen Sofort-Sync'),
+              _Hint(
+                'NAS hat Vorrang beim ersten Start: Existieren auf dem NAS bereits '
+                'Arbeitgeber und Einträge, werden diese geladen. Lokale Beispiel-Standorte '
+                'werden nicht angelegt wenn NAS konfiguriert ist.',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.backup_outlined,
+            title: 'Backup & Restore (Windows)',
+            children: [
+              _Para(
+                'Alle lokalen Daten können als JSON-Datei exportiert '
+                'und auf demselben oder einem anderen Gerät wiederhergestellt werden.',
+              ),
+              _SubHeading('Backup erstellen'),
+              _Step(number: '1', text: 'Einstellungen → Datensicherung → Exportieren'),
+              _Step(number: '2', text: 'Speicherort wählen → zeiterfassung_backup_JJJJ-MM-TT.json'),
+              _Para('Enthält: Arbeitgeber, Zeiteinträge, Standorte, IMAP-Config, App-Einstellungen.'),
+              _SubHeading('Backup einspielen'),
+              _Step(number: '1', text: 'Einstellungen → Datensicherung → Importieren'),
+              _Step(number: '2', text: 'Backup-Datei auswählen → Bestätigungsdialog'),
+              _Step(number: '3', text: 'App startet automatisch neu mit den wiederhergestellten Daten'),
+              _Hint(
+                'Restore überschreibt alle bestehenden lokalen Daten. '
+                'Empfehlung: Vor einem Import zuerst ein aktuelles Backup erstellen.',
               ),
             ],
           ),

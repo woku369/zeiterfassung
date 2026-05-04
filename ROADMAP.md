@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-04 – Telefonat-Schnellerfassung, Backup/Restore, Arbeitgeber-Switcher
+> Letztes Update: 2026-05-04 – Auto-Sync, NAS-Global-Config, Android Foreground Geofencing, Manuell-Eintrag-Button
 
 ---
 
@@ -90,6 +90,16 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Adaptive Launcher-Icons (mipmap-anydpi-v26)
 - [x] Core library desugaring für flutter_local_notifications
 
+### v1.8 – Sync-Automatisierung & Geofencing-Robustheit
+- [x] **Auto-Sync beim Start:** `await syncNow()` vor Provider-Reload – NAS hat Vorrang bei Erstinstallation
+- [x] **Periodischer Sync:** Timer (15/30/60 Min., abschaltbar) in `SyncProvider.startPeriodicSync()`
+- [x] **Trigger-basierter Sync:** 3-Sek.-Debounce nach jedem Schreibvorgang (`setSyncTrigger` in `TimeEntryProvider`)
+- [x] **NAS-Konfiguration global:** `SharedPreferences` statt Arbeitgeber-Feld – konfigurierbar vor Arbeitgeber-Anlage
+- [x] **NAS-Karte in Einstellungen ganz oben** (unabhängig von Arbeitgebern): URL, API-Key, Verbindungstest, Sync-Status
+- [x] **Android Foreground-Service für Geofencing:** `flutter_background_service` – überlebt App-Close und Neustart, `autoStart: true`, `foregroundServiceType: location`
+- [x] **Geofencing NAS-Sync-Schutz:** Default-Standorte werden nicht angelegt wenn NAS konfiguriert (verhindert Duplikate)
+- [x] **Manuell-Eintrag-Button auf Dashboard:** Sichtbarer „Manuell"-Button neben Telefonat, öffnet `EntryFormScreen`
+
 ### v1.7 – UX-Verbesserungen & Backup
 - [x] **Telefonat-Schnellerfassung:** Button auf Dashboard, Dialog mit Dauer (+/−5 Min.), Arbeitgeber-Auswahl, Notiz; Start = jetzt−Dauer
 - [x] **Arbeitgeber-Switcher auf Dashboard:** ChoiceChip-Leiste (ab 2 Arbeitgebern), sofortiger Wechsel per Tap
@@ -163,9 +173,10 @@ app/
     models/          time_entry, employer, tracked_location, imap_config,
                      work_type, activity_log
     providers/       time_entry_provider, employer_provider, location_provider,
-                     activity_provider
+                     activity_provider, sync_provider
     services/        sync_service, export_service, import_service,
                      gps_service, holiday_service, geofencing_service,
+                     geofencing_background (Foreground-Service-Isolate),
                      imap_service, tray_service, backup_service,
                      activity_tracking_service, activity_tracking_win32
     screens/         home, entries, entry_form, reports, settings,
@@ -174,7 +185,9 @@ app/
   android/
     kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService
                      Permissions: ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS,
-                                  PACKAGE_USAGE_STATS
+                                  PACKAGE_USAGE_STATS, FOREGROUND_SERVICE,
+                                  FOREGROUND_SERVICE_LOCATION, RECEIVE_BOOT_COMPLETED
+                     Service: flutter_background_service (Foreground, autoStart)
   windows/           (noch nicht generiert – flutter create --platforms=windows .)
 
 backend/
@@ -199,7 +212,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.6)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.8)
 
 ---
 
@@ -207,7 +220,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 | Thema | Details |
 |---|---|
-| Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant (v1.7) |
+| Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant |
 | Stempeluhr-Import E-Ort | „Mobil" wurde initial als Fahrt importiert – Korrektur via `fix_worktypes.py` |
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
 | HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen |
