@@ -1,150 +1,102 @@
-import 'dart:async';
-import 'dart:math';
+import 'dart:io';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/tracked_location.dart';
 
-/// Callback fired when a location zone is entered or left.
-/// [location] is the affected zone, [entered] is true on enter, false on leave.
 typedef GeofenceCallback = void Function(TrackedLocation location, bool entered);
 
 class GeofencingService {
   GeofencingService._();
   static final GeofencingService instance = GeofencingService._();
 
-  final _notifications = FlutterLocalNotificationsPlugin();
-  StreamSubscription<Position>? _positionSub;
   GeofenceCallback? onZoneChange;
 
-  // Tracks which location IDs the user is currently inside.
-  final Set<String> _inside = {};
-
+  final _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _isRunning = false;
+
+  bool get isTracking => _isRunning;
 
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
-    await _notifications.initialize(initSettings);
+    await _notifications.initialize(
+        const InitializationSettings(android: androidInit));
 
-    const androidChannel = AndroidNotificationChannel(
-      'geofence',
-      'Standort-Erkennung',
-      description: 'Benachrichtigungen beim Betreten/Verlassen von Standorten',
-      importance: Importance.high,
-    );
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
+    if (!Platform.isAndroid) return;
+
+    // Restore tracking state after app restart.
+    _isRunning = await FlutterBackgroundService().isRunning();
+
+    // Forward zone change events from background isolate to onZoneChange.
+    FlutterBackgroundService().on('zoneChange').listen((data) {
+      if (data == null) return;
+      onZoneChange?.call(_minimalLocation(data), data['entered'] as bool);
+    });
   }
 
-  /// Start listening to GPS updates and check against [locations].
+  /// Start the persistent foreground GPS service.
   Future<bool> startTracking(List<TrackedLocation> locations) async {
-    await init();
+    if (!Platform.isAndroid) return false;
 
     final permission = await _checkPermission();
     if (!permission) return false;
 
-    _positionSub?.cancel();
-    _inside.clear();
+    await FlutterBackgroundService().startService();
+    // Short delay so the isolate is ready before receiving locations.
+    await Future.delayed(const Duration(milliseconds: 400));
+    _sendLocations(locations);
 
-    const settings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 20,
-    );
-
-    _positionSub = Geolocator.getPositionStream(locationSettings: settings)
-        .listen((pos) => _onPosition(pos, locations));
-
+    _isRunning = true;
     return true;
   }
 
-  void updateLocations(List<TrackedLocation> locations) {
-    // Called when the location list changes while tracking is active.
-    // Resets inside-state for removed locations.
-    final ids = locations.map((l) => l.id).toSet();
-    _inside.removeWhere((id) => !ids.contains(id));
-  }
-
   void stopTracking() {
-    _positionSub?.cancel();
-    _positionSub = null;
-    _inside.clear();
+    if (!Platform.isAndroid) return;
+    FlutterBackgroundService().invoke('stop');
+    _isRunning = false;
   }
 
-  bool get isTracking => _positionSub != null;
+  /// Push updated location list to the running background service.
+  void updateLocations(List<TrackedLocation> locations) {
+    if (!Platform.isAndroid || !_isRunning) return;
+    _sendLocations(locations);
+  }
 
-  void _onPosition(Position pos, List<TrackedLocation> locations) {
-    for (final loc in locations.where((l) => l.isActive)) {
-      final dist = _haversineMeters(
-        pos.latitude, pos.longitude,
-        loc.latitude, loc.longitude,
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  void _sendLocations(List<TrackedLocation> locs) {
+    FlutterBackgroundService().invoke('setLocations', {
+      'locations': locs.map((l) => {
+        'id': l.id,
+        'name': l.name,
+        'latitude': l.latitude,
+        'longitude': l.longitude,
+        'radiusMeters': l.radiusMeters,
+        'employerId': l.employerId,
+      }).toList(),
+    });
+  }
+
+  TrackedLocation _minimalLocation(Map<String, dynamic> data) => TrackedLocation(
+        id: data['locationId'] as String,
+        name: data['locationName'] as String,
+        latitude: 0,
+        longitude: 0,
+        radiusMeters: 0,
+        employerId: data['employerId'] as String?,
       );
-      final wasInside = _inside.contains(loc.id);
-      final nowInside = dist <= loc.radiusMeters;
-
-      if (!wasInside && nowInside) {
-        _inside.add(loc.id);
-        _notify(
-          loc.id.hashCode,
-          'Standort: ${loc.name}',
-          'Arbeitszeit jetzt starten?',
-        );
-        onZoneChange?.call(loc, true);
-      } else if (wasInside && !nowInside) {
-        _inside.remove(loc.id);
-        _notify(
-          loc.id.hashCode + 1,
-          'Standort verlassen: ${loc.name}',
-          'Arbeitszeit beenden?',
-        );
-        onZoneChange?.call(loc, false);
-      }
-    }
-  }
-
-  void _notify(int id, String title, String body) {
-    _notifications.show(
-      id,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'geofence',
-          'Standort-Erkennung',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
-    );
-  }
 
   Future<bool> _checkPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
-
-    LocationPermission perm = await Geolocator.checkPermission();
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
+    var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
     return perm == LocationPermission.always ||
         perm == LocationPermission.whileInUse;
   }
-
-  /// Haversine formula – returns distance in meters.
-  double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {
-    const r = 6371000.0;
-    final dLat = _toRad(lat2 - lat1);
-    final dLon = _toRad(lon2 - lon1);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRad(lat1)) * cos(_toRad(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2);
-    return r * 2 * atan2(sqrt(a), sqrt(1 - a));
-  }
-
-  double _toRad(double deg) => deg * pi / 180;
 }

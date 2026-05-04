@@ -47,6 +47,10 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
     // Reload providers so they pick up any data pulled from NAS.
     await lp.load();
     await tp.refresh();
+    // If geofencing was already running, refresh its location list.
+    if (GeofencingService.instance.isTracking) {
+      GeofencingService.instance.updateLocations(lp.activeLocations);
+    }
   }
 
   void _setupGeofenceCallback() {

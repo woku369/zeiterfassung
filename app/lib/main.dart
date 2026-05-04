@@ -11,6 +11,7 @@ import 'providers/activity_provider.dart';
 import 'providers/sync_provider.dart';
 import 'database/database_helper.dart';
 import 'services/geofencing_service.dart';
+import 'services/geofencing_background.dart';
 import 'services/tray_service.dart';
 
 void main() async {
@@ -22,6 +23,9 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await DatabaseHelper.instance.database;
+  if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    await configureGeofencingBackground();
+  }
   await GeofencingService.instance.init();
 
   final activityProvider = ActivityProvider();

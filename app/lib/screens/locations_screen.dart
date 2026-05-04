@@ -59,7 +59,12 @@ class _LocationsScreenState extends State<LocationsScreen> {
                 location: lp.locations[i],
                 onEdit: () => _showLocationDialog(ctx, lp.locations[i]),
                 onDelete: () => _confirmDelete(ctx, lp.locations[i]),
-                onToggle: () => lp.toggleActive(lp.locations[i]),
+                onToggle: () async {
+                  await lp.toggleActive(lp.locations[i]);
+                  if (_tracking) {
+                    GeofencingService.instance.updateLocations(lp.activeLocations);
+                  }
+                },
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
