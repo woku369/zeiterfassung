@@ -40,7 +40,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     leading: const Icon(Icons.business_outlined),
                     title: Text(employer.name),
                     subtitle: Text('Wochensoll: ${employer.weeklyHours}h'),
-                    trailing: const Icon(Icons.edit_outlined),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (v) {
+                        if (v == 'edit') _editEmployer(context, employer);
+                        if (v == 'delete') _deleteEmployer(context, employer);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Bearbeiten')),
+                        PopupMenuItem(value: 'delete', child: Text('Löschen')),
+                      ],
+                    ),
                     onTap: () => _editEmployer(context, employer),
                   ),
                   ListTile(
@@ -110,9 +119,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: Text(e.name),
                         subtitle: Text(
                             '${e.weeklyHours}h/Woche · WJ ab ${_monthName(e.fiscalYearStartMonth)}'),
-                        trailing: FilledButton.tonal(
-                          onPressed: () => ep.setActive(e),
-                          child: const Text('Wechseln'),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (v) {
+                            if (v == 'switch') ep.setActive(e);
+                            if (v == 'edit') _editEmployer(context, e);
+                            if (v == 'delete') _deleteEmployer(context, e);
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'switch', child: Text('Aktivieren')),
+                            PopupMenuItem(value: 'edit', child: Text('Bearbeiten')),
+                            PopupMenuItem(value: 'delete', child: Text('Löschen')),
+                          ],
                         ),
                         onTap: () => ep.setActive(e),
                       ),
@@ -207,6 +224,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
     ];
     return m >= 1 && m <= 12 ? names[m] : '$m';
+  }
+
+  Future<void> _deleteEmployer(BuildContext context, Employer employer) async {
+    final ep = context.read<EmployerProvider>();
+    if (ep.employers.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mindestens ein Arbeitgeber muss vorhanden sein.')),
+      );
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Arbeitgeber löschen'),
+        content: Text('"${employer.name}" wirklich löschen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      await ep.remove(employer.id);
+    }
   }
 
   Future<void> _addEmployer(BuildContext context) async {
