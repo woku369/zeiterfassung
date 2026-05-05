@@ -9,6 +9,7 @@ import 'providers/time_entry_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/activity_provider.dart';
 import 'providers/sync_provider.dart';
+import 'providers/suggestion_provider.dart';
 import 'database/database_helper.dart';
 import 'services/geofencing_service.dart';
 import 'services/geofencing_background.dart';
@@ -34,6 +35,9 @@ void main() async {
   final syncProvider = SyncProvider();
   await syncProvider.init();
 
+  final suggestionProvider = SuggestionProvider();
+  await suggestionProvider.init();
+
   // Navigation channel: QS Tile → open timeline
   const navChannel = MethodChannel('zeiterfassung/navigation');
 
@@ -49,6 +53,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => LocationProvider()..load()),
         ChangeNotifierProvider.value(value: activityProvider),
         ChangeNotifierProvider.value(value: syncProvider),
+        ChangeNotifierProvider.value(value: suggestionProvider),
       ],
       child: ZeiterfassungApp(navChannel: navChannel),
     ),

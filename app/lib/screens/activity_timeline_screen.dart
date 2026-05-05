@@ -2,13 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import '../providers/activity_provider.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../providers/suggestion_provider.dart';
+import '../models/suggested_entry.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../services/holiday_service.dart';
+import 'entry_form_screen.dart';
 
 class ActivityTimelineScreen extends StatefulWidget {
   const ActivityTimelineScreen({super.key});
@@ -28,13 +30,36 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _selected.clear();
+    });
     final ap = context.read<ActivityProvider>();
     await ap.recheckPermission();
     if (ap.hasPermission) {
       await ap.loadSessions(ap.selectedDate);
     }
-    if (mounted) setState(() => _loading = false);
+    if (mounted) {
+      await _generateSuggestions();
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _generateSuggestions() async {
+    final ap = context.read<ActivityProvider>();
+    final tp = context.read<TimeEntryProvider>();
+    final ep = context.read<EmployerProvider>();
+    final sp = context.read<SuggestionProvider>();
+
+    // Ensure entries for selected day are loaded
+    await tp.loadMonth(ap.selectedDate.year, ap.selectedDate.month);
+
+    await sp.generate(
+      ap.selectedDate,
+      sessions: ap.sessions,
+      existingEntries: tp.entries,
+      activeEmployerId: ep.active?.id,
+    );
   }
 
   Future<void> _pickDate() async {
@@ -47,24 +72,51 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
       locale: const Locale('de', 'AT'),
     );
     if (picked == null || !mounted) return;
-    setState(() => _selected.clear());
     await ap.loadSessions(picked);
+    if (mounted) await _generateSuggestions();
   }
 
-  Future<void> _createEntry() async {
+  // ── Suggestion actions ─────────────────────────────────────────────────────
+
+  Future<void> _acceptSuggestion(SuggestedEntry suggestion) async {
+    // Pre-fill EntryFormScreen – user always has a chance to edit before saving
+    final prefilled = suggestion.toPrefilledEntry();
+    final dayType = HolidayService.instance.isHoliday(prefilled.date)
+        ? DayType.holiday
+        : prefilled.date.weekday == 6
+            ? DayType.saturday
+            : prefilled.date.weekday == 7
+                ? DayType.sunday
+                : DayType.workday;
+    final entry = prefilled.copyWith(dayType: dayType);
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => EntryFormScreen(entry: entry, forceNew: true)),
+    );
+    // Regenerate after returning – user might have saved the entry
+    if (mounted) await _generateSuggestions();
+  }
+
+  void _dismissSuggestion(String id) {
+    context.read<SuggestionProvider>().dismiss(id);
+  }
+
+  // ── Raw-session → entry ────────────────────────────────────────────────────
+
+  Future<void> _createFromSelected() async {
     final ap = context.read<ActivityProvider>();
-    final selected = ap.sessions.where((s) => _selected.contains(s.id)).toList();
+    final ep = context.read<EmployerProvider>();
+    final selected =
+        ap.sessions.where((s) => _selected.contains(s.id)).toList();
     if (selected.isEmpty) return;
 
     selected.sort((a, b) => a.startTime.compareTo(b.startTime));
-    final earliest = selected.first.startTime;
-    final latest = selected.last.endTime;
-    final titles = selected.map((s) => s.title).toSet().join(', ');
-
-    final result = await _showConvertDialog(earliest, latest, titles);
-    if (result == null || !mounted) return;
-
-    final date = DateTime(earliest.year, earliest.month, earliest.day);
+    final start = selected.first.startTime;
+    final end = selected.last.endTime;
+    final titles = selected.map((s) => s.title).toSet().take(3).join(', ');
+    final date = DateTime(start.year, start.month, start.day);
     final dayType = HolidayService.instance.isHoliday(date)
         ? DayType.holiday
         : date.weekday == 6
@@ -73,148 +125,34 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                 ? DayType.sunday
                 : DayType.workday;
 
-    final entry = TimeEntry(
-      id: const Uuid().v4(),
+    final prefilled = TimeEntry(
+      id: '',
       date: date,
-      startTime: earliest,
-      endTime: latest,
-      breakMinutes: result['break'] as int,
-      workType: result['workType'] as WorkType,
+      startTime: start,
+      endTime: end,
       dayType: dayType,
-      note: result['note'] as String,
-      employerId: result['employerId'] as String?,
+      note: titles,
+      employerId: ep.active?.id,
       createdAt: DateTime.now(),
     );
 
-    await context.read<TimeEntryProvider>().addEntry(entry);
-    if (!mounted) return;
-
-    setState(() => _selected.clear());
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Zeiteintrag erstellt'), backgroundColor: Colors.green),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => EntryFormScreen(entry: prefilled, forceNew: true)),
     );
+    if (mounted) {
+      setState(() => _selected.clear());
+      await _generateSuggestions();
+    }
   }
 
-  Future<Map<String, dynamic>?> _showConvertDialog(
-      DateTime start, DateTime end, String titles) {
-    WorkType workType = WorkType.homeoffice;
-    final noteCtrl = TextEditingController(text: titles);
-    int breakMinutes = 0;
-    final tf = DateFormat('HH:mm');
-    final employers = context.read<EmployerProvider>().employers;
-    String? employerId = context.read<EmployerProvider>().active?.id;
-
-    return showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('Zeiteintrag erstellen'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${tf.format(start)} – ${tf.format(end)}',
-                  style: Theme.of(ctx).textTheme.titleMedium,
-                ),
-                Text(
-                  _formatDuration(end.difference(start) - Duration(minutes: breakMinutes)),
-                  style: Theme.of(ctx).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<WorkType>(
-                  value: workType,
-                  decoration: const InputDecoration(
-                    labelText: 'Tätigkeitsart',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: WorkType.values
-                      .where((t) => !t.isAbsence)
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t.label)))
-                      .toList(),
-                  onChanged: (v) => setState(() => workType = v!),
-                ),
-                if (employers.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    value: employerId,
-                    decoration: const InputDecoration(
-                      labelText: 'Arbeitgeber',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('Kein Arbeitgeber'),
-                      ),
-                      ...employers.map((e) => DropdownMenuItem<String?>(
-                            value: e.id,
-                            child: Text(e.name),
-                          )),
-                    ],
-                    onChanged: (v) => setState(() => employerId = v),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: Text('Pause: $breakMinutes min')),
-                    IconButton(
-                      icon: const Icon(Icons.remove),
-                      onPressed: breakMinutes >= 5
-                          ? () => setState(() => breakMinutes -= 5)
-                          : null,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () => setState(() => breakMinutes += 5),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: noteCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Notiz',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Abbrechen'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, {
-                'workType': workType,
-                'break': breakMinutes,
-                'note': noteCtrl.text.trim(),
-                'employerId': employerId,
-              }),
-              child: const Text('Übernehmen'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration d) {
-    if (d.isNegative) return '0m';
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    if (h == 0) return '${m}m';
-    return '${h}h ${m.toString().padLeft(2, '0')}m';
-  }
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final ap = context.watch<ActivityProvider>();
+    final sp = context.watch<SuggestionProvider>();
     final tf = DateFormat('HH:mm');
     final df = DateFormat('EE, d. MMMM yyyy', 'de_AT');
     final cs = Theme.of(context).colorScheme;
@@ -226,16 +164,17 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
           if (ap.sessions.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Sitzung löschen',
+              tooltip: 'Protokoll löschen',
               onPressed: () => _confirmClear(ap),
             ),
         ],
       ),
       body: Column(
         children: [
-          // ── Date + tracking status bar ──────────────────────────────────
+          // ── Date + status bar ──────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: cs.surfaceContainerLow,
             child: Row(
               children: [
@@ -247,7 +186,8 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                         const Icon(Icons.calendar_today_outlined, size: 18),
                         const SizedBox(width: 8),
                         Text(df.format(ap.selectedDate),
-                            style: Theme.of(context).textTheme.bodyMedium),
+                            style:
+                                Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(width: 4),
                         const Icon(Icons.arrow_drop_down, size: 18),
                       ],
@@ -256,7 +196,8 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                 ),
                 if (ap.isSupported && !ap.hasPermission)
                   TextButton.icon(
-                    icon: const Icon(Icons.lock_open_outlined, size: 16),
+                    icon:
+                        const Icon(Icons.lock_open_outlined, size: 16),
                     label: const Text('Berechtigung'),
                     onPressed: () async {
                       await ap.openUsageSettings();
@@ -277,65 +218,68 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
 
           // ── Windows tracking toggle ────────────────────────────────────
           if (_isWindows())
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: ap.isTracking
-                  ? cs.primaryContainer.withOpacity(0.5)
-                  : cs.surfaceContainerHighest,
-              child: Row(
-                children: [
-                  Icon(
-                    ap.isTracking ? Icons.circle : Icons.circle_outlined,
-                    size: 12,
-                    color: ap.isTracking ? Colors.green : cs.onSurface.withOpacity(0.4),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      ap.isTracking
-                          ? 'Tracking läuft – Fenster werden aufgezeichnet'
-                          : 'Tracking inaktiv',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: ap.isTracking
-                        ? () async {
-                            await ap.stopTracking();
-                            if (mounted) setState(() {});
-                          }
-                        : () {
-                            ap.startTracking();
-                            setState(() {});
-                          },
-                    child: Text(ap.isTracking ? 'Stopp' : 'Start'),
-                  ),
-                ],
-              ),
-            ),
+            _WindowsTrackingBar(ap: ap),
 
-          // ── Session list ───────────────────────────────────────────────
+          // ── Content ───────────────────────────────────────────────────
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : !ap.hasPermission
-                    ? _PermissionPlaceholder(onRequest: () async {
-                        await ap.openUsageSettings();
-                        await Future.delayed(const Duration(seconds: 2));
-                        await ap.recheckPermission();
-                        if (ap.hasPermission && mounted) await _load();
-                      })
-                    : ap.sessions.isEmpty
-                        ? _EmptyPlaceholder(isWindows: _isWindows(), isTracking: ap.isTracking)
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-                            itemCount: ap.sessions.length,
-                            itemBuilder: (_, i) {
-                              final s = ap.sessions[i];
-                              final checked = _selected.contains(s.id);
+                    ? _PermissionPlaceholder(
+                        onRequest: () async {
+                          await ap.openUsageSettings();
+                          await Future.delayed(
+                              const Duration(seconds: 2));
+                          await ap.recheckPermission();
+                          if (ap.hasPermission && mounted) await _load();
+                        },
+                      )
+                    : ListView(
+                        padding:
+                            const EdgeInsets.fromLTRB(12, 8, 12, 100),
+                        children: [
+                          // ── Suggestions section ──────────────────────
+                          if (sp.pending.isNotEmpty) ...[
+                            _SectionHeader(
+                              icon: Icons.auto_awesome_outlined,
+                              label:
+                                  'Vorschläge (${sp.pending.length})',
+                              color: cs.primary,
+                            ),
+                            const SizedBox(height: 4),
+                            ...sp.pending.map(
+                              (s) => _SuggestionCard(
+                                suggestion: s,
+                                onAccept: () => _acceptSuggestion(s),
+                                onDismiss: () =>
+                                    _dismissSuggestion(s.id),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // ── Raw sessions section ─────────────────────
+                          if (ap.sessions.isEmpty)
+                            _EmptyPlaceholder(
+                              isWindows: _isWindows(),
+                              isTracking: ap.isTracking,
+                            )
+                          else ...[
+                            _SectionHeader(
+                              icon: Icons.history_outlined,
+                              label: 'Rohdaten',
+                              color: cs.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 4),
+                            ...ap.sessions.map((s) {
+                              final checked =
+                                  _selected.contains(s.id);
                               return Card(
-                                margin: const EdgeInsets.only(bottom: 6),
-                                color: checked ? cs.primaryContainer : null,
+                                margin:
+                                    const EdgeInsets.only(bottom: 6),
+                                color: checked
+                                    ? cs.primaryContainer
+                                    : null,
                                 child: CheckboxListTile(
                                   value: checked,
                                   onChanged: (v) => setState(() {
@@ -347,24 +291,30 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                                   }),
                                   title: Text(s.title,
                                       maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
+                                      overflow:
+                                          TextOverflow.ellipsis),
                                   subtitle: Text(
-                                    '${tf.format(s.startTime)} – ${tf.format(s.endTime)}'
-                                    '  ·  ${_formatDuration(s.duration)}',
+                                    '${tf.format(s.startTime)} – '
+                                    '${tf.format(s.endTime)}'
+                                    '  ·  ${_fmt(s.duration)}',
                                   ),
-                                  secondary: _AppIcon(appName: s.appName),
-                                  controlAffinity: ListTileControlAffinity.leading,
+                                  secondary:
+                                      _AppIcon(appName: s.appName),
+                                  controlAffinity:
+                                      ListTileControlAffinity
+                                          .leading,
                                 ),
                               );
-                            },
-                          ),
+                            }),
+                          ],
+                        ],
+                      ),
           ),
         ],
       ),
-      // ── FAB: convert selected ──────────────────────────────────────────
       floatingActionButton: _selected.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: _createEntry,
+              onPressed: _createFromSelected,
               icon: const Icon(Icons.add_task),
               label: Text('${_selected.length} übernehmen'),
             )
@@ -377,11 +327,16 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Protokoll löschen'),
-        content: const Text('Alle aufgezeichneten Aktivitäten dieses Tages löschen?'),
+        content: const Text(
+            'Alle aufgezeichneten Aktivitäten dieses Tages löschen?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Abbrechen')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: FilledButton.styleFrom(
+                backgroundColor:
+                    Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Löschen'),
           ),
@@ -390,12 +345,265 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
     );
     if (ok == true) {
       await ap.clearSessionsForDate(ap.selectedDate);
-      setState(() => _selected.clear());
+      if (mounted) {
+        setState(() => _selected.clear());
+        context.read<SuggestionProvider>().clearForDate();
+      }
     }
+  }
+
+  String _fmt(Duration d) {
+    if (d.isNegative) return '0m';
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '${m}m';
+    return '${h}h ${m.toString().padLeft(2, '0')}m';
   }
 
   bool _isWindows() => Platform.isWindows;
 }
+
+// ── Suggestion card ─────────────────────────────────────────────────────────
+
+class _SuggestionCard extends StatelessWidget {
+  final SuggestedEntry suggestion;
+  final VoidCallback onAccept;
+  final VoidCallback onDismiss;
+
+  const _SuggestionCard({
+    required this.suggestion,
+    required this.onAccept,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tf = DateFormat('HH:mm');
+    final pct = (suggestion.confidence * 100).round();
+    final confidenceColor = pct >= 70
+        ? Colors.green
+        : pct >= 50
+            ? Colors.orange
+            : Colors.grey;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: cs.secondaryContainer.withOpacity(0.45),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header row ─────────────────────────────────────────────
+            Row(
+              children: [
+                Icon(
+                  suggestion.signals.contains(SignalType.phoneCall)
+                      ? Icons.phone_outlined
+                      : Icons.work_outline,
+                  size: 18,
+                  color: cs.secondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${tf.format(suggestion.startTime)} – '
+                    '${tf.format(suggestion.endTime)}'
+                    '  ·  ${_fmt(suggestion.duration)}',
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: confidenceColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$pct%',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: confidenceColor,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            // ── Sub-info ───────────────────────────────────────────────
+            if (suggestion.note.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 26),
+                child: Text(
+                  suggestion.note,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 26),
+              child: Row(
+                children: [
+                  _SignalChip(
+                      label: suggestion.workType.label,
+                      icon: Icons.label_outline),
+                  if (suggestion.signals.contains(SignalType.phoneCall))
+                    const _SignalChip(
+                        label: 'Telefonat',
+                        icon: Icons.phone_outlined),
+                ],
+              ),
+            ),
+            // ── Action buttons ─────────────────────────────────────────
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Verwerfen'),
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                    textStyle: const TextStyle(fontSize: 13),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: onAccept,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Bearbeiten & Übernehmen'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '${m}m';
+    return '${h}h ${m.toString().padLeft(2, '0')}m';
+  }
+}
+
+class _SignalChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _SignalChip({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 3),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Section header ──────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _SectionHeader(
+      {required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Windows tracking bar ────────────────────────────────────────────────────
+
+class _WindowsTrackingBar extends StatelessWidget {
+  final ActivityProvider ap;
+  const _WindowsTrackingBar({required this.ap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: ap.isTracking
+          ? cs.primaryContainer.withOpacity(0.5)
+          : cs.surfaceContainerHighest,
+      child: Row(
+        children: [
+          Icon(
+            ap.isTracking ? Icons.circle : Icons.circle_outlined,
+            size: 12,
+            color: ap.isTracking
+                ? Colors.green
+                : cs.onSurface.withOpacity(0.4),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              ap.isTracking
+                  ? 'Tracking läuft – Fenster werden aufgezeichnet'
+                  : 'Tracking inaktiv',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          FilledButton.tonal(
+            onPressed: ap.isTracking
+                ? () async {
+                    await ap.stopTracking();
+                  }
+                : () => ap.startTracking(),
+            child: Text(ap.isTracking ? 'Stopp' : 'Start'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── App icon ────────────────────────────────────────────────────────────────
 
 class _AppIcon extends StatelessWidget {
   final String appName;
@@ -437,6 +645,8 @@ class _AppIcon extends StatelessWidget {
   }
 }
 
+// ── Placeholders ────────────────────────────────────────────────────────────
+
 class _PermissionPlaceholder extends StatelessWidget {
   final VoidCallback onRequest;
   const _PermissionPlaceholder({required this.onRequest});
@@ -451,11 +661,13 @@ class _PermissionPlaceholder extends StatelessWidget {
           children: [
             const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text('Nutzungsstatistiken benötigen eine Sonderberechtigung.',
+            const Text(
+                'Nutzungsstatistiken benötigen eine Sonderberechtigung.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             const Text(
-              'Einstellungen → Apps → Zugriff auf Nutzungsdaten → Zeiterfassung aktivieren',
+              'Einstellungen → Apps → Zugriff auf Nutzungsdaten → '
+              'Zeiterfassung aktivieren',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
@@ -475,7 +687,8 @@ class _PermissionPlaceholder extends StatelessWidget {
 class _EmptyPlaceholder extends StatelessWidget {
   final bool isWindows;
   final bool isTracking;
-  const _EmptyPlaceholder({required this.isWindows, required this.isTracking});
+  const _EmptyPlaceholder(
+      {required this.isWindows, required this.isTracking});
 
   @override
   Widget build(BuildContext context) {
@@ -485,14 +698,17 @@ class _EmptyPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.history_outlined, size: 64, color: Colors.grey),
+            const Icon(Icons.history_outlined,
+                size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               isWindows
                   ? isTracking
-                      ? 'Tracking läuft – Aktivitäten erscheinen nach 30 Sekunden.'
+                      ? 'Tracking läuft – Aktivitäten erscheinen nach '
+                          '30 Sekunden.'
                       : 'Tracking starten um Aktivitäten aufzuzeichnen.'
-                  : 'Keine Aktivitäten für diesen Tag.\nMindestdauer: '
+                  : 'Keine Aktivitäten für diesen Tag.\n'
+                      'Mindestdauer: '
                       '${context.read<ActivityProvider>().minDurationMinutes} Min.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.grey),

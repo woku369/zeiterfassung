@@ -10,7 +10,9 @@ import '../services/holiday_service.dart';
 
 class EntryFormScreen extends StatefulWidget {
   final TimeEntry? entry;
-  const EntryFormScreen({super.key, this.entry});
+  // forceNew: treat entry as template for a new entry (e.g. from suggestions)
+  final bool forceNew;
+  const EntryFormScreen({super.key, this.entry, this.forceNew = false});
   @override
   State<EntryFormScreen> createState() => _EntryFormScreenState();
 }
@@ -28,7 +30,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late TextEditingController _breakCtrl;
   String? _employerId;
 
-  bool get _isNew => widget.entry == null;
+  bool get _isNew => widget.entry == null || widget.forceNew;
   bool get _isAbsence => _workType.isAbsence;
 
   @override
@@ -100,7 +102,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     }
     final tp = context.read<TimeEntryProvider>();
     final entry = TimeEntry(
-      id: widget.entry?.id ?? const Uuid().v4(),
+      id: _isNew ? const Uuid().v4() : widget.entry!.id,
       date: _date,
       startTime: start,
       endTime: end,
