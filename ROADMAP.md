@@ -168,6 +168,8 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Kalender-Regeln:** Google Calendar / Exchange-Termine als dritten Signal-Typ einbinden (hoher Confidence-Wert bei fixen Terminen)
 - [ ] **Job-Profile:** Job 1 (manuell + Geofence-Reminder) vs. Job 2 (voll event-getrieben) als Einstellung pro Arbeitgeber
 - [ ] **Parallelzeiten:** explizit erlaubte überlappende Einträge, getrennte Auswertung
+- [ ] **Regeleditor:** Confidence-Gewichte sichtbar und manuell einstellbar (Basis, Call, Dauer, …) – erst nach einigen Wochen Praxisbetrieb sinnvoll
+- [ ] **Bayesianische Gewichtsadaption** *(nach Regeleditor)*: Accept/Dismiss verschiebt Gewichte automatisch mit konfigurierbarer Lernrate (α); vollständig transparent und rücksetzbar
 
 ### Mittelfristig – Aktivitäts-Tracking Erweiterungen
 - [ ] Windows Tray-Icon-Farbe während Tracking aktiv (grün = läuft, grau = inaktiv)
