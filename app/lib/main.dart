@@ -14,6 +14,7 @@ import 'database/database_helper.dart';
 import 'services/geofencing_service.dart';
 import 'services/geofencing_background.dart';
 import 'services/tray_service.dart';
+import 'package:window_manager/window_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,19 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await DatabaseHelper.instance.database;
+
+  if (Platform.isWindows) {
+    await windowManager.ensureInitialized();
+    WindowOptions windowOptions = const WindowOptions(
+      size: Size(420, 780),
+      minimumSize: Size(360, 600),
+      center: true,
+      title: 'Zeiterfassung',
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions);
+    await windowManager.show();
+  }
+
   if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
     await configureGeofencingBackground();
   }
@@ -59,11 +73,6 @@ void main() async {
     ),
   );
 
-  // Windows tray – no-op until flutter create --platforms=windows is run.
-  await TrayService.instance.init(
-    onClockIn: () {},
-    onClockOut: () {},
-    onOpenApp: () {},
-    onQuit: () {},
-  );
+  // Tray wird nach runApp() in app.dart verdrahtet (braucht Provider-Zugriff).
+  // TrayService.init() ist kein-op auf Android.
 }

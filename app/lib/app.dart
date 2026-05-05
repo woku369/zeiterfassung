@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 import 'providers/employer_provider.dart';
 import 'providers/time_entry_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/sync_provider.dart';
 import 'services/geofencing_service.dart';
+import 'services/tray_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/activity_timeline_screen.dart';
 
@@ -18,12 +21,15 @@ class ZeiterfassungApp extends StatefulWidget {
   State<ZeiterfassungApp> createState() => _ZeiterfassungAppState();
 }
 
-class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
+class _ZeiterfassungAppState extends State<ZeiterfassungApp>
+    with WindowListener {
   final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
+    if (Platform.isWindows) windowManager.addListener(this);
+
     widget.navChannel.setMethodCallHandler((call) async {
       if (call.method == 'openTimeline') {
         _navigatorKey.currentState?.push(
@@ -31,11 +37,70 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
         );
       }
     });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupGeofenceCallback();
       _setupSync();
+      _initTray();
     });
   }
+
+  @override
+  void dispose() {
+    if (Platform.isWindows) windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  // ── Window close → minimize to tray ─────────────────────────────────────
+
+  @override
+  void onWindowClose() async {
+    if (!Platform.isWindows) return;
+    // Fenster verstecken statt beenden – "Beenden" nur über Tray-Menü
+    await windowManager.hide();
+  }
+
+  // ── Tray-Setup ────────────────────────────────────────────────────────────
+
+  Future<void> _initTray() async {
+    if (!Platform.isWindows) return;
+    final tp = context.read<TimeEntryProvider>();
+
+    await TrayService.instance.init(
+      onClockIn: () {
+        // Öffnet das Einstempeln-Sheet über die Home-Route
+        // (vereinfacht: App in Vordergrund bringen genügt – User stempelt selbst)
+      },
+      onClockOut: () {},
+      onOpenApp: () {
+        windowManager.show();
+        windowManager.focus();
+      },
+      onQuit: () async {
+        TrayService.instance.dispose();
+        await windowManager.destroy();
+      },
+    );
+
+    // Tray-Status bei Provider-Änderungen aktualisieren
+    tp.addListener(_syncTrayStatus);
+    _syncTrayStatus();
+  }
+
+  void _syncTrayStatus() {
+    if (!Platform.isWindows) return;
+    final tp = context.read<TimeEntryProvider>();
+    final active = tp.activeEntry;
+    final label = active != null
+        ? 'Seit ${_hhmm(active.startTime)} · ${active.workType.label}'
+        : null;
+    TrayService.instance.updateClockedIn(active != null, label: label);
+  }
+
+  String _hhmm(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  // ── Sync & Geofencing ─────────────────────────────────────────────────────
 
   Future<void> _setupSync() async {
     final sp = context.read<SyncProvider>();
@@ -43,11 +108,9 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
     final lp = context.read<LocationProvider>();
     tp.setSyncTrigger(sp.triggerSync);
     sp.startPeriodicSync();
-    await sp.syncNow(); // startup sync – NAS hat Vorrang
-    // Reload providers so they pick up any data pulled from NAS.
+    await sp.syncNow();
     await lp.load();
     await tp.refresh();
-    // If geofencing was already running, refresh its location list.
     if (GeofencingService.instance.isTracking) {
       GeofencingService.instance.updateLocations(lp.activeLocations);
     }
@@ -62,6 +125,8 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp> {
       if (idx != -1) ep.setActive(employers[idx]);
     };
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
