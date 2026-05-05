@@ -289,12 +289,38 @@ class HelpScreen extends StatelessWidget {
           SizedBox(height: 8),
           _Section(
             icon: Icons.history_outlined,
-            title: 'Aktivitäts-Tracking',
+            title: 'Aktivitäts-Tracking & Vorschläge',
             children: [
               _Para(
-                'Erfasst welche Apps und Fenster aktiv waren und erlaubt '
-                'die nachträgliche Übernahme als Zeiteintrag. '
-                'Kein Autostart – nur wenn manuell aktiviert.',
+                'Erfasst welche Apps und Fenster aktiv waren. '
+                'Die Fusion-Engine analysiert die Daten automatisch und '
+                'schlägt passende Zeiteinträge vor – jeder Vorschlag kann '
+                'vor dem Speichern vollständig bearbeitet werden.',
+              ),
+              _SubHeading('Vorschläge (automatische Erkennung)'),
+              _Para(
+                'Beim Öffnen der Timeline werden Aktivitäts-Sessions '
+                'mit bereits erfassten Telefonaten abgeglichen und zu '
+                'Vorschlägen gruppiert. Jeder Vorschlag zeigt:',
+              ),
+              _KeyValue(label: 'Uhrzeit', value: 'Start – Ende · Dauer'),
+              _KeyValue(label: 'Confidence', value: 'Wahrscheinlichkeit 0–100 % (grün / orange / grau)'),
+              _KeyValue(label: 'Typ-Chip', value: 'Abgeleitete Tätigkeitsart (Telefonat, Homeoffice, …)'),
+              _KeyValue(label: 'Signal-Chips', value: 'Welche Signale geflossen sind (Aktivität, Telefonat)'),
+              _Step(
+                number: '1',
+                text: '"Bearbeiten & Übernehmen" → Eintrag-Formular öffnet sich vollständig editierbar',
+              ),
+              _Step(number: '2', text: 'Zeit, Tätigkeitsart, Pause, Notiz, Arbeitgeber anpassen'),
+              _Step(number: '3', text: '"Speichern" → Eintrag wird angelegt, Vorschlag verschwindet'),
+              _Step(
+                number: '4',
+                text: '"Verwerfen" → Vorschlag wird dauerhaft ausgeblendet (bleibt auch nach Neustart weg)',
+              ),
+              _Hint(
+                'Vorschläge entstehen nur für Zeiträume die noch nicht durch '
+                'bestehende Einträge abgedeckt sind (>50 % Überlappung → kein Vorschlag). '
+                'Manuelles Nachbearbeiten ist immer möglich.',
               ),
               _SubHeading('Android – Nutzungsstatistiken'),
               _Step(number: '1', text: 'Übersicht → Aktivitäts-Timeline antippen'),
@@ -306,7 +332,7 @@ class HelpScreen extends StatelessWidget {
                 number: '3',
                 text: 'Zeiterfassung in der Liste suchen → Zugriff aktivieren',
               ),
-              _Step(number: '4', text: 'Zurück in die App → Timeline lädt automatisch'),
+              _Step(number: '4', text: 'Zurück in die App → Timeline lädt und Vorschläge erscheinen oben'),
               _Para(
                 'Android zeigt App-Namen und Nutzungszeiträume für den '
                 'gewählten Tag. Daten kommen direkt vom System '
@@ -323,7 +349,7 @@ class HelpScreen extends StatelessWidget {
                 number: '3',
                 text: 'Nach 5 Min. ohne Eingabe (Idle) pausiert die Aufzeichnung',
               ),
-              _Step(number: '4', text: '"Stopp" → alle Blöcke erscheinen in der Timeline'),
+              _Step(number: '4', text: '"Stopp" → alle Blöcke erscheinen, Vorschläge werden generiert'),
               _SubHeading('Whitelist'),
               _Para('Nur Titel/Apps die einen Whitelist-Begriff enthalten werden aufgezeichnet.'),
               _KeyValue(label: 'Browser', value: 'Chrome, Firefox, Edge, Opera, Brave'),
@@ -336,13 +362,17 @@ class HelpScreen extends StatelessWidget {
                 'Whitelist bearbeiten. Mindestdauer (Standard 3 Min.) und '
                 'Leerlauf-Schwelle (Standard 5 Min.) sind ebenfalls konfigurierbar.',
               ),
-              _SubHeading('Blöcke übernehmen'),
+              _SubHeading('Rohdaten manuell übernehmen'),
+              _Para(
+                'Unter den Vorschlägen sind alle Rohdaten-Blöcke sichtbar. '
+                'Für feingranulare Kontrolle oder falls kein Vorschlag passt:',
+              ),
               _Step(number: '1', text: 'Checkboxen der gewünschten Blöcke aktivieren'),
               _Step(
                 number: '2',
-                text: '"X übernehmen" → Dialog mit Start/Ende, Tätigkeitsart, Pause, Notiz',
+                text: '"X übernehmen" → Eintrag-Formular öffnet sich mit Start/Ende vorausgefüllt',
               ),
-              _Step(number: '3', text: 'Bestätigen → Zeiteintrag wird angelegt'),
+              _Step(number: '3', text: 'Tätigkeitsart, Pause, Notiz anpassen → Speichern'),
               _Hint(
                 'Datenschutz: Browser-URLs werden nicht erfasst. '
                 'Nur Fenster-Titel bzw. App-Name. '

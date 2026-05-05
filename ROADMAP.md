@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-04 – Auto-Sync, NAS-Global-Config, Android Foreground Geofencing, Manuell-Eintrag-Button
+> Letztes Update: 2026-05-05 – Event-Fusion-Engine mit Vorschlagskarten in der Timeline
 
 ---
 
@@ -90,6 +90,19 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Adaptive Launcher-Icons (mipmap-anydpi-v26)
 - [x] Core library desugaring für flutter_local_notifications
 
+### v1.9 – Event-Fusion-Engine
+- [x] **FusionEngine** (`services/fusion_engine.dart`): Clustering von ActivityLog-Sessions mit max. 10-Min-Lücke
+- [x] **Coverage-Check:** Perioden die >50 % durch bestehende Einträge abgedeckt sind werden übersprungen
+- [x] **Confidence-Scoring:** Basis 0.3 + Telefonat-Signale (+0.35/+0.1) + Dauer (+0.1/+0.1) + Session-Anzahl (+0.05)
+- [x] **WorkType-Ableitung:** phoneCall wenn Mehrheit der Clusterzeit Anrufe, sonst offsite/homeoffice
+- [x] **Deterministische Suggestion-IDs** (start+end): persistentes Verwerfen bleibt über App-Neustarts erhalten
+- [x] **SuggestionProvider** (`providers/suggestion_provider.dart`): State-Management, dismissed-IDs in SharedPreferences (max. 500)
+- [x] **Vorschlagskarten in ActivityTimelineScreen:** farbige Karten mit Uhrzeit, Dauer, Confidence-% (Ampelfarbe), Typ-Chip, Signal-Chips
+- [x] **„Bearbeiten & Übernehmen":** öffnet `EntryFormScreen` vollständig editierbar – nichts wird automatisch gespeichert
+- [x] **„Verwerfen":** persistiert dismiss, Vorschlag verschwindet dauerhaft für dieses Zeitfenster
+- [x] **EntryFormScreen `forceNew`-Flag:** vorausgefüllte Einträge aus Vorschlägen/Rohdaten werden als Neu-Einträge gespeichert
+- [x] Vorschläge werden nach Datumswechsel und nach Speichern eines Eintrags automatisch neu generiert
+
 ### v1.8 – Sync-Automatisierung & Geofencing-Robustheit
 - [x] **Auto-Sync beim Start:** `await syncNow()` vor Provider-Reload – NAS hat Vorrang bei Erstinstallation
 - [x] **Periodischer Sync:** Timer (15/30/60 Min., abschaltbar) in `SyncProvider.startPeriodicSync()`
@@ -150,6 +163,12 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
 - [ ] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe anzeigen und direkt als Eintrag übernehmen
 
+### Mittelfristig – Fusion-Engine Erweiterungen
+- [ ] **Standort-Scoring:** GPS-Besuchshistorie loggen → Aufenthalt in definierten Zonen erhöht Confidence
+- [ ] **Kalender-Regeln:** Google Calendar / Exchange-Termine als dritten Signal-Typ einbinden (hoher Confidence-Wert bei fixen Terminen)
+- [ ] **Job-Profile:** Job 1 (manuell + Geofence-Reminder) vs. Job 2 (voll event-getrieben) als Einstellung pro Arbeitgeber
+- [ ] **Parallelzeiten:** explizit erlaubte überlappende Einträge, getrennte Auswertung
+
 ### Mittelfristig – Aktivitäts-Tracking Erweiterungen
 - [ ] Windows Tray-Icon-Farbe während Tracking aktiv (grün = läuft, grau = inaktiv)
 - [ ] Windows: Prozessname zusätzlich zum Fenstertitel für genauere Whitelist-Prüfung
@@ -171,14 +190,15 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 app/
   lib/
     models/          time_entry, employer, tracked_location, imap_config,
-                     work_type, activity_log
+                     work_type, activity_log, suggested_entry
     providers/       time_entry_provider, employer_provider, location_provider,
-                     activity_provider, sync_provider
+                     activity_provider, sync_provider, suggestion_provider
     services/        sync_service, export_service, import_service,
                      gps_service, holiday_service, geofencing_service,
                      geofencing_background (Foreground-Service-Isolate),
                      imap_service, tray_service, backup_service,
-                     activity_tracking_service, activity_tracking_win32
+                     activity_tracking_service, activity_tracking_win32,
+                     fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
     database/        database_helper (SQLite v7)
@@ -212,7 +232,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.8)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.9)
 
 ---
 
