@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-05 – Event-Fusion-Engine mit Vorschlagskarten in der Timeline
+> Letztes Update: 2026-05-05 – Windows Tray-Widget + Build-Script
 
 ---
 
@@ -90,6 +90,22 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Adaptive Launcher-Icons (mipmap-anydpi-v26)
 - [x] Core library desugaring für flutter_local_notifications
 
+### v1.10 – Windows-Platform & Build-Automatisierung
+- [x] **Windows Tray-Widget vollständig implementiert** (`tray_service.dart` mit `tray_manager` + `window_manager`)
+  - Tray-Menü: Öffnen / Einstempeln oder Ausstempeln / Beenden
+  - Tooltip zeigt Echtzeit-Status: `Zeiterfassung · Seit 09:15 · Homeoffice`
+  - X-Button minimiert ins Tray statt Beenden (`onWindowClose → windowManager.hide()`)
+  - Doppelklick auf Tray-Icon öffnet Fenster wieder
+  - `WindowListener`-Mixin in `app.dart`, `_syncTrayStatus()` als `TimeEntryProvider`-Listener
+  - `WindowOptions`: 420×780 px, Minimum 360×600 px
+- [x] **Tray-Icon Platzhalter** (`assets/tray_icon.ico`, 16×16, App-Blau #1565C0)
+- [x] **`build.ps1`** im Projektroot: APK + Windows-ZIP in `builds\` mit Datums-Suffix
+  - Parameter: `-Clean`, `-ApkOnly`, `-WindowsOnly`
+  - Windows-EXE als ZIP (enthält EXE + DLLs aus Release-Ordner)
+  - Hinweis wenn Windows-Platform noch nicht eingerichtet
+- [x] **`.gitignore`** für `builds/`-Ordner (Binaries nicht im Repo)
+- [ ] *Voraussetzung noch offen:* `cd app && flutter create --platforms=windows .` auf Build-Rechner ausführen
+
 ### v1.9 – Event-Fusion-Engine
 - [x] **FusionEngine** (`services/fusion_engine.dart`): Clustering von ActivityLog-Sessions mit max. 10-Min-Lücke
 - [x] **Coverage-Check:** Perioden die >50 % durch bestehende Einträge abgedeckt sind werden übersprungen
@@ -154,8 +170,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Fahrzeit-Konzept klären:** Fahrzeit als separates Feld vs. eigener Eintragstyp
 
 ### Kurzfristig – Plattform
-- [ ] **Windows-Platform aktivieren:** `flutter create --platforms=windows .` ausführen
-- [ ] **Tray-Widget fertigstellen:** Auskommentierte Zeilen in `tray_service.dart` aktivieren, `assets/tray_icon.ico` hinzufügen
+- [ ] **Windows-Platform aktivieren:** `cd app && flutter create --platforms=windows .` auf Build-Rechner ausführen (Tray-Code ist fertig, wartet nur auf `windows/`-Ordner)
 - [ ] NAS-Verbindungstest auf Windows/Android erfolgreich abschließen (URL + API-Key prüfen)
 
 ### Mittelfristig – Auswertung
@@ -198,19 +213,21 @@ app/
     services/        sync_service, export_service, import_service,
                      gps_service, holiday_service, geofencing_service,
                      geofencing_background (Foreground-Service-Isolate),
-                     imap_service, tray_service, backup_service,
-                     activity_tracking_service, activity_tracking_win32,
-                     fusion_engine
+                     imap_service, tray_service (tray_manager + window_manager),
+                     backup_service, activity_tracking_service,
+                     activity_tracking_win32, fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
     database/        database_helper (SQLite v7)
+  assets/
+    tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
     kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService
                      Permissions: ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS,
                                   PACKAGE_USAGE_STATS, FOREGROUND_SERVICE,
                                   FOREGROUND_SERVICE_LOCATION, RECEIVE_BOOT_COMPLETED
                      Service: flutter_background_service (Foreground, autoStart)
-  windows/           (noch nicht generiert – flutter create --platforms=windows .)
+  windows/           (Ordner fehlt noch – flutter create --platforms=windows . ausführen)
 
 backend/
   server.js          Standalone Node.js, kein Build-Schritt
@@ -219,6 +236,8 @@ backend/
   backup_synology.sh Tägliches DB-Backup (30 Tage)
   data/              zeiterfassung.db (SQLite, WAL-Modus)
 
+build.ps1              Windows PowerShell Build-Script (APK + Windows-ZIP → builds\)
+builds/                Build-Ausgaben – nicht im Git (.gitignore)
 import_stempeluhr.py   Einmal-Import Stempeluhr 2.1 XLSX → SQLite (Python)
 fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 ```
@@ -234,7 +253,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.9)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.10)
 
 ---
 
@@ -247,7 +266,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
 | HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
-| Windows Tray | Noch nicht fertig – Windows-Platform-Ordner fehlt noch |
+| Windows Tray | Code fertig – benötigt `flutter create --platforms=windows .` auf Build-Rechner |
 | Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig nach `flutter create --platforms=windows .` |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |

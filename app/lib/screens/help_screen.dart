@@ -192,33 +192,51 @@ class HelpScreen extends StatelessWidget {
             children: [
               _Para(
                 'Die App läuft nativ auf Windows. Einmalig muss die '
-                'Windows-Platform generiert werden, danach mit flutter build windows.',
+                'Windows-Platform generiert werden, danach per build.ps1 bauen.',
               ),
-              _SubHeading('Ersteinrichtung'),
+              _SubHeading('Ersteinrichtung (einmalig)'),
               _Code(
                 'cd app\n'
                 'flutter create --platforms=windows .\n'
                 'flutter pub get',
               ),
-              _SubHeading('Bauen & Starten'),
+              _SubHeading('Build-Script (empfohlen)'),
+              _Para('build.ps1 im Projektroot baut APK und/oder Windows-EXE und '
+                  'legt die Ausgaben in builds\\ ab:'),
+              _Code(
+                '.\\build.ps1              # APK + Windows-ZIP\n'
+                '.\\build.ps1 -ApkOnly     # nur APK\n'
+                '.\\build.ps1 -WindowsOnly # nur Windows\n'
+                '.\\build.ps1 -Clean       # mit flutter clean',
+              ),
+              _KeyValue(label: 'APK', value: 'builds\\zeiterfassung-YYYY-MM-DD.apk'),
+              _KeyValue(label: 'Windows', value: 'builds\\zeiterfassung-YYYY-MM-DD-windows.zip'),
+              _SubHeading('Manuell bauen'),
               _Code(
                 '# Starten (Entwicklung):\n'
-                'flutter run -d windows\n\n'
-                '# Release-Build:\n'
+                'cd app && flutter run -d windows\n\n'
+                '# Release:\n'
                 'flutter build windows\n'
-                '# → build\\windows\\x64\\runner\\Release\\zeiterfassung.exe',
+                '# → build\\windows\\x64\\runner\\Release\\',
+              ),
+              _SubHeading('Windows System-Tray'),
+              _Para(
+                'Die App minimiert sich per X-Button ins System-Tray '
+                'statt zu beenden. Das Tray-Icon zeigt den aktuellen Status.',
+              ),
+              _KeyValue(label: 'Linksklick', value: 'Fenster öffnen'),
+              _KeyValue(label: 'Rechtsklick', value: 'Menü: Öffnen / Ein-Ausstempeln / Beenden'),
+              _KeyValue(label: 'Tooltip', value: 'Zeiterfassung · Seit 09:15 · Homeoffice'),
+              _Hint(
+                'Beenden nur über Tray-Menü → "Beenden". '
+                'Der X-Button schließt das Fenster, die App läuft im Hintergrund weiter.',
               ),
               _SubHeading('Aktivitäts-Tracking auf Windows'),
               _Step(number: '1', text: 'App starten → Übersicht → Aktivitäts-Timeline'),
               _Step(number: '2', text: '"Start" drücken – läuft im Vordergrund'),
               _Step(number: '3', text: 'Aktives Fenster wird alle 30 Sek. geprüft'),
               _Step(number: '4', text: 'Whitelist-Treffer werden als Blöcke aufgezeichnet'),
-              _Step(number: '5', text: 'Blöcke auswählen → "Übernehmen" → Zeiteintrag'),
-              _Hint(
-                'Windows-Tray (1-Klick-Einstempeln) ist vorbereitet in '
-                'tray_service.dart – Aktivierung nach flutter create --platforms=windows '
-                'und Hinzufügen eines 32×32 tray_icon.ico.',
-              ),
+              _Step(number: '5', text: 'Vorschläge erscheinen automatisch oben in der Timeline'),
             ],
           ),
           SizedBox(height: 8),
