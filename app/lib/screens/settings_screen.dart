@@ -818,22 +818,6 @@ class _BackupCard extends StatefulWidget {
 class _BackupCardState extends State<_BackupCard> {
   bool _busy = false;
 
-  Future<void> _export() async {
-    setState(() => _busy = true);
-    try {
-      final path = await BackupService.instance.export();
-      if (!mounted) return;
-      if (path != null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Backup gespeichert: $path'),
-          backgroundColor: Colors.green,
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _exportToNas() async {
     final sp = context.read<SyncProvider>();
     if (!sp.hasNasConfig) {
@@ -918,76 +902,11 @@ class _BackupCardState extends State<_BackupCard> {
     }
   }
 
-  Future<void> _import() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Backup wiederherstellen'),
-        content: const Text(
-          'Alle aktuellen Daten (Einträge, Arbeitgeber, Standorte) werden '
-          'durch das Backup ersetzt. Fortfahren?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Wiederherstellen'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      final success = await BackupService.instance.import();
-      if (!mounted) return;
-      if (success) {
-        // Reload all providers.
-        await context.read<EmployerProvider>().reload();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Backup erfolgreich wiederhergestellt. App bitte neu starten.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 5),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.backup_outlined),
-            title: const Text('Backup erstellen'),
-            subtitle: const Text('Alle Daten als JSON-Datei exportieren'),
-            trailing: _busy
-                ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.save_alt_outlined),
-            onTap: _busy ? null : _export,
-          ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-          ListTile(
-            leading: const Icon(Icons.restore_outlined),
-            title: const Text('Backup wiederherstellen'),
-            subtitle: const Text('Daten aus JSON-Datei importieren'),
-            trailing: const Icon(Icons.folder_open_outlined),
-            onTap: _busy ? null : _import,
-          ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.cloud_upload_outlined),
             title: const Text('Backup auf NAS'),

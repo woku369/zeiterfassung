@@ -5,10 +5,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
-import '../providers/sync_provider.dart';
 import '../services/export_service.dart';
 import '../services/import_service.dart';
-import '../services/sync_service.dart';
 import '../database/database_helper.dart';
 import '../models/time_entry.dart';
 import '../models/employer.dart';
@@ -50,7 +48,6 @@ class _MonthTab extends StatefulWidget {
 class _MonthTabState extends State<_MonthTab> {
   bool _exporting = false;
   bool _importing = false;
-  bool _syncing = false;
 
   Future<void> _exportXlsx() async {
     setState(() => _exporting = true);
@@ -145,31 +142,6 @@ class _MonthTabState extends State<_MonthTab> {
       if (mounted) _showError('Import fehlgeschlagen: $e');
     } finally {
       if (mounted) setState(() => _importing = false);
-    }
-  }
-
-  Future<void> _sync() async {
-    final sp = context.read<SyncProvider>();
-    if (!sp.hasNasConfig) {
-      _showError('Bitte NAS-URL in den Einstellungen konfigurieren.');
-      return;
-    }
-    setState(() => _syncing = true);
-    try {
-      final result = await SyncService.instance.sync(
-        baseUrl: sp.nasUrl,
-        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
-      );
-      if (!mounted) return;
-      final msg = result.errors.isEmpty
-          ? '${result.pushed} hochgeladen, ${result.pulled} empfangen'
-          : 'Fehler: ${result.errors.first}';
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg)));
-      await context.read<EmployerProvider>().reload();
-      await context.read<TimeEntryProvider>().refresh();
-    } finally {
-      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -318,15 +290,6 @@ class _MonthTabState extends State<_MonthTab> {
           subtitle: 'Aus Stempeluhr 2.1 oder kompatiblem Format',
           loading: _importing,
           onTap: _importXlsx,
-        ),
-        _ActionTile(
-          icon: Icons.sync,
-          title: 'Mit NAS synchronisieren',
-          subtitle: context.watch<SyncProvider>().hasNasConfig
-              ? context.watch<SyncProvider>().nasUrl
-              : 'NAS-URL in Einstellungen konfigurieren',
-          loading: _syncing,
-          onTap: _sync,
         ),
       ],
     );
