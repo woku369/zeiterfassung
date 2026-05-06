@@ -65,12 +65,23 @@
             android:exported="true"
             tools:replace="android:exported" />
 
-        <!-- Auto-Start nach Geräteneustart -->
+        <!-- Built-in BootReceiver deaktiviert: unser eigener Receiver erstellt
+             zuerst die Notification-Channels, dann startet er den Service.
+             Ohne diesen Schritt crasht startForeground() auf Android 8+. -->
         <receiver
             android:name="id.flutter.flutter_background_service.BootReceiver"
+            android:enabled="false"
+            android:exported="false"
+            tools:replace="android:enabled,android:exported" />
+
+        <!-- Eigener BootReceiver: Channels anlegen → Service starten -->
+        <receiver
+            android:name=".ZeiterfassungBootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Xiaomi/MIUI Schnellstart -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

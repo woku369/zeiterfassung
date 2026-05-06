@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tracked_location.dart';
 
 typedef GeofenceCallback = void Function(TrackedLocation location, bool entered);
@@ -51,13 +52,18 @@ class GeofencingService {
     _sendLocations(locations);
 
     _isRunning = true;
+    // Flag für BootReceiver: Service war aktiv, nach Neustart wieder starten.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('geofencing_active', true);
     return true;
   }
 
-  void stopTracking() {
+  Future<void> stopTracking() async {
     if (!Platform.isAndroid) return;
     FlutterBackgroundService().invoke('stop');
     _isRunning = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('geofencing_active', false);
   }
 
   /// Push updated location list to the running background service.

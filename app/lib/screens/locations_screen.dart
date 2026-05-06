@@ -20,7 +20,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
 
   Future<void> _toggleTracking(List<TrackedLocation> locations) async {
     if (_tracking) {
-      GeofencingService.instance.stopTracking();
+      await GeofencingService.instance.stopTracking();
       setState(() => _tracking = false);
     } else {
       final started = await GeofencingService.instance.startTracking(locations);
