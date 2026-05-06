@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-06 – NAS-Master-Sync + Boot-Persistenz
+> Letztes Update: 2026-05-06 – Sync-Vereinheitlichung & robuster Windows-Tray
 
 ---
 
@@ -24,6 +24,19 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.13 – Sync-Vereinheitlichung & robuster Windows-Tray
+- [x] **Ein einziger Sync-Befehl:** Reports-Tab-Sync entfernt – einzige Sync-Schaltfläche in den Einstellungen synchronisiert nun *alles* (Arbeitgeber, Standorte, Einträge, Whitelist + Activity-Settings)
+- [x] **Provider-Refresh nach Sync:** `SyncProvider.setOnSyncComplete()` ruft nach jedem erfolgreichen Sync `EmployerProvider.reload()` + `LocationProvider.load()` + `TimeEntryProvider.refresh()` – neue Daten erscheinen sofort, kein App-Neustart mehr nötig
+- [x] **Settings-LWW korrekt implementiert:** `ActivityProvider._settingsChangedAt` wird nur bei expliziter User-Änderung (`saveSettings()`) auf `now` gesetzt; `applyServerSettings()` schreibt direkt in Prefs, ohne den Timestamp anzufassen → das Gerät, das die Whitelist *zuletzt geändert* hat, gewinnt (nicht das, das *zuletzt synchronisiert* hat)
+- [x] **Backup-Restore setzt `last_sync_at` zurück:** Auf Epoch (`1970-01-01`), damit der nächste Sync alle NAS-Daten erneut zieht – verhindert Datenverlust durch das `since`-Filter wenn Einträge zwischen Backup-Erstellung und Restore synct wurden
+- [x] **Windows X-Button minimiert jetzt zuverlässig ins Tray:** `setPreventClose(true)` wurde aus `main.dart` (vor Listener-Registrierung) nach `app.dart::initState()` (direkt nach `addListener`) verschoben – ohne registrierten Listener wirkungslos
+- [x] **`onWindowClose` prüft `isPreventClose()`** gemäß offiziellem `window_manager`-Pattern
+- [x] **Windows-only AppBar (40 px)** auf dem HomeScreen mit zwei expliziten Icons:
+  - Minimize-Icon: in Tray verstecken (gleich wie X-Button)
+  - Close-Icon: echtes Beenden mit Bestätigungsdialog (Hinweis auf Tracking-Stop)
+- [x] **`build.ps1` automatisiert:** holt vor jedem Build automatisch den aktuellen Branch (`git pull origin <branch>`); funktioniert vom beliebigem CWD via `$PSScriptRoot`; neue Flag `-NoPull` für Offline/Lokal-Arbeit
+- [x] **Bug-Fix:** `await TrayService.instance.dispose()` (synchronous void) brach Build – await entfernt
 
 ### v1.12 – Robuste Boot-Persistenz & Tray-Stabilität
 - [x] **Eigener Kotlin BootReceiver** (`ZeiterfassungBootReceiver.kt`):
@@ -203,9 +216,11 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Fahrzeit-Konzept klären:** Fahrzeit als separates Feld vs. eigener Eintragstyp
 
 ### Kurzfristig – Plattform
-- [x] Windows-Platform aktiviert, Tray-Widget verifiziert (X-Knopf minimiert ins Tray, Beenden nur über Tray-Menü)
+- [x] Windows-Platform aktiviert, Tray-Widget verifiziert (X-Knopf minimiert ins Tray, Beenden nur über Tray-Menü oder explizitem Close-Icon in der AppBar)
 - [x] NAS-Verbindungstest auf Windows + Android erfolgreich – bidirektionaler Sync verifiziert
-- [ ] **Multi-Gerät-Test mit Soft-Delete:** Arbeitgeber auf Gerät A löschen → auf Gerät B Sync → soll lokal verschwinden
+- [x] **Multi-Gerät-Test Soft-Delete:** APK löscht 5 Dubletten → Windows-Sync zieht 2 verbleibende Arbeitgeber – verifiziert
+- [ ] **Whitelist-Sync mit korrektem LWW verifizieren:** Whitelist auf Windows ändern → APK syncen → muss übernommen werden (auch wenn APK später erneut sync't, darf sie die Windows-Werte nicht überschreiben)
+- [ ] **Backup-Restore-Test:** Backup auf NAS → neue Einträge anlegen → altes Backup wiederherstellen → Sync → fehlende Einträge müssen vom NAS zurückkommen
 - [ ] **Boot-Persistenz auf Xiaomi verifizieren:** Geofencing aktivieren → Telefon neu starten → Service muss ohne App-Öffnen wieder laufen
 
 ### Mittelfristig – Auswertung
@@ -312,9 +327,10 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
 | HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen, sonst kein zuverlässiger Background-Service |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
-| Windows Tray | Funktioniert. X-Knopf minimiert ins Tray (`setPreventClose: true`), Beenden nur über Tray-Menü |
+| Windows Tray | Funktioniert. X-Knopf minimiert ins Tray (`setPreventClose` nach `addListener`), Beenden über Tray-Menü oder explizites Close-Icon in der AppBar mit Bestätigungsdialog |
+| Settings-Sync Timing | LWW basiert auf "Gerät hat Setting zuletzt geändert" – nicht auf Sync-Reihenfolge. Erfordert konsistente Systemuhren auf allen Geräten |
+| Backup-Restore | Setzt `last_sync_at` lokal auf Epoch zurück, damit beim nächsten Sync alle NAS-Daten neu gezogen werden. NAS-Stand gewinnt per LWW – Backup ist nur dann „die Wahrheit", wenn der NAS keine neueren Daten hat |
 | Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig |
-| Settings-Sync Konflikt | Bei gleichzeitiger Whitelist-Bearbeitung auf zwei Geräten gewinnt der spätere Sync (LWW pro Key) |
 | NAS-Backup | Speichert immer nur das letzte Backup (`backup_latest.json`) – keine Versionierung. Tägliches DB-Backup via `backup_synology.sh` bleibt zusätzliche Sicherung |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |

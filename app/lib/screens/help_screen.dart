@@ -236,9 +236,13 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Linksklick', value: 'Fenster öffnen'),
               _KeyValue(label: 'Rechtsklick', value: 'Menü: Öffnen / Ein-Ausstempeln / Beenden'),
               _KeyValue(label: 'Tooltip', value: 'Zeiterfassung · Seit 09:15 · Homeoffice'),
+              _SubHeading('AppBar-Buttons (oben rechts)'),
+              _KeyValue(label: 'Minimize-Icon', value: 'In Tray verstecken (gleich wie X-Button)'),
+              _KeyValue(label: 'Close-Icon', value: 'App vollständig beenden (mit Bestätigung)'),
               _Hint(
-                'Beenden nur über Tray-Menü → "Beenden". '
-                'Der X-Button schließt das Fenster, die App läuft im Hintergrund weiter.',
+                'X-Button und Minimize-Icon: App läuft im Hintergrund weiter, '
+                'Tracking bleibt aktiv. Echtes Beenden nur über Tray-Menü → '
+                '"Beenden" oder Close-Icon in der AppBar.',
               ),
               _SubHeading('Aktivitäts-Tracking auf Windows'),
               _Step(number: '1', text: 'App starten → Übersicht → Aktivitäts-Timeline'),
@@ -285,16 +289,29 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Zeiteinträge', value: 'Bidirektional, last-write-wins'),
               _KeyValue(label: 'Arbeitgeber', value: 'Inkl. Löschungen (Soft-Delete)'),
               _KeyValue(label: 'Standorte', value: 'Inkl. Löschungen (Soft-Delete)'),
-              _KeyValue(label: 'Whitelist + Activity-Settings', value: 'NAS gewinnt (LWW pro Key)'),
+              _KeyValue(label: 'Whitelist + Activity-Settings', value: 'LWW per Key – Gerät mit jüngster Änderung gewinnt'),
               _KeyValue(label: 'IMAP-Config', value: 'Bidirektional'),
               _SubHeading('Einstellungen'),
               _Step(number: '1', text: 'Einstellungen → Sync-Status → Intervall wählen (Aus / 15 / 30 / 60 Min.)'),
-              _Step(number: '2', text: '"Jetzt" für manuellen Sofort-Sync'),
+              _Step(number: '2', text: '"Jetzt" für manuellen Sofort-Sync – synchronisiert ALLES auf einmal'),
+              _Hint(
+                'Es gibt nur einen Sync-Befehl (Einstellungen → "Jetzt"). '
+                'Er deckt Arbeitgeber, Standorte, Einträge und Whitelist '
+                'gemeinsam ab. Nach erfolgreichem Sync werden alle Provider '
+                'automatisch neu geladen – die UI zeigt neue Daten sofort, '
+                'kein App-Neustart nötig.',
+              ),
               _Hint(
                 'Soft-Delete: Wird ein Arbeitgeber oder Standort gelöscht, '
                 'erhält der Datensatz lokal ein deleted_at-Flag und wird beim '
-                'nächsten Sync auch auf allen anderen Geräten entfernt. Dadurch '
-                'tauchen gelöschte Einträge nach einem Sync nicht mehr auf.',
+                'nächsten Sync auch auf allen anderen Geräten entfernt.',
+              ),
+              _Hint(
+                'Settings-LWW: Whitelist wird nur dann zum NAS hochgeladen, '
+                'wenn du sie auf diesem Gerät tatsächlich geändert hast. '
+                'Synchronisiert ein anderes Gerät später mit alten Werten, '
+                'verlierst du deine Änderungen NICHT – das Gerät mit der '
+                'jüngsten User-Änderung gewinnt.',
               ),
             ],
           ),
@@ -318,9 +335,16 @@ class HelpScreen extends StatelessWidget {
                 'backup_synology.sh täglich ein DB-Backup mit 30 Tagen Aufbewahrung.',
               ),
               _Hint(
-                'Restore überschreibt alle bestehenden lokalen Daten. '
-                'Empfehlung: Vor einem Import zuerst ein aktuelles Backup auf NAS '
-                'oder als JSON-Datei erstellen.',
+                'Restore überschreibt alle bestehenden lokalen Daten und '
+                'setzt last_sync_at zurück. Beim nächsten Sync werden alle '
+                'NAS-Daten neu gezogen – Einträge die zwischen Backup-Erstellung '
+                'und Restore synct wurden, kommen automatisch zurück.',
+              ),
+              _Hint(
+                'Praxis: Backup ist primär eine Notfall-Sicherung für den '
+                'Fall dass der NAS nicht erreichbar ist. Solange der NAS läuft, '
+                'ist er die "Single Source of Truth" – ein Restore alter '
+                'Daten + Sync = du landest wieder beim NAS-Stand.',
               ),
             ],
           ),
