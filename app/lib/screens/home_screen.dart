@@ -1,14 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:window_manager/window_manager.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
 import '../models/employer.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../services/holiday_service.dart';
+import '../services/tray_service.dart';
 import 'entries_screen.dart';
 import 'entry_form_screen.dart';
 import 'reports_screen.dart';
@@ -34,9 +37,54 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _minimizeToTray() async {
+    await windowManager.hide();
+  }
+
+  Future<void> _quitApp() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('App beenden?'),
+        content: const Text(
+          'Die App wird vollständig geschlossen. '
+          'Tracking im Hintergrund läuft erst nach Neustart wieder.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Beenden')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    TrayService.instance.dispose();
+    await windowManager.destroy();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: Platform.isWindows
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              toolbarHeight: 40,
+              titleSpacing: 12,
+              title: const Text('Zeiterfassung', style: TextStyle(fontSize: 14)),
+              actions: [
+                IconButton(
+                  tooltip: 'In Tray minimieren',
+                  icon: const Icon(Icons.minimize),
+                  onPressed: _minimizeToTray,
+                ),
+                IconButton(
+                  tooltip: 'App beenden',
+                  icon: const Icon(Icons.close),
+                  onPressed: _quitApp,
+                ),
+                const SizedBox(width: 4),
+              ],
+            )
+          : null,
       body: IndexedStack(
         index: _navIndex,
         children: const [_DashboardTab(), EntriesScreen(), ReportsScreen(), SettingsScreen()],

@@ -35,9 +35,10 @@ void main() async {
       title: 'Zeiterfassung',
     );
     await windowManager.waitUntilReadyToShow(windowOptions);
-    // Schließen-Knopf → minimize to tray (muss VOR show() gesetzt werden)
-    await windowManager.setPreventClose(true);
     await windowManager.show();
+    // Note: setPreventClose(true) is called in app.dart after the
+    // WindowListener is registered – the order matters, otherwise the
+    // close-event has no handler and the window closes anyway.
   }
 
   if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {

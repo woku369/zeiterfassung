@@ -28,7 +28,12 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows) windowManager.addListener(this);
+    if (Platform.isWindows) {
+      windowManager.addListener(this);
+      // Must be called AFTER addListener, otherwise the X button still
+      // terminates the process because no listener handles the event.
+      windowManager.setPreventClose(true);
+    }
 
     widget.navChannel.setMethodCallHandler((call) async {
       if (call.method == 'openTimeline') {
@@ -56,8 +61,10 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
   @override
   void onWindowClose() async {
     if (!Platform.isWindows) return;
-    // Fenster verstecken statt beenden – "Beenden" nur über Tray-Menü
-    await windowManager.hide();
+    final preventClose = await windowManager.isPreventClose();
+    if (preventClose) {
+      await windowManager.hide();
+    }
   }
 
   // ── Tray-Setup ────────────────────────────────────────────────────────────
