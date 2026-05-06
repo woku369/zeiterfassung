@@ -77,7 +77,7 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
         windowManager.focus();
       },
       onQuit: () async {
-        await TrayService.instance.dispose();
+        TrayService.instance.dispose();
         await windowManager.destroy();
       },
     );
