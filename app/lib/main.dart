@@ -35,6 +35,8 @@ void main() async {
       title: 'Zeiterfassung',
     );
     await windowManager.waitUntilReadyToShow(windowOptions);
+    // Schließen-Knopf → minimize to tray (muss VOR show() gesetzt werden)
+    await windowManager.setPreventClose(true);
     await windowManager.show();
   }
 

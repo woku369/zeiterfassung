@@ -4,14 +4,60 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 
+// Kanal-IDs als Konstanten, damit sie an beiden Stellen übereinstimmen.
+const _kFgChannelId   = 'geofence_service';
+const _kFgChannelName = 'Standort-Erkennung (Hintergrund)';
+const _kEvChannelId   = 'geofence_events';
+const _kEvChannelName = 'Geofence-Ereignisse';
+
 /// Configure the background service. Call once from main() before runApp.
 Future<void> configureGeofencingBackground() async {
+  // ── Notification-Channels im Hauptisolate anlegen ──────────────────────────
+  // Android 8+ verlangt dass Channels existieren BEVOR startForeground()
+  // aufgerufen wird. flutter_background_service kann den Channel nicht
+  // zuverlässig selbst anlegen, wenn der Service via BootReceiver startet.
+  final plugin = FlutterLocalNotificationsPlugin();
+  await plugin.initialize(
+    const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    ),
+  );
+  final androidPlugin =
+      plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+  // Foreground-Service-Channel (importance LOW – keine Ton-/Vibrations-Störung)
+  await androidPlugin?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      _kFgChannelId,
+      _kFgChannelName,
+      description: 'Dauerhafter Hintergrundservice für Standort-Geofencing',
+      importance: Importance.low,
+      playSound: false,
+      enableVibration: false,
+    ),
+  );
+
+  // Ereignis-Channel (importance DEFAULT – erscheint als Popup)
+  await androidPlugin?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      _kEvChannelId,
+      _kEvChannelName,
+      description: 'Benachrichtigungen beim Betreten/Verlassen von Standorten',
+      importance: Importance.defaultImportance,
+    ),
+  );
+
+  // ── Background-Service konfigurieren ──────────────────────────────────────
   await FlutterBackgroundService().configure(
     androidConfiguration: AndroidConfiguration(
       onStart: _onStart,
-      autoStart: true,
+      // autoStart: false – Service nur starten wenn Standorte konfiguriert sind.
+      // Verhindert den Crash "Bad notification for startForeground" beim
+      // Erststart ohne konfigurierte Locations.
+      autoStart: false,
       isForegroundMode: true,
-      notificationChannelId: 'geofence_service',
+      notificationChannelId: _kFgChannelId,
       initialNotificationTitle: 'Standort-Erkennung aktiv',
       initialNotificationContent: 'GPS wird überwacht …',
       foregroundServiceNotificationId: 888,
@@ -33,8 +79,6 @@ Future<void> _onStart(ServiceInstance service) async {
   );
 
   final Set<String> inside = {};
-  // Each location is a Map with keys: id, name, latitude, longitude,
-  // radiusMeters, employerId (nullable).
   var locations = <Map<String, dynamic>>[];
 
   // ── Receive commands from main isolate ─────────────────────────────────────
@@ -107,9 +151,10 @@ Future<void> _onStart(ServiceInstance service) async {
 void _notify(FlutterLocalNotificationsPlugin n, int id, String title, String body) {
   n.show(id, title, body, const NotificationDetails(
     android: AndroidNotificationDetails(
-      'geofence', 'Standort-Erkennung',
-      importance: Importance.high,
-      priority: Priority.high,
+      _kEvChannelId,
+      _kEvChannelName,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
       icon: '@mipmap/ic_launcher',
     ),
   ));
