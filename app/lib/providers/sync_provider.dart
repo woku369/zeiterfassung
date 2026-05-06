@@ -19,6 +19,7 @@ class SyncProvider extends ChangeNotifier {
   Timer? _periodicTimer;
   Timer? _debounceTimer;
   ActivityProvider? _activityProvider;
+  Future<void> Function()? _onSyncComplete;
 
   bool get isSyncing => _isSyncing;
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -37,6 +38,10 @@ class SyncProvider extends ChangeNotifier {
 
   void setActivityProvider(ActivityProvider ap) {
     _activityProvider = ap;
+  }
+
+  void setOnSyncComplete(Future<void> Function() cb) {
+    _onSyncComplete = cb;
   }
 
   Future<void> saveNasConfig(String url, String apiKey) async {
@@ -116,6 +121,13 @@ class SyncProvider extends ChangeNotifier {
       // Server-Settings anwenden (NAS ist master)
       if (result.serverSettings != null && _activityProvider != null) {
         await _activityProvider!.applyServerSettings(result.serverSettings!);
+      }
+
+      // Provider neu laden, damit UI die frischen DB-Daten zeigt
+      if (_lastError == null && _onSyncComplete != null) {
+        try {
+          await _onSyncComplete!();
+        } catch (_) {}
       }
     } catch (e) {
       _lastError = e.toString();

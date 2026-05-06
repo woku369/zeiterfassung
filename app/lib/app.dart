@@ -106,7 +106,13 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
     final sp = context.read<SyncProvider>();
     final tp = context.read<TimeEntryProvider>();
     final lp = context.read<LocationProvider>();
+    final ep = context.read<EmployerProvider>();
     tp.setSyncTrigger(sp.triggerSync);
+    sp.setOnSyncComplete(() async {
+      await ep.reload();
+      await lp.load();
+      await tp.refresh();
+    });
     sp.startPeriodicSync();
     await sp.syncNow();
     await lp.load();
