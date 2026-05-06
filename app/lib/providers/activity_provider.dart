@@ -9,6 +9,10 @@ class ActivityProvider extends ChangeNotifier {
   static const _keyWhitelist = 'activity_whitelist';
   static const _keyMinDuration = 'activity_min_duration_minutes';
   static const _keyIdleThreshold = 'activity_idle_threshold_minutes';
+  // Timestamp of last USER-initiated settings change (epoch = never changed locally).
+  // Used for LWW sync: only advance when the user explicitly saves settings.
+  static const _keySettingsChangedAt = 'activity_settings_changed_at';
+  static const _epochTs = '2000-01-01T00:00:00.000Z';
 
   List<ActivityLog> _sessions = [];
   List<String> _whitelist = List.from(defaultWhitelist);
@@ -17,6 +21,7 @@ class ActivityProvider extends ChangeNotifier {
   bool _isTracking = false;
   bool _hasPermission = false;
   DateTime _selectedDate = DateTime.now();
+  String _settingsChangedAt = _epochTs;
 
   List<ActivityLog> get sessions => _sessions;
   List<String> get whitelist => _whitelist;
@@ -25,6 +30,8 @@ class ActivityProvider extends ChangeNotifier {
   bool get isTracking => _isTracking;
   bool get hasPermission => _hasPermission;
   DateTime get selectedDate => _selectedDate;
+  /// Timestamp to use as updated_at when pushing settings to NAS.
+  String get settingsChangedAt => _settingsChangedAt;
 
   bool get isSupported => Platform.isWindows || Platform.isAndroid;
 
@@ -44,13 +51,17 @@ class ActivityProvider extends ChangeNotifier {
     if (saved != null) _whitelist = saved;
     _minDurationMinutes = prefs.getInt(_keyMinDuration) ?? 3;
     _idleThresholdMinutes = prefs.getInt(_keyIdleThreshold) ?? 5;
+    _settingsChangedAt = prefs.getString(_keySettingsChangedAt) ?? _epochTs;
   }
 
+  /// Called when the user explicitly saves settings – advances the LWW timestamp.
   Future<void> saveSettings() async {
+    _settingsChangedAt = DateTime.now().toIso8601String();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_keyWhitelist, _whitelist);
     await prefs.setInt(_keyMinDuration, _minDurationMinutes);
     await prefs.setInt(_keyIdleThreshold, _idleThresholdMinutes);
+    await prefs.setString(_keySettingsChangedAt, _settingsChangedAt);
     notifyListeners();
   }
 
@@ -58,15 +69,14 @@ class ActivityProvider extends ChangeNotifier {
     _whitelist = list;
   }
 
-  /// Vom NAS empfangene Settings übernehmen (LWW: Server gewinnt).
+  /// Vom NAS empfangene Settings übernehmen.
+  /// Schreibt Werte direkt in Prefs, OHNE _settingsChangedAt zu aktualisieren,
+  /// damit das Gerät beim nächsten Sync nicht seine alten Werte als "neu" deklariert.
   Future<void> applyServerSettings(Map<String, dynamic> settings) async {
     bool changed = false;
     if (settings.containsKey('activity_whitelist')) {
       final raw = settings['activity_whitelist'];
-      if (raw is List) {
-        _whitelist = List<String>.from(raw);
-        changed = true;
-      }
+      if (raw is List) { _whitelist = List<String>.from(raw); changed = true; }
     }
     if (settings.containsKey('activity_min_duration_minutes')) {
       final v = settings['activity_min_duration_minutes'];
@@ -76,7 +86,14 @@ class ActivityProvider extends ChangeNotifier {
       final v = settings['activity_idle_threshold_minutes'];
       if (v is int) { _idleThresholdMinutes = v; changed = true; }
     }
-    if (changed) await saveSettings();
+    if (changed) {
+      // Persist values without touching _settingsChangedAt.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_keyWhitelist, _whitelist);
+      await prefs.setInt(_keyMinDuration, _minDurationMinutes);
+      await prefs.setInt(_keyIdleThreshold, _idleThresholdMinutes);
+      notifyListeners();
+    }
   }
 
   void setMinDuration(int minutes) {

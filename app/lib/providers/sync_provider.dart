@@ -102,11 +102,13 @@ class SyncProvider extends ChangeNotifier {
       Map<String, dynamic>? localSettings;
       if (_activityProvider != null) {
         final ap = _activityProvider!;
-        final now = DateTime.now().toIso8601String();
+        // Use the stored change-timestamp, not DateTime.now(). This ensures
+        // that only the device that last CHANGED the settings wins (true LWW).
+        final ts = ap.settingsChangedAt;
         localSettings = {
-          'activity_whitelist': {'value': ap.whitelist, 'updated_at': now},
-          'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': now},
-          'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': now},
+          'activity_whitelist': {'value': ap.whitelist, 'updated_at': ts},
+          'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': ts},
+          'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': ts},
         };
       }
 

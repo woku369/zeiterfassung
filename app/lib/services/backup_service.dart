@@ -105,6 +105,13 @@ class BackupService {
       if (v is bool) await prefs.setBool(entry.key, v);
       if (v is List) await prefs.setStringList(entry.key, List<String>.from(v));
     }
+
+    // Force full sync after restore: entries synced after the backup but before
+    // the restore would otherwise be missed because last_sync_at still points
+    // to the pre-restore sync time.
+    await DatabaseHelper.instance.setSyncState(
+      'last_sync_at', '1970-01-01T00:00:00.000Z',
+    );
   }
 
   // ── Lokales Backup (Datei) ──────────────────────────────────────────────────
