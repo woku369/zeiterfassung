@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sync_service.dart';
+import 'activity_provider.dart';
 
 class SyncProvider extends ChangeNotifier {
   static const _prefInterval = 'sync_interval_minutes';
@@ -17,6 +18,7 @@ class SyncProvider extends ChangeNotifier {
   String _nasApiKey = '';
   Timer? _periodicTimer;
   Timer? _debounceTimer;
+  ActivityProvider? _activityProvider;
 
   bool get isSyncing => _isSyncing;
   DateTime? get lastSyncAt => _lastSyncAt;
@@ -31,6 +33,10 @@ class SyncProvider extends ChangeNotifier {
     _intervalMinutes = prefs.getInt(_prefInterval) ?? _defaultInterval;
     _nasUrl  = prefs.getString(_prefNasUrl)  ?? '';
     _nasApiKey = prefs.getString(_prefNasKey) ?? '';
+  }
+
+  void setActivityProvider(ActivityProvider ap) {
+    _activityProvider = ap;
   }
 
   Future<void> saveNasConfig(String url, String apiKey) async {
@@ -87,12 +93,30 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Lokale Settings für den Sync einsammeln
+      Map<String, dynamic>? localSettings;
+      if (_activityProvider != null) {
+        final ap = _activityProvider!;
+        final now = DateTime.now().toIso8601String();
+        localSettings = {
+          'activity_whitelist': {'value': ap.whitelist, 'updated_at': now},
+          'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': now},
+          'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': now},
+        };
+      }
+
       final result = await SyncService.instance.sync(
         baseUrl: _nasUrl,
         apiKey: _nasApiKey.isEmpty ? null : _nasApiKey,
+        localSettings: localSettings,
       );
       _lastError = result.errors.isEmpty ? null : result.errors.first;
       if (_lastError == null) _lastSyncAt = DateTime.now();
+
+      // Server-Settings anwenden (NAS ist master)
+      if (result.serverSettings != null && _activityProvider != null) {
+        await _activityProvider!.applyServerSettings(result.serverSettings!);
+      }
     } catch (e) {
       _lastError = e.toString();
     } finally {

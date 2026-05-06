@@ -6,6 +6,7 @@ class Employer {
   final String? nasUrl;
   final String? nasApiKey;
   final String updatedAt;
+  final String? deletedAt;
 
   Employer({
     required this.id,
@@ -15,6 +16,7 @@ class Employer {
     this.nasUrl,
     this.nasApiKey,
     String? updatedAt,
+    this.deletedAt,
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   Employer copyWith({
@@ -33,6 +35,7 @@ class Employer {
         nasUrl: nasUrl ?? this.nasUrl,
         nasApiKey: nasApiKey ?? this.nasApiKey,
         updatedAt: DateTime.now().toIso8601String(),
+        deletedAt: deletedAt,
       );
 
   Map<String, dynamic> toMap() => {
@@ -43,6 +46,7 @@ class Employer {
         'nas_url': nasUrl,
         'nas_api_key': nasApiKey,
         'updated_at': updatedAt,
+        'deleted_at': deletedAt,
       };
 
   factory Employer.fromMap(Map<String, dynamic> m) => Employer(
@@ -53,6 +57,7 @@ class Employer {
         nasUrl: m['nas_url'] as String?,
         nasApiKey: m['nas_api_key'] as String?,
         updatedAt: m['updated_at'] as String?,
+        deletedAt: m['deleted_at'] as String?,
       );
 
   Map<String, dynamic> toJson() => toMap();

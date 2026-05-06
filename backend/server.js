@@ -89,6 +89,12 @@ db.exec(`
     deleted_at       TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_entries_date       ON time_entries(date);
   CREATE INDEX IF NOT EXISTS idx_entries_employer   ON time_entries(employer_id);
   CREATE INDEX IF NOT EXISTS idx_entries_updated    ON time_entries(updated_at);
@@ -206,6 +212,18 @@ const stmts = {
   getImapSince: db.prepare(
     `SELECT * FROM imap_config WHERE updated_at > ? ORDER BY updated_at`
   ),
+
+  // app_settings – LWW per key
+  upsertSetting: db.prepare(`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (@key, @value, @updated_at)
+    ON CONFLICT(key) DO UPDATE SET
+      value      = excluded.value,
+      updated_at = excluded.updated_at
+    WHERE excluded.updated_at > app_settings.updated_at
+  `),
+
+  getAllSettings: db.prepare(`SELECT key, value FROM app_settings`),
 };
 
 // ── Routen ────────────────────────────────────────────────────────────────────
@@ -280,6 +298,29 @@ async function handleRequest(req, res) {
     if (body.locations?.length) pushLocations(body.locations);
     if (body.imap?.length)      pushImap(body.imap);
 
+    // Settings-Sync: LWW per key, client sendet {key: {value, updated_at}}
+    if (body.settings && typeof body.settings === 'object') {
+      const pushSettings = db.transaction(entries => {
+        for (const [key, entry] of Object.entries(entries)) {
+          const value = (entry && typeof entry === 'object' && 'value' in entry)
+            ? JSON.stringify(entry.value)
+            : JSON.stringify(entry);
+          const updatedAt = (entry && typeof entry === 'object' && 'updated_at' in entry)
+            ? entry.updated_at
+            : ts;
+          stmts.upsertSetting.run({ key, value, updated_at: updatedAt });
+        }
+      });
+      pushSettings(body.settings);
+    }
+
+    // Alle Settings zurückschicken (NAS ist master)
+    const rawSettings = stmts.getAllSettings.all();
+    const settings = {};
+    for (const row of rawSettings) {
+      try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
+    }
+
     return send(res, 200, {
       ok: true,
       server_ts: ts,
@@ -287,7 +328,28 @@ async function handleRequest(req, res) {
       employers: stmts.getEmployersSince.all(since),
       locations: stmts.getLocationsSince.all(since),
       imap:      stmts.getImapSince.all(since),
+      settings,
     });
+  }
+
+  // ── POST /api/backup ──────────────────────────────────────────────────────
+  if (path_ === '/api/backup' && method === 'POST') {
+    const body = await readBody(req);
+    const backupPath = path.join(DATA_DIR, 'backup_latest.json');
+    fs.writeFileSync(backupPath, JSON.stringify(body, null, 2), 'utf8');
+    console.log('Backup gespeichert:', backupPath);
+    return send(res, 200, { ok: true, saved_at: now() });
+  }
+
+  // ── GET /api/backup ───────────────────────────────────────────────────────
+  if (path_ === '/api/backup' && method === 'GET') {
+    const backupPath = path.join(DATA_DIR, 'backup_latest.json');
+    if (!fs.existsSync(backupPath)) {
+      return send(res, 404, { error: 'Kein Backup vorhanden' });
+    }
+    const content = fs.readFileSync(backupPath, 'utf8');
+    const data = JSON.parse(content);
+    return send(res, 200, data);
   }
 
   // ── Legacy: POST /api/entries/sync (Rückwärtskompatibilität) ───────────────

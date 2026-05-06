@@ -58,6 +58,27 @@ class ActivityProvider extends ChangeNotifier {
     _whitelist = list;
   }
 
+  /// Vom NAS empfangene Settings übernehmen (LWW: Server gewinnt).
+  Future<void> applyServerSettings(Map<String, dynamic> settings) async {
+    bool changed = false;
+    if (settings.containsKey('activity_whitelist')) {
+      final raw = settings['activity_whitelist'];
+      if (raw is List) {
+        _whitelist = List<String>.from(raw);
+        changed = true;
+      }
+    }
+    if (settings.containsKey('activity_min_duration_minutes')) {
+      final v = settings['activity_min_duration_minutes'];
+      if (v is int) { _minDurationMinutes = v; changed = true; }
+    }
+    if (settings.containsKey('activity_idle_threshold_minutes')) {
+      final v = settings['activity_idle_threshold_minutes'];
+      if (v is int) { _idleThresholdMinutes = v; changed = true; }
+    }
+    if (changed) await saveSettings();
+  }
+
   void setMinDuration(int minutes) {
     _minDurationMinutes = minutes.clamp(1, 60);
   }

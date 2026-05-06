@@ -10,6 +10,7 @@ class TrackedLocation {
   final bool isActive;
   final String? employerId;
   final String updatedAt;
+  final String? deletedAt;
 
   TrackedLocation({
     required this.id,
@@ -21,6 +22,7 @@ class TrackedLocation {
     this.isActive = true,
     this.employerId,
     String? updatedAt,
+    this.deletedAt,
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   TrackedLocation copyWith({
@@ -55,6 +57,7 @@ class TrackedLocation {
         'is_active': isActive ? 1 : 0,
         'employer_id': employerId,
         'updated_at': updatedAt,
+        'deleted_at': deletedAt,
       };
 
   factory TrackedLocation.fromMap(Map<String, dynamic> m) => TrackedLocation(
@@ -67,6 +70,7 @@ class TrackedLocation {
         isActive: (m['is_active'] as int? ?? 1) == 1,
         employerId: m['employer_id'] as String?,
         updatedAt: m['updated_at'] as String?,
+        deletedAt: m['deleted_at'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -79,5 +83,6 @@ class TrackedLocation {
         'is_active': isActive ? 1 : 0,
         'employer_id': employerId,
         'updated_at': updatedAt,
+        'deleted_at': deletedAt,
       };
 }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import 'sync_service.dart';
 
 class BackupService {
   BackupService._();
@@ -21,25 +22,7 @@ class BackupService {
   /// Export all data to a JSON file chosen by the user.
   /// Returns the saved file path, or null if cancelled.
   Future<String?> export() async {
-    final db = await DatabaseHelper.instance.database;
-    final prefs = await SharedPreferences.getInstance();
-
-    final payload = <String, dynamic>{
-      'version': _version,
-      'exported_at': DateTime.now().toIso8601String(),
-    };
-
-    for (final table in _tables) {
-      payload[table] = await db.query(table);
-    }
-
-    final settings = <String, dynamic>{};
-    for (final key in _prefKeys) {
-      final v = prefs.get(key);
-      if (v != null) settings[key] = v;
-    }
-    payload['settings'] = settings;
-
+    final payload = await _buildPayload();
     final ts = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Backup speichern',
@@ -55,33 +38,59 @@ class BackupService {
     return savePath;
   }
 
-  /// Import all data from a JSON backup file.
-  /// Returns true on success, false if cancelled.
-  Future<bool> import() async {
-    final result = await FilePicker.platform.pickFiles(
-      dialogTitle: 'Backup öffnen',
-      type: FileType.custom,
-      allowedExtensions: ['json'],
+  // ── NAS-Backup ──────────────────────────────────────────────────────────────
+
+  /// Erstellt ein Backup und schickt es zum NAS.
+  Future<bool> exportToNas({required String nasUrl, String? apiKey}) async {
+    final payload = await _buildPayload();
+    return SyncService.instance.pushBackup(
+      baseUrl: nasUrl,
+      apiKey: apiKey,
+      payload: payload,
     );
-    final path = result?.files.single.path;
-    if (path == null) return false;
+  }
 
-    final Map<String, dynamic> data =
-        jsonDecode(await File(path).readAsString());
+  /// Holt das letzte Backup vom NAS und importiert es lokal.
+  Future<bool> importFromNas({required String nasUrl, String? apiKey}) async {
+    final data = await SyncService.instance.pullBackup(
+      baseUrl: nasUrl,
+      apiKey: apiKey,
+    );
+    if (data == null) return false;
+    await _applyPayload(data);
+    return true;
+  }
 
+  Future<Map<String, dynamic>> _buildPayload() async {
+    final db = await DatabaseHelper.instance.database;
+    final prefs = await SharedPreferences.getInstance();
+
+    final payload = <String, dynamic>{
+      'version': _version,
+      'exported_at': DateTime.now().toIso8601String(),
+    };
+    for (final table in _tables) {
+      payload[table] = await db.query(table);
+    }
+    final settings = <String, dynamic>{};
+    for (final key in _prefKeys) {
+      final v = prefs.get(key);
+      if (v != null) settings[key] = v;
+    }
+    payload['settings'] = settings;
+    return payload;
+  }
+
+  Future<void> _applyPayload(Map<String, dynamic> data) async {
     final db = await DatabaseHelper.instance.database;
     await db.transaction((txn) async {
-      // Delete in reverse FK order, insert in forward order.
       for (final table in _tables.reversed) {
         await txn.delete(table);
       }
       for (final table in _tables) {
         for (final row in (data[table] as List? ?? [])) {
-          await txn.insert(
-            table,
-            Map<String, dynamic>.from(row as Map),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          await txn.insert(table, Map<String, dynamic>.from(row as Map),
+              conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
     });
@@ -96,7 +105,24 @@ class BackupService {
       if (v is bool) await prefs.setBool(entry.key, v);
       if (v is List) await prefs.setStringList(entry.key, List<String>.from(v));
     }
+  }
 
+  // ── Lokales Backup (Datei) ──────────────────────────────────────────────────
+
+  /// Import all data from a JSON backup file.
+  /// Returns true on success, false if cancelled.
+  Future<bool> import() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Backup öffnen',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return false;
+
+    final Map<String, dynamic> data =
+        jsonDecode(await File(path).readAsString());
+    await _applyPayload(data);
     return true;
   }
 }

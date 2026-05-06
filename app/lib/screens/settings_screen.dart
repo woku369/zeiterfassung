@@ -834,6 +834,90 @@ class _BackupCardState extends State<_BackupCard> {
     }
   }
 
+  Future<void> _exportToNas() async {
+    final sp = context.read<SyncProvider>();
+    if (!sp.hasNasConfig) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Bitte NAS-URL in den Einstellungen konfigurieren.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final ok = await BackupService.instance.exportToNas(
+        nasUrl: sp.nasUrl,
+        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? 'Backup auf NAS gespeichert.' : 'NAS-Backup fehlgeschlagen.'),
+        backgroundColor: ok ? Colors.green : Colors.red,
+      ));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _importFromNas() async {
+    final sp = context.read<SyncProvider>();
+    if (!sp.hasNasConfig) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Bitte NAS-URL in den Einstellungen konfigurieren.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('NAS-Backup wiederherstellen'),
+        content: const Text(
+          'Alle aktuellen Daten werden durch das letzte NAS-Backup ersetzt. Fortfahren?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Wiederherstellen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final success = await BackupService.instance.importFromNas(
+        nasUrl: sp.nasUrl,
+        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
+      );
+      if (!mounted) return;
+      if (success) {
+        await context.read<EmployerProvider>().reload();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('NAS-Backup wiederhergestellt. App bitte neu starten.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 5),
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Kein NAS-Backup gefunden oder Fehler.'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _import() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -902,6 +986,26 @@ class _BackupCardState extends State<_BackupCard> {
             subtitle: const Text('Daten aus JSON-Datei importieren'),
             trailing: const Icon(Icons.folder_open_outlined),
             onTap: _busy ? null : _import,
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.cloud_upload_outlined),
+            title: const Text('Backup auf NAS'),
+            subtitle: const Text('Aktuellen Stand auf dem NAS sichern'),
+            trailing: _busy
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.upload_outlined),
+            onTap: _busy ? null : _exportToNas,
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.cloud_download_outlined),
+            title: const Text('Backup vom NAS'),
+            subtitle: const Text('Letzten NAS-Stand wiederherstellen'),
+            trailing: const Icon(Icons.download_outlined),
+            onTap: _busy ? null : _importFromNas,
           ),
         ],
       ),

@@ -15,7 +15,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 7, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 8, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -27,7 +27,8 @@ class DatabaseHelper {
         fiscal_year_start_month INTEGER NOT NULL DEFAULT 4,
         nas_url TEXT,
         nas_api_key TEXT,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
       )
     ''');
     await db.execute('''
@@ -92,6 +93,14 @@ class DatabaseHelper {
     if (oldVersion < 7) {
       await _createV7Tables(db);
     }
+    if (oldVersion < 8) {
+      try {
+        await db.execute("ALTER TABLE employers ADD COLUMN deleted_at TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE tracked_locations ADD COLUMN deleted_at TEXT");
+      } catch (_) {}
+    }
   }
 
   Future<void> _createV2Tables(Database db) async {
@@ -105,7 +114,8 @@ class DatabaseHelper {
         work_type TEXT NOT NULL DEFAULT 'offsite',
         is_active INTEGER NOT NULL DEFAULT 1,
         employer_id TEXT,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
       )
     ''');
     await db.execute('''
@@ -238,10 +248,19 @@ class DatabaseHelper {
 
   Future<void> deleteEmployer(String id) async {
     final db = await database;
-    await db.delete('employers', where: 'id = ?', whereArgs: [id]);
+    final now = DateTime.now().toIso8601String();
+    await db.update('employers', {'deleted_at': now, 'updated_at': now},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<Employer>> getEmployers() async {
+    final db = await database;
+    final rows = await db.query('employers', where: 'deleted_at IS NULL');
+    return rows.map(Employer.fromMap).toList();
+  }
+
+  /// Alle Employers inkl. soft-deleted – nur für Sync-Push.
+  Future<List<Employer>> getAllEmployersForSync() async {
     final db = await database;
     final rows = await db.query('employers');
     return rows.map(Employer.fromMap).toList();
@@ -261,10 +280,20 @@ class DatabaseHelper {
 
   Future<void> deleteLocation(String id) async {
     final db = await database;
-    await db.delete('tracked_locations', where: 'id = ?', whereArgs: [id]);
+    final now = DateTime.now().toIso8601String();
+    await db.update('tracked_locations', {'deleted_at': now, 'updated_at': now},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<TrackedLocation>> getLocations() async {
+    final db = await database;
+    final rows = await db.query('tracked_locations',
+        where: 'deleted_at IS NULL', orderBy: 'name ASC');
+    return rows.map(TrackedLocation.fromMap).toList();
+  }
+
+  /// Alle Locations inkl. soft-deleted – nur für Sync-Push.
+  Future<List<TrackedLocation>> getAllLocationsForSync() async {
     final db = await database;
     final rows = await db.query('tracked_locations', orderBy: 'name ASC');
     return rows.map(TrackedLocation.fromMap).toList();
@@ -280,15 +309,20 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final loc in locations) {
-      batch.insert('tracked_locations', loc.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      if (loc.deletedAt != null) {
+        batch.delete('tracked_locations', where: 'id = ?', whereArgs: [loc.id]);
+      } else {
+        batch.insert('tracked_locations', loc.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
     }
     await batch.commit(noResult: true);
   }
 
   Future<List<TrackedLocation>> getAllLocations() async {
     final db = await database;
-    final rows = await db.query('tracked_locations', orderBy: 'name ASC');
+    final rows = await db.query('tracked_locations',
+        where: 'deleted_at IS NULL', orderBy: 'name ASC');
     return rows.map(TrackedLocation.fromMap).toList();
   }
 
@@ -311,8 +345,12 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final e in employers) {
-      batch.insert('employers', e.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      if (e.deletedAt != null) {
+        batch.delete('employers', where: 'id = ?', whereArgs: [e.id]);
+      } else {
+        batch.insert('employers', e.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
     }
     await batch.commit(noResult: true);
   }

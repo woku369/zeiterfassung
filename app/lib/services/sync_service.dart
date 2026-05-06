@@ -9,7 +9,13 @@ class SyncResult {
   final int pushed;
   final int pulled;
   final List<String> errors;
-  SyncResult({required this.pushed, required this.pulled, this.errors = const []});
+  final Map<String, dynamic>? serverSettings;
+  SyncResult({
+    required this.pushed,
+    required this.pulled,
+    this.errors = const [],
+    this.serverSettings,
+  });
 }
 
 class SyncService {
@@ -24,17 +30,21 @@ class SyncService {
         if (apiKey != null && apiKey.isNotEmpty) 'x-api-key': apiKey,
       };
 
-  Future<SyncResult> sync({required String baseUrl, String? apiKey}) async {
+  Future<SyncResult> sync({
+    required String baseUrl,
+    String? apiKey,
+    Map<String, dynamic>? localSettings,
+  }) async {
     final db = DatabaseHelper.instance;
     final url = _normalize(baseUrl);
     final headers = _headers(apiKey);
     final errors = <String>[];
 
-    // Collect local changes to push
-    final unsynced    = await db.getUnsyncedEntries();
-    final employers   = await db.getEmployers();
-    final locations   = await db.getLocations();
-    final lastSync    = await db.getSyncState('last_sync_at') ?? '1970-01-01T00:00:00.000Z';
+    // Unsynced time entries + alle Employers/Locations inkl. soft-deleted
+    final unsynced  = await db.getUnsyncedEntries();
+    final employers = await db.getAllEmployersForSync();
+    final locations = await db.getAllLocationsForSync();
+    final lastSync  = await db.getSyncState('last_sync_at') ?? '1970-01-01T00:00:00.000Z';
 
     try {
       final body = jsonEncode({
@@ -42,6 +52,8 @@ class SyncService {
         'entries':   unsynced.map((e) => e.toJson()).toList(),
         'employers': employers.map((e) => e.toJson()).toList(),
         'locations': locations.map((l) => l.toJson()).toList(),
+        if (localSettings != null && localSettings.isNotEmpty)
+          'settings': localSettings,
       });
 
       final resp = await http.post(
@@ -85,10 +97,14 @@ class SyncService {
       }
       await db.setSyncState('last_sync_at', serverTs);
 
+      // Server settings (LWW: server wins, propagate to other devices)
+      final rawSettings = data['settings'] as Map<String, dynamic>?;
+
       return SyncResult(
         pushed: unsynced.length,
         pulled: serverEntries.length + serverEmployers.length + serverLocations.length,
         errors: errors,
+        serverSettings: rawSettings,
       );
     } catch (e) {
       errors.add('Sync fehlgeschlagen: $e');
@@ -114,6 +130,44 @@ class SyncService {
       return resp.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  // ── NAS-Backup ──────────────────────────────────────────────────────────────
+
+  Future<bool> pushBackup({
+    required String baseUrl,
+    String? apiKey,
+    required Map<String, dynamic> payload,
+  }) async {
+    final url = _normalize(baseUrl);
+    try {
+      final resp = await http.post(
+        Uri.parse('$url/api/backup'),
+        headers: _headers(apiKey),
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 60));
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> pullBackup({
+    required String baseUrl,
+    String? apiKey,
+  }) async {
+    final url = _normalize(baseUrl);
+    try {
+      final resp = await http
+          .get(Uri.parse('$url/api/backup'), headers: _headers(apiKey))
+          .timeout(const Duration(seconds: 60));
+      if (resp.statusCode == 200) {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 }

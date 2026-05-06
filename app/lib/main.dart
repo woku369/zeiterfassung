@@ -48,6 +48,7 @@ void main() async {
 
   final syncProvider = SyncProvider();
   await syncProvider.init();
+  syncProvider.setActivityProvider(activityProvider);
 
   final suggestionProvider = SuggestionProvider();
   await suggestionProvider.init();
