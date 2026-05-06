@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-05 – Windows Tray-Widget + Build-Script
+> Letztes Update: 2026-05-06 – NAS-Master-Sync + Boot-Persistenz
 
 ---
 
@@ -24,6 +24,39 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.12 – Robuste Boot-Persistenz & Tray-Stabilität
+- [x] **Eigener Kotlin BootReceiver** (`ZeiterfassungBootReceiver.kt`):
+  - Liest `flutter.geofencing_active` aus FlutterSharedPreferences
+  - Legt Notification-Channels (`geofence_service`, `geofence_events`) idempotent an, bevor `startForegroundService()` aufgerufen wird
+  - Reagiert auf `BOOT_COMPLETED` und `QUICKBOOT_POWERON` (Xiaomi/MIUI)
+  - Built-in `flutter_background_service.BootReceiver` per `enabled=false` deaktiviert (Crash-Ursache)
+- [x] **`autoStart: false`** in `AndroidConfiguration` – kein automatischer Service-Start ohne existierende Channels mehr
+- [x] **Notification-Channels explizit im Hauptisolate** vor `FlutterBackgroundService().configure()` angelegt – Foreground-Channel mit `IMPORTANCE_LOW` (lautlos), Event-Channel mit `IMPORTANCE_DEFAULT`
+- [x] **`GeofencingService.stopTracking()` async** + Persistenz des `geofencing_active`-Flags bei Start/Stop
+- [x] **Windows Tray-Close-Fix:** `windowManager.setPreventClose(true)` vor `show()` – ohne diesen Aufruf ignorierte Windows den `onWindowClose()`-Handler komplett
+- [x] **Race-Condition beim Beenden:** `await TrayService.dispose()` vor `windowManager.destroy()`
+- [x] **Crash behoben:** `CannotPostForegroundServiceNotificationException: Bad notification for startForeground` (Android 14)
+
+### v1.11 – NAS-Master-Sync (Soft-Delete + Settings + Backup)
+- [x] **Soft-Delete für Employers + Locations:** `deleted_at`-Spalte (DB v8) statt Hard-Delete
+  - `deleteEmployer()` / `deleteLocation()` setzen `deleted_at` + `updated_at`
+  - `getEmployers()` / `getLocations()` filtern `WHERE deleted_at IS NULL`
+  - `getAllEmployersForSync()` / `getAllLocationsForSync()` schicken auch soft-deleted Records
+  - `upsertEmployersFromServer()` / `upsertLocationsFromServer()` löschen lokal wenn `deleted_at` gesetzt
+  - **Löscht ein Gerät einen Arbeitgeber, wird er auf allen anderen Geräten beim nächsten Sync entfernt** – keine Duplikate mehr
+- [x] **App-Settings via NAS synchronisiert:**
+  - Neue Tabelle `app_settings(key, value, updated_at)` auf dem Server (LWW per Key)
+  - `SyncProvider` schickt lokale Settings (Whitelist, min_duration, idle_threshold) bei jedem Sync mit
+  - `ActivityProvider.applyServerSettings()` übernimmt NAS-Werte – **NAS gewinnt**
+  - Whitelist-Änderung auf einem Gerät propagiert binnen Sekunden auf alle anderen
+- [x] **NAS-Backup:**
+  - Neue Endpunkte `POST /api/backup` und `GET /api/backup` (speichert `backup_latest.json` im DATA_DIR)
+  - `BackupService.exportToNas()` / `importFromNas()`
+  - Zwei neue Kacheln in den Einstellungen: „Backup auf NAS" / „Backup vom NAS"
+- [x] **DB-Migration v8** ergänzt `deleted_at` auf bestehenden Installationen
+- [x] **`AndroidManifest`-Merger-Konflikt** für `flutter_background_service` über `tools:replace="android:exported"` behoben
+- [x] **`reports_screen` NAS-Sync** verwendet jetzt globalen `SyncProvider` statt der gelöschten per-Employer-NAS-Felder
 
 ### v1.0 – Grundgerüst
 - [x] Flutter-App: Android & Windows (gemeinsame Codebasis)
@@ -170,8 +203,10 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Fahrzeit-Konzept klären:** Fahrzeit als separates Feld vs. eigener Eintragstyp
 
 ### Kurzfristig – Plattform
-- [ ] **Windows-Platform aktivieren:** `cd app && flutter create --platforms=windows .` auf Build-Rechner ausführen (Tray-Code ist fertig, wartet nur auf `windows/`-Ordner)
-- [ ] NAS-Verbindungstest auf Windows/Android erfolgreich abschließen (URL + API-Key prüfen)
+- [x] Windows-Platform aktiviert, Tray-Widget verifiziert (X-Knopf minimiert ins Tray, Beenden nur über Tray-Menü)
+- [x] NAS-Verbindungstest auf Windows + Android erfolgreich – bidirektionaler Sync verifiziert
+- [ ] **Multi-Gerät-Test mit Soft-Delete:** Arbeitgeber auf Gerät A löschen → auf Gerät B Sync → soll lokal verschwinden
+- [ ] **Boot-Persistenz auf Xiaomi verifizieren:** Geofencing aktivieren → Telefon neu starten → Service muss ohne App-Öffnen wieder laufen
 
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
@@ -211,11 +246,12 @@ app/
                      work_type, activity_log, suggested_entry
     providers/       time_entry_provider, employer_provider, location_provider,
                      activity_provider, sync_provider, suggestion_provider
-    services/        sync_service, export_service, import_service,
-                     gps_service, holiday_service, geofencing_service,
-                     geofencing_background (Foreground-Service-Isolate),
+    services/        sync_service (inkl. NAS-Backup-Endpoints),
+                     export_service, import_service, gps_service,
+                     holiday_service, geofencing_service (mit Boot-Flag),
+                     geofencing_background (autoStart:false, Channels im Hauptisolate),
                      imap_service, tray_service (tray_manager + window_manager),
-                     backup_service, activity_tracking_service,
+                     backup_service (lokal + NAS), activity_tracking_service,
                      activity_tracking_win32, fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
@@ -223,19 +259,25 @@ app/
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
-    kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService
+    kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService,
+                     ZeiterfassungBootReceiver (eigener Receiver,
+                     legt Channels an bevor BackgroundService gestartet wird)
                      Permissions: ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS,
                                   PACKAGE_USAGE_STATS, FOREGROUND_SERVICE,
                                   FOREGROUND_SERVICE_LOCATION, RECEIVE_BOOT_COMPLETED
-                     Service: flutter_background_service (Foreground, autoStart)
-  windows/           (Ordner fehlt noch – flutter create --platforms=windows . ausführen)
+                     Service: flutter_background_service
+                              (autoStart:false, manuell + via eigenem BootReceiver)
+  windows/           Ordner aktiv – Tray verifiziert
 
 backend/
   server.js          Standalone Node.js, kein Build-Schritt
+                     Endpunkte: /api/health, /api/sync, /api/backup,
+                                /api/entries (legacy)
   package.json       Abhängigkeit: better-sqlite3
   start_synology.sh  Synology Task Scheduler Startskript
   backup_synology.sh Tägliches DB-Backup (30 Tage)
-  data/              zeiterfassung.db (SQLite, WAL-Modus)
+  data/              zeiterfassung.db (SQLite, WAL-Modus),
+                     backup_latest.json (NAS-Backup)
 
 build.ps1              Windows PowerShell Build-Script (APK + Windows-ZIP → builds\)
 builds/                Build-Ausgaben – nicht im Git (.gitignore)
@@ -251,10 +293,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v5: + `employer_id` (time_entries)
 - v6: + `updated_at` (employers, tracked_locations), `employer_id` (tracked_locations), `sync_state`
 - v7: + `activity_log`
+- v8: + `deleted_at` (employers, tracked_locations) – Soft-Delete-Propagation
+
+**Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync.
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.10)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.12)
 
 ---
 
@@ -265,10 +310,12 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Arbeitstyp-Konzept | WorkType vermischt Arbeitsort und Tätigkeit – Redesign geplant |
 | Stempeluhr-Import E-Ort | „Mobil" wurde initial als Fahrt importiert – Korrektur via `fix_worktypes.py` |
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
-| HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen |
+| HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen, sonst kein zuverlässiger Background-Service |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
-| Windows Tray | Code fertig – benötigt `flutter create --platforms=windows .` auf Build-Rechner |
-| Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig nach `flutter create --platforms=windows .` |
+| Windows Tray | Funktioniert. X-Knopf minimiert ins Tray (`setPreventClose: true`), Beenden nur über Tray-Menü |
+| Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig |
+| Settings-Sync Konflikt | Bei gleichzeitiger Whitelist-Bearbeitung auf zwei Geräten gewinnt der spätere Sync (LWW pro Key) |
+| NAS-Backup | Speichert immer nur das letzte Backup (`backup_latest.json`) – keine Versionierung. Tägliches DB-Backup via `backup_synology.sh` bleibt zusätzliche Sicherung |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge) |

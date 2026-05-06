@@ -115,14 +115,15 @@ class HelpScreen extends StatelessWidget {
                 text: 'Gerät B öffnen → beim Start werden alle Einträge geladen',
               ),
               _Hint(
-                'Konflikte: Einträge mit derselben ID werden per Upsert '
-                'überschrieben – immer der zuletzt gesyncte Stand gewinnt. '
-                'Manueller Sync jederzeit: Einstellungen → Sync-Status → Jetzt.',
+                'NAS ist Master: Löschungen, Whitelist und App-Settings '
+                'propagieren auf alle Geräte. Einträge mit gleicher ID werden '
+                'per last-write-wins gemerged. Manueller Sync jederzeit: '
+                'Einstellungen → Sync-Status → Jetzt.',
               ),
               _SubHeading('Geräte-Übersicht'),
-              _KeyValue(label: 'Android', value: 'GPS, Geofencing (Foreground-Service), automatischer Sync'),
-              _KeyValue(label: 'Windows', value: 'Aktivitäts-Tracking, IMAP-Sync, Backup/Restore'),
-              _KeyValue(label: 'NAS', value: 'Zentraler Datenspeicher, immer online'),
+              _KeyValue(label: 'Android', value: 'GPS, Geofencing (Foreground-Service), Sync, Boot-Restart'),
+              _KeyValue(label: 'Windows', value: 'Tray-Widget, Aktivitäts-Tracking, IMAP, Sync'),
+              _KeyValue(label: 'NAS', value: 'Master-Datenspeicher, immer online'),
             ],
           ),
           SizedBox(height: 8),
@@ -152,10 +153,18 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · AG: Gurktaler'),
               _KeyValue(label: 'Wien (Büro)', value: 'Radius ~150 m · AG: Gurktaler Wien'),
               _KeyValue(label: 'Homeoffice', value: 'Radius ~100 m · manuell einstempeln'),
+              _SubHeading('Verhalten nach Geräteneustart'),
+              _Para(
+                'Wurde das Tracking aktiviert, läuft es nach jedem Neustart '
+                'des Telefons automatisch weiter – ein eigener BootReceiver '
+                'legt zuerst die Notification-Channels an und startet danach '
+                'den Foreground-Service.',
+              ),
               _Hint(
                 'Hintergrund-GPS: Android fragt beim ersten Start nach '
-                '"Immer erlauben". HyperOS/MIUI: Akkuoptimierung für Zeiterfassung '
-                'auf "Keine Einschränkungen" setzen, damit der Service dauerhaft läuft.',
+                '"Immer erlauben". HyperOS/MIUI: Akkuoptimierung für '
+                'Zeiterfassung auf "Keine Einschränkungen" setzen, sonst '
+                'beendet das System den Service trotz Foreground-Notification.',
               ),
             ],
           ),
@@ -265,42 +274,53 @@ class HelpScreen extends StatelessWidget {
             title: 'Automatische Synchronisierung',
             children: [
               _Para(
-                'Die Synchronisierung mit dem NAS läuft vollautomatisch '
-                'und muss nicht manuell ausgelöst werden.',
+                'Die Synchronisierung mit dem NAS läuft vollautomatisch. '
+                'Das NAS ist die Master-Quelle: gelöschte Arbeitgeber, '
+                'Standorte und Whitelist-Änderungen propagieren auf alle Geräte.',
               ),
-              _KeyValue(label: 'Beim App-Start', value: 'Sofort – NAS-Daten haben Vorrang vor lokalen Daten'),
-              _KeyValue(label: 'Nach Änderungen', value: '3 Sekunden nach jedem Speichern oder Löschen'),
-              _KeyValue(label: 'Periodisch', value: 'Alle 15, 30 oder 60 Minuten (einstellbar)'),
+              _KeyValue(label: 'Beim App-Start', value: 'Sofort – NAS-Daten haben Vorrang'),
+              _KeyValue(label: 'Nach Änderungen', value: '3 Sekunden nach Speichern/Löschen'),
+              _KeyValue(label: 'Periodisch', value: 'Alle 15, 30 oder 60 Min. (einstellbar)'),
+              _SubHeading('Was wird synchronisiert'),
+              _KeyValue(label: 'Zeiteinträge', value: 'Bidirektional, last-write-wins'),
+              _KeyValue(label: 'Arbeitgeber', value: 'Inkl. Löschungen (Soft-Delete)'),
+              _KeyValue(label: 'Standorte', value: 'Inkl. Löschungen (Soft-Delete)'),
+              _KeyValue(label: 'Whitelist + Activity-Settings', value: 'NAS gewinnt (LWW pro Key)'),
+              _KeyValue(label: 'IMAP-Config', value: 'Bidirektional'),
               _SubHeading('Einstellungen'),
               _Step(number: '1', text: 'Einstellungen → Sync-Status → Intervall wählen (Aus / 15 / 30 / 60 Min.)'),
               _Step(number: '2', text: '"Jetzt" für manuellen Sofort-Sync'),
               _Hint(
-                'NAS hat Vorrang beim ersten Start: Existieren auf dem NAS bereits '
-                'Arbeitgeber und Einträge, werden diese geladen. Lokale Beispiel-Standorte '
-                'werden nicht angelegt wenn NAS konfiguriert ist.',
+                'Soft-Delete: Wird ein Arbeitgeber oder Standort gelöscht, '
+                'erhält der Datensatz lokal ein deleted_at-Flag und wird beim '
+                'nächsten Sync auch auf allen anderen Geräten entfernt. Dadurch '
+                'tauchen gelöschte Einträge nach einem Sync nicht mehr auf.',
               ),
             ],
           ),
           SizedBox(height: 8),
           _Section(
             icon: Icons.backup_outlined,
-            title: 'Backup & Restore (Windows)',
+            title: 'Backup & Restore',
             children: [
               _Para(
-                'Alle lokalen Daten können als JSON-Datei exportiert '
-                'und auf demselben oder einem anderen Gerät wiederhergestellt werden.',
+                'Vier Backup-Varianten in den Einstellungen unter "Datensicherung":',
               ),
-              _SubHeading('Backup erstellen'),
-              _Step(number: '1', text: 'Einstellungen → Datensicherung → Exportieren'),
-              _Step(number: '2', text: 'Speicherort wählen → zeiterfassung_backup_JJJJ-MM-TT.json'),
-              _Para('Enthält: Arbeitgeber, Zeiteinträge, Standorte, IMAP-Config, App-Einstellungen.'),
-              _SubHeading('Backup einspielen'),
-              _Step(number: '1', text: 'Einstellungen → Datensicherung → Importieren'),
-              _Step(number: '2', text: 'Backup-Datei auswählen → Bestätigungsdialog'),
-              _Step(number: '3', text: 'App startet automatisch neu mit den wiederhergestellten Daten'),
+              _SubHeading('Lokales Backup (JSON-Datei)'),
+              _KeyValue(label: 'Backup erstellen', value: 'Speichert alle Tabellen + Settings als JSON'),
+              _KeyValue(label: 'Backup wiederherstellen', value: 'Lädt eine JSON-Datei und ersetzt alle Daten'),
+              _SubHeading('NAS-Backup'),
+              _KeyValue(label: 'Backup auf NAS', value: 'Schickt aktuellen Stand an /api/backup'),
+              _KeyValue(label: 'Backup vom NAS', value: 'Holt letzten NAS-Stand und stellt ihn wieder her'),
+              _Para(
+                'Auf dem NAS liegt immer nur das jeweils letzte Backup als '
+                'backup_latest.json im DATA_DIR. Zusätzlich erstellt '
+                'backup_synology.sh täglich ein DB-Backup mit 30 Tagen Aufbewahrung.',
+              ),
               _Hint(
                 'Restore überschreibt alle bestehenden lokalen Daten. '
-                'Empfehlung: Vor einem Import zuerst ein aktuelles Backup erstellen.',
+                'Empfehlung: Vor einem Import zuerst ein aktuelles Backup auf NAS '
+                'oder als JSON-Datei erstellen.',
               ),
             ],
           ),
