@@ -2,11 +2,13 @@
 #
 # Baut APK und/oder Windows-EXE (ZIP) und kopiert sie nach builds\
 #
-# Usage:
+# Usage (von beliebigem Verzeichnis):
+#   C:\Users\wolfg\zeiterfassung\build.ps1
 #   .\build.ps1                 - APK + Windows (wenn Platform vorhanden)
 #   .\build.ps1 -Clean          - flutter clean vor dem Build
 #   .\build.ps1 -ApkOnly        - nur APK
 #   .\build.ps1 -WindowsOnly    - nur Windows
+#   .\build.ps1 -NoPull         - git pull ueberspringen
 #
 # Ausgabe: zeiterfassung\builds\zeiterfassung-YYYY-MM-DD.apk
 #          zeiterfassung\builds\zeiterfassung-YYYY-MM-DD-windows.zip
@@ -14,7 +16,8 @@
 param(
     [switch]$Clean,
     [switch]$ApkOnly,
-    [switch]$WindowsOnly
+    [switch]$WindowsOnly,
+    [switch]$NoPull
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +38,29 @@ function Write-Fail($msg) { Write-Host "XX $msg" -ForegroundColor Red }
 if (-not (Test-Path $buildsDir)) {
     New-Item -ItemType Directory -Path $buildsDir | Out-Null
 }
+
+# Immer im Projekt-Root arbeiten - egal von wo das Script gestartet wurde.
+Set-Location $projectRoot
+Write-Step "Projekt-Root: $projectRoot"
+
+# -- Git Pull ------------------------------------------------------------------
+if (-not $NoPull) {
+    if (Test-Path (Join-Path $projectRoot ".git")) {
+        Write-Step "git pull"
+        try {
+            $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+            git pull origin $branch
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "git pull fehlgeschlagen - baue trotzdem mit lokalem Stand"
+            }
+        } catch {
+            Write-Warn "git pull konnte nicht ausgefuehrt werden: $_"
+        }
+    } else {
+        Write-Warn "Kein git-Repository - pull uebersprungen"
+    }
+}
+
 Set-Location $appDir
 
 if ($Clean) {
