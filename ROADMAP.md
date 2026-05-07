@@ -25,6 +25,24 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Erledigt
 
+### v1.15 – Sonderarbeitszeiten & Vertragsäquivalent (Gurktaler AG)
+- [x] **Neue Spalte `is_special_hours` (DB v9, NAS-Migration idempotent):** Markierung für Sonderarbeitszeiten (hauptsächlich Führungen) am `time_entries`-Datensatz
+- [x] **`SurchargeService`:** zentrale Faktor-Berechnung für Vertragsäquivalent
+  - Aktiv nur bei Arbeitgeber, dessen Name `gurktaler` enthält
+  - Faktoren: Sa 1.5×, So/Feiertag 2.0×, Werktag 1.0× (kein Zuschlag, gilt als Mehrarbeit)
+  - Homeoffice ist immer zuschlagsfrei (auch nachts/Sa/So/Feiertag)
+  - Greift nur bei explizit gesetztem `isSpecialHours`-Flag – Standard-Einträge bleiben unverändert
+- [x] **Entry-Form-Erweiterung (nur sichtbar bei Gurktaler AG):**
+  - Switch „Sonderarbeitszeit (Führung u. ä.)" mit Live-Anzeige des aktuellen Zuschlagsfaktors
+  - Schnellschaltfläche „+80 Min Fahrtzeit" (Standardwert konfigurierbar) → schreibt in bestehendes `travel_minutes`-Feld
+  - `totalDuration` rechnet Fahrtzeit nun mit ein (vorher rein dekorativ) – bestehende Einträge mit `travel_minutes = 0` unberührt
+- [x] **Wirtschaftsjahr-Bericht: neue Spalte „Äquiv."** + Total-Zeile
+  - Zeigt Vertragsäquivalent (Ist × Faktor) je Monat und Jahressumme
+  - Hervorgehoben wenn Äquivalent > Ist (Zuschlag wirksam)
+  - Erläuterungstext direkt unter der Tabelle
+  - Erscheint nur bei aktivem Gurktaler-Arbeitgeber – andere Arbeitgeber sehen unverändertes Layout
+- [x] **Konzeptioneller Hintergrund:** Ziel ist nicht Lohnberechnung, sondern transparente Dokumentation des tatsächlichen zeitlichen Aufwands für Vertragsverhandlungen – Vertragsäquivalent macht den faktischen Wert sichtbar, ohne die Ist-Stunden zu verfälschen
+
 ### v1.14 – Auto Clock-in via Geofencing + UX-Polishing
 - [x] **Auto Clock-in/out via Geofencing** im Background-Isolate (funktioniert auch bei vollständig geschlossener App):
   - Zone betreten → SQLite-Insert eines `time_entries`-Datensatzes mit `WorkType` der Zone, `employer_id` der Zone, Notiz `Auto · [Standortname]`
@@ -339,12 +357,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v6: + `updated_at` (employers, tracked_locations), `employer_id` (tracked_locations), `sync_state`
 - v7: + `activity_log`
 - v8: + `deleted_at` (employers, tracked_locations) – Soft-Delete-Propagation
+- v9: + `is_special_hours` (time_entries) – Sonderarbeitszeit-Flag für Zuschlagsberechnung
 
 **Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync.
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.14)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.15)
 
 ---
 
@@ -364,6 +383,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | NAS-Backup | Speichert immer nur das letzte Backup (`backup_latest.json`) – keine Versionierung. Tägliches DB-Backup via `backup_synology.sh` bleibt zusätzliche Sicherung |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
-| Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge) |
+| Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge). Ausnahme: Vertragsäquivalent für Gurktaler AG im Jahresbericht – informativ, beeinflusst Ist-Stunden nicht |
+| Sonderarbeitszeit-Faktoren | Hardcoded für Gurktaler AG (Sa 1.5×, So/Feiertag 2.0×). Andere Arbeitgeber: Spalte ausgeblendet, kein Effekt. Erweiterbar via `SurchargeService` |
 | Auto Clock-in/out | Funktioniert auch bei geschlossener App (Background-Isolate schreibt direkt in SQLite). 5 Min Karenz beim Verlassen einer Zone gegen GPS-Drift. Auto-Clock-out greift nur bei Einträgen, die selbst per Geofencing erstellt wurden – manuelle Einträge bleiben unangetastet |
 | Geofencing-Watchdog | Schlägt nur Alarm bei auto-erstellten Einträgen, nicht bei manuellen (kein Fehlalarm für legitimes Homeoffice). Schwelle: 30 Min außerhalb aller Zonen. Notification-ID 994 wird ersetzt – kein Spam |

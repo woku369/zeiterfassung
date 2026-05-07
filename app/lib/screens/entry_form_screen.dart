@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../models/employer.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
 import '../services/holiday_service.dart';
+import '../services/surcharge_service.dart';
 
 class EntryFormScreen extends StatefulWidget {
   final TimeEntry? entry;
@@ -29,6 +31,9 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late TextEditingController _kmCtrl;
   late TextEditingController _breakCtrl;
   String? _employerId;
+  bool _isSpecialHours = false;
+  int _travelMinutes = 0;
+  static const int _defaultTravelMinutes = 80;
 
   bool get _isNew => widget.entry == null || widget.forceNew;
   bool get _isAbsence => _workType.isAbsence;
@@ -49,7 +54,19 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     _noteCtrl = TextEditingController(text: e?.note ?? '');
     _kmCtrl = TextEditingController(text: e?.distanceKm?.toString() ?? '');
     _breakCtrl = TextEditingController(text: _breakMinutes.toString());
+    _isSpecialHours = e?.isSpecialHours ?? false;
+    _travelMinutes = e?.travelMinutes ?? 0;
   }
+
+  Employer? get _selectedEmployer {
+    if (_employerId == null) return null;
+    final list = context.read<EmployerProvider>().employers;
+    final idx = list.indexWhere((e) => e.id == _employerId);
+    return idx == -1 ? null : list[idx];
+  }
+
+  bool get _isSurchargeEmployer =>
+      SurchargeService.isSurchargeEmployer(_selectedEmployer);
 
   DayType _defaultDayType(DateTime d) {
     if (HolidayService.instance.isHoliday(d)) return DayType.holiday;
@@ -111,8 +128,9 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       dayType: _dayType,
       note: _noteCtrl.text.trim(),
       distanceKm: km,
-      travelMinutes: widget.entry?.travelMinutes ?? 0,
+      travelMinutes: _travelMinutes,
       employerId: _employerId,
+      isSpecialHours: _isSurchargeEmployer && _isSpecialHours,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
     );
@@ -291,6 +309,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              if (_isSurchargeEmployer) ..._gurktalerExtras(),
             ] else ...[
               // Absence info card
               Container(
@@ -338,6 +357,87 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _gurktalerExtras() {
+    final isWeekendOrHoliday = _dayType != DayType.workday;
+    final factor = (_isSpecialHours && _workType != WorkType.homeoffice)
+        ? switch (_dayType) {
+            DayType.saturday => 1.5,
+            DayType.sunday   => 2.0,
+            DayType.holiday  => 2.0,
+            DayType.workday  => 1.0,
+          }
+        : 1.0;
+    return [
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.amber.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.amber.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.star_outline, size: 18, color: Colors.amber.shade800),
+              const SizedBox(width: 6),
+              Text('Gurktaler-Sonderoptionen',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade900)),
+            ]),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Sonderarbeitszeit (Führung u. ä.)',
+                  style: TextStyle(fontSize: 14)),
+              subtitle: Text(
+                _workType == WorkType.homeoffice
+                    ? 'Homeoffice ist immer zuschlagsfrei.'
+                    : isWeekendOrHoliday
+                        ? 'Zuschlag laut Tagesart × ${factor.toStringAsFixed(1)}'
+                        : 'Werktag → kein Zuschlag, gilt als Mehrarbeit.',
+                style: const TextStyle(fontSize: 11),
+              ),
+              value: _isSpecialHours,
+              onChanged: (v) => setState(() => _isSpecialHours = v),
+            ),
+            const Divider(height: 16),
+            Row(children: [
+              Icon(Icons.directions_car_outlined,
+                  size: 18, color: Colors.grey.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _travelMinutes > 0
+                      ? 'Fahrtzeit: $_travelMinutes Min.'
+                      : 'Keine Fahrtzeit hinterlegt.',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              if (_travelMinutes == 0)
+                TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _travelMinutes = _defaultTravelMinutes),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('+80 Min'),
+                )
+              else
+                IconButton(
+                  iconSize: 18,
+                  tooltip: 'Fahrtzeit entfernen',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => setState(() => _travelMinutes = 0),
+                ),
+            ]),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+    ];
   }
 
   Color? _dayTypeTileColor(BuildContext context) {

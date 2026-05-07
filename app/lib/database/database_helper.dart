@@ -15,7 +15,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 8, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 9, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -48,6 +48,7 @@ class DatabaseHelper {
         end_lng REAL,
         travel_minutes INTEGER NOT NULL DEFAULT 0,
         employer_id TEXT,
+        is_special_hours INTEGER NOT NULL DEFAULT 0,
         is_synced INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
@@ -99,6 +100,12 @@ class DatabaseHelper {
       } catch (_) {}
       try {
         await db.execute("ALTER TABLE tracked_locations ADD COLUMN deleted_at TEXT");
+      } catch (_) {}
+    }
+    if (oldVersion < 9) {
+      try {
+        await db.execute(
+            "ALTER TABLE time_entries ADD COLUMN is_special_hours INTEGER NOT NULL DEFAULT 0");
       } catch (_) {}
     }
   }

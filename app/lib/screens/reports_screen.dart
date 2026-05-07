@@ -12,6 +12,7 @@ import '../models/time_entry.dart';
 import '../models/employer.dart';
 import '../models/work_type.dart';
 import '../services/holiday_service.dart';
+import '../services/surcharge_service.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -310,6 +311,9 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   bool _loading = false;
   // Month index 0..11 → actual hours for that month.
   final List<double> _monthHours = List.filled(12, 0.0);
+  // Month index → Vertragsäquivalent (Ist × Zuschlagsfaktor).
+  final List<double> _monthEquivalent = List.filled(12, 0.0);
+  bool _showEquivalent = false;
   int _vacationDays = 0;
   int _sickDays = 0;
   int _compensatoryDays = 0;
@@ -350,15 +354,20 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
             employerId: _employer?.id);
     for (var i = 0; i < 12; i++) {
       _monthHours[i] = 0.0;
+      _monthEquivalent[i] = 0.0;
     }
     _vacationDays = 0;
     _sickDays = 0;
     _compensatoryDays = 0;
+    final isSurcharge = SurchargeService.isSurchargeEmployer(_employer);
+    _showEquivalent = isSurcharge;
     for (final e in entries) {
       final monthIndex = (e.date.year * 12 + e.date.month - 1) -
           (_fyStart.year * 12 + _fyStart.month - 1);
       if (monthIndex >= 0 && monthIndex < 12) {
         _monthHours[monthIndex] += e.totalHours;
+        _monthEquivalent[monthIndex] +=
+            SurchargeService.equivalentHours(e, isSurchargeEmployer: isSurcharge);
       }
       if (e.workType == WorkType.vacation) _vacationDays++;
       if (e.workType == WorkType.sick) _sickDays++;
@@ -420,17 +429,35 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Column(children: [
-                    _TableHeader(),
+                    _TableHeader(showEquivalent: _showEquivalent),
                     const Divider(height: 1),
                     ..._buildRows(weeklyHours),
                     const Divider(height: 1),
                     _TotalRow(
                       monthHours: _monthHours,
+                      monthEquivalent: _monthEquivalent,
                       weeklyHours: weeklyHours,
+                      showEquivalent: _showEquivalent,
                     ),
                   ]),
                 ),
               ),
+              if (_showEquivalent)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
+                  child: Text(
+                    'Äquivalent = Ist × Zuschlagsfaktor (Sa 1.5×, So/Feiertag 2×) – '
+                    'nur für Sonderarbeitszeiten ohne Homeoffice. '
+                    'Zeigt den vertraglichen Gegenwert der geleisteten Arbeit.',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6)),
+                  ),
+                ),
               const SizedBox(height: 12),
               // ── Abwesenheitsübersicht ────────────────────────────────
               if (_vacationDays > 0 || _sickDays > 0 || _compensatoryDays > 0)
@@ -495,6 +522,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         label: mf.format(monthDate),
         soll: soll,
         ist: ist,
+        equivalent: _monthEquivalent[i],
+        showEquivalent: _showEquivalent,
         diff: diff,
         cumDiff: cumDiff,
         isFuture: isFuture,
@@ -505,6 +534,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
 }
 
 class _TableHeader extends StatelessWidget {
+  final bool showEquivalent;
+  const _TableHeader({this.showEquivalent = false});
   @override
   Widget build(BuildContext context) {
     final style = TextStyle(
@@ -517,6 +548,9 @@ class _TableHeader extends StatelessWidget {
         SizedBox(width: 40, child: Text('Monat', style: style)),
         Expanded(child: Text('Soll', style: style, textAlign: TextAlign.right)),
         Expanded(child: Text('Ist', style: style, textAlign: TextAlign.right)),
+        if (showEquivalent)
+          Expanded(
+              child: Text('Äquiv.', style: style, textAlign: TextAlign.right)),
         Expanded(child: Text('Diff', style: style, textAlign: TextAlign.right)),
         Expanded(
             child: Text('Kumuliert', style: style, textAlign: TextAlign.right)),
@@ -529,6 +563,8 @@ class _MonthRow extends StatelessWidget {
   final String label;
   final double soll;
   final double ist;
+  final double equivalent;
+  final bool showEquivalent;
   final double diff;
   final double cumDiff;
   final bool isFuture;
@@ -537,6 +573,8 @@ class _MonthRow extends StatelessWidget {
     required this.label,
     required this.soll,
     required this.ist,
+    this.equivalent = 0,
+    this.showEquivalent = false,
     required this.diff,
     required this.cumDiff,
     required this.isFuture,
@@ -580,6 +618,17 @@ class _MonthRow extends StatelessWidget {
             child: Text(ist > 0 || !isFuture ? _fmtH(ist) : '–',
                 style: TextStyle(fontSize: 12, color: textColor),
                 textAlign: TextAlign.right)),
+        if (showEquivalent)
+          Expanded(
+              child: Text(
+                  equivalent > 0 || !isFuture ? _fmtH(equivalent) : '–',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: textColor,
+                      fontWeight: equivalent > ist + 0.01
+                          ? FontWeight.w600
+                          : FontWeight.normal),
+                  textAlign: TextAlign.right)),
         Expanded(
             child: Text(
                 isFuture ? '–' : '${diff >= 0 ? '+' : ''}${_fmtH(diff)}',
@@ -603,17 +652,22 @@ class _MonthRow extends StatelessWidget {
 
 class _TotalRow extends StatelessWidget {
   final List<double> monthHours;
+  final List<double> monthEquivalent;
   final double weeklyHours;
+  final bool showEquivalent;
 
   const _TotalRow({
     required this.monthHours,
+    this.monthEquivalent = const [],
     required this.weeklyHours,
+    this.showEquivalent = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final totalSoll = weeklyHours * 4.33 * 12;
     final totalIst = monthHours.fold(0.0, (s, h) => s + h);
+    final totalEq  = monthEquivalent.fold(0.0, (s, h) => s + h);
     final diff = totalIst - totalSoll;
     final diffColor = diff > 0.25
         ? Colors.orange.shade700
@@ -636,6 +690,14 @@ class _TotalRow extends StatelessWidget {
         Expanded(
             child: Text(_fmtH(totalIst),
                 style: style, textAlign: TextAlign.right)),
+        if (showEquivalent)
+          Expanded(
+              child: Text(_fmtH(totalEq),
+                  style: style.copyWith(
+                      color: totalEq > totalIst + 0.01
+                          ? Colors.amber.shade800
+                          : null),
+                  textAlign: TextAlign.right)),
         Expanded(
             child: Text('${diff >= 0 ? '+' : ''}${_fmtH(diff)}',
                 style: style.copyWith(color: diffColor),
