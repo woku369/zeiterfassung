@@ -175,7 +175,6 @@ Future<void> _onStart(ServiceInstance service) async {
 Future<void> _autoClockIn(
     Map<String, dynamic> loc, FlutterLocalNotificationsPlugin n) async {
   final prefs = await SharedPreferences.getInstance();
-  if (prefs.getString(_kAutoEntryKey) != null) return; // already clocked in
 
   final now        = DateTime.now();
   final id         = const Uuid().v4();
@@ -185,6 +184,17 @@ Future<void> _autoClockIn(
 
   try {
     final db = await _openDb();
+    // Skip if already clocked in (manually or via geofencing) – the user
+    // explicitly does not want overlapping entries.
+    final active = await db.query('time_entries',
+        where: 'end_time IS NULL', limit: 1);
+    if (active.isNotEmpty) {
+      await db.close();
+      _notify(n, 995, 'Bei $name angekommen',
+          'Bereits eingestempelt – Geofencing übersprungen.');
+      return;
+    }
+
     await db.insert('time_entries', {
       'id':            id,
       'employer_id':   employerId,
@@ -206,7 +216,7 @@ Future<void> _autoClockIn(
       await prefs.setString(_kAutoEntryEmployerKey, employerId);
     }
     _notify(n, 997, 'Eingestempelt: $name',
-        'Automatisch gestartet. Zum Bearbeiten App öffnen.');
+        'Automatisch gestartet. Tippen, um Notiz/Tätigkeit zu ergänzen.');
   } catch (_) {
     // Silently ignore – user can clock in manually.
   }
