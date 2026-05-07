@@ -136,6 +136,37 @@ class _DashboardTabState extends State<_DashboardTab> {
     );
   }
 
+  Future<void> _editActiveNote() async {
+    final tp = context.read<TimeEntryProvider>();
+    final active = tp.activeEntry;
+    if (active == null) return;
+    final ctrl = TextEditingController(text: active.note);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Notiz / Tätigkeit'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'z. B. Verschliesser sichten, Pfau Tel., Kennzeichnung Zirbe …',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    await tp.updateEntry(active.copyWith(note: result));
+  }
+
   Future<void> _clockOut() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context, builder: (_) => const _ClockOutDialog());
@@ -257,12 +288,40 @@ class _DashboardTabState extends State<_DashboardTab> {
                         'seit ${DateFormat('HH:mm').format(active.startTime)} · ${active.workType.label}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      const SizedBox(height: 20),
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
-                        onPressed: _clockOut,
-                        icon: const Icon(Icons.stop_rounded),
-                        label: const Text('Ausstempeln'),
+                      if (active.note.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            active.note,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontStyle: FontStyle.italic,
+                              color: cs.onPrimaryContainer.withOpacity(0.85),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _editActiveNote,
+                            icon: const Icon(Icons.edit_note, size: 18),
+                            label: Text(active.note.isEmpty ? 'Notiz' : 'Notiz bearbeiten'),
+                          ),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
+                            onPressed: _clockOut,
+                            icon: const Icon(Icons.stop_rounded),
+                            label: const Text('Ausstempeln'),
+                          ),
+                        ],
                       ),
                     ] else ...[
                       Text(
