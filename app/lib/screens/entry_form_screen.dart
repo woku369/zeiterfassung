@@ -33,7 +33,6 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   String? _employerId;
   bool _isSpecialHours = false;
   int _travelMinutes = 0;
-  static const int _defaultTravelMinutes = 80;
 
   bool get _isNew => widget.entry == null || widget.forceNew;
   bool get _isAbsence => _workType.isAbsence;
@@ -359,6 +358,39 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     );
   }
 
+  Future<void> _editTravelMinutes() async {
+    final ctrl = TextEditingController(
+        text: _travelMinutes > 0 ? _travelMinutes.toString() : '');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Fahrtzeit (Hin+Rück)'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            suffixText: 'Min.',
+            border: OutlineInputBorder(),
+            hintText: 'z.B. 30 für Klagenfurt, 80 für Gurk',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          FilledButton(
+              onPressed: () {
+                final v = int.tryParse(ctrl.text.trim()) ?? 0;
+                Navigator.pop(context, v);
+              },
+              child: const Text('OK')),
+        ],
+      ),
+    );
+    if (result != null && result >= 0) setState(() => _travelMinutes = result);
+  }
+
   List<Widget> _gurktalerExtras() {
     final isWeekendOrHoliday = _dayType != DayType.workday;
     final factor = (_isSpecialHours && _workType != WorkType.homeoffice)
@@ -413,26 +445,50 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               Expanded(
                 child: Text(
                   _travelMinutes > 0
-                      ? 'Fahrtzeit: $_travelMinutes Min.'
-                      : 'Keine Fahrtzeit hinterlegt.',
+                      ? 'Fahrtzeit: $_travelMinutes Min. (Hin+Rück)'
+                      : 'Fahrtzeit (Hin+Rück) hinzufügen:',
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              if (_travelMinutes == 0)
-                TextButton.icon(
-                  onPressed: () =>
-                      setState(() => _travelMinutes = _defaultTravelMinutes),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('+80 Min'),
-                )
-              else
+              if (_travelMinutes > 0) ...[
                 IconButton(
                   iconSize: 18,
-                  tooltip: 'Fahrtzeit entfernen',
+                  tooltip: 'Anpassen',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: _editTravelMinutes,
+                ),
+                IconButton(
+                  iconSize: 18,
+                  tooltip: 'Entfernen',
                   icon: const Icon(Icons.close),
                   onPressed: () => setState(() => _travelMinutes = 0),
                 ),
+              ],
             ]),
+            if (_travelMinutes == 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.add, size: 14),
+                      label: const Text('+30 Min  (Klagenfurt)'),
+                      onPressed: () => setState(() => _travelMinutes = 30),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.add, size: 14),
+                      label: const Text('+80 Min  (Gurk)'),
+                      onPressed: () => setState(() => _travelMinutes = 80),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.edit_outlined, size: 14),
+                      label: const Text('Anderer Wert'),
+                      onPressed: _editTravelMinutes,
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
