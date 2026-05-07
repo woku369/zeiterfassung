@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoHotspot</string>
+    <string name="accessibility_service_label">AutoHotspot</string>
+    <string name="accessibility_service_description">Wird benötigt, um den WLAN-Hotspot automatisch über Quick Settings zu aktivieren, wenn dein Bluetooth-Gerät (z.B. Auto-Handsfree) verbindet. Die App liest nur Quick-Settings-Inhalte und führt einen einzigen Klick auf den Hotspot-Schalter aus.</string>
+</resources>
