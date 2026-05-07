@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - claude/auto-hotspot-android-nYqTc
-    paths:
-      - 'auto-hotspot-android/**'
   workflow_dispatch:
 
 env:
