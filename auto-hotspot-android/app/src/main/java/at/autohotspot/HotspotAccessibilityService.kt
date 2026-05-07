@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,26 +17,46 @@ class HotspotAccessibilityService : AccessibilityService() {
 
     companion object {
         const val ACTION_ENABLE_HOTSPOT = "at.autohotspot.ACTION_ENABLE_HOTSPOT"
+        const val ACTION_DISABLE_HOTSPOT = "at.autohotspot.ACTION_DISABLE_HOTSPOT"
         private const val TAG = "AutoHotspot"
-
-        // Tile label fragments in all languages HyperOS might show
-        private val HOTSPOT_KEYWORDS = listOf(
-            "hotspot", "tethering", "mobiler hotspot", "mobile hotspot",
-            "wlan-hotspot", "persönlicher hotspot", "internet sharing"
-        )
+        private const val PREF_WE_ENABLED_IT = "we_enabled_hotspot"
     }
 
-    private var pendingEnable = false
+    private enum class PendingAction { NONE, ENABLE, DISABLE }
+
+    private var pendingAction = PendingAction.NONE
     private var retryCount = 0
     private val handler = Handler(Looper.getMainLooper())
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == ACTION_ENABLE_HOTSPOT) {
-                Log.d(TAG, "Enable hotspot requested")
-                pendingEnable = true
-                retryCount = 0
-                openQuickSettings()
+            when (intent?.action) {
+                ACTION_ENABLE_HOTSPOT -> {
+                    if (isHotspotEnabled()) {
+                        Log.d(TAG, "Hotspot already on, nothing to do")
+                        return
+                    }
+                    Log.d(TAG, "Enable requested")
+                    pendingAction = PendingAction.ENABLE
+                    retryCount = 0
+                    openQuickSettings()
+                }
+                ACTION_DISABLE_HOTSPOT -> {
+                    val prefs = getSharedPreferences("autohotspot", MODE_PRIVATE)
+                    if (!prefs.getBoolean(PREF_WE_ENABLED_IT, false)) {
+                        Log.d(TAG, "We didn't enable it, leaving hotspot alone")
+                        return
+                    }
+                    if (!isHotspotEnabled()) {
+                        Log.d(TAG, "Hotspot already off")
+                        prefs.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
+                        return
+                    }
+                    Log.d(TAG, "Disable requested")
+                    pendingAction = PendingAction.DISABLE
+                    retryCount = 0
+                    openQuickSettings()
+                }
             }
         }
     }
@@ -43,58 +64,71 @@ class HotspotAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         val flags = if (Build.VERSION.SDK_INT >= 34) RECEIVER_NOT_EXPORTED else 0
         if (Build.VERSION.SDK_INT >= 26) {
-            registerReceiver(receiver, IntentFilter(ACTION_ENABLE_HOTSPOT), flags)
+            registerReceiver(receiver, IntentFilter().apply {
+                addAction(ACTION_ENABLE_HOTSPOT)
+                addAction(ACTION_DISABLE_HOTSPOT)
+            }, flags)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(receiver, IntentFilter(ACTION_ENABLE_HOTSPOT))
+            registerReceiver(receiver, IntentFilter().apply {
+                addAction(ACTION_ENABLE_HOTSPOT)
+                addAction(ACTION_DISABLE_HOTSPOT)
+            })
         }
         Log.d(TAG, "Accessibility service connected")
     }
 
     private fun openQuickSettings() {
-        // GLOBAL_ACTION_QUICK_SETTINGS expands the full quick settings panel directly
         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
-
-        // Give the panel time to animate open, then scan
         handler.postDelayed({ scanAndClick() }, 800)
     }
 
     private fun scanAndClick() {
-        if (!pendingEnable) return
+        if (pendingAction == PendingAction.NONE) return
 
         val root = rootInActiveWindow
         if (root != null && findAndClickHotspot(root)) {
-            pendingEnable = false
-            retryCount = 0
-            Log.d(TAG, "Hotspot tile clicked successfully")
-            // Close quick settings again
-            handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 500)
+            onTileClicked()
             return
         }
 
         retryCount++
         if (retryCount < 5) {
-            Log.d(TAG, "Tile not found yet, retry $retryCount")
+            Log.d(TAG, "Tile not found, retry $retryCount")
             handler.postDelayed({ scanAndClick() }, 600)
         } else {
-            Log.w(TAG, "Hotspot tile not found after $retryCount attempts")
-            pendingEnable = false
-            retryCount = 0
+            Log.w(TAG, "Hotspot tile not found after $retryCount retries")
+            pendingAction = PendingAction.NONE
         }
     }
 
+    private fun onTileClicked() {
+        val prefs = getSharedPreferences("autohotspot", MODE_PRIVATE)
+        when (pendingAction) {
+            PendingAction.ENABLE -> {
+                prefs.edit().putBoolean(PREF_WE_ENABLED_IT, true).apply()
+                Log.d(TAG, "Hotspot enabled by us")
+            }
+            PendingAction.DISABLE -> {
+                prefs.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
+                Log.d(TAG, "Hotspot disabled by us")
+            }
+            PendingAction.NONE -> {}
+        }
+        pendingAction = PendingAction.NONE
+        retryCount = 0
+        handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 500)
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        // Passive scan on window changes — catches cases where QS was already open
-        if (!pendingEnable) return
+        if (pendingAction == PendingAction.NONE) return
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
             val root = rootInActiveWindow ?: return
             if (findAndClickHotspot(root)) {
-                pendingEnable = false
-                retryCount = 0
                 handler.removeCallbacksAndMessages(null)
-                handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_BACK) }, 500)
+                onTileClicked()
             }
         }
     }
@@ -103,8 +137,10 @@ class HotspotAccessibilityService : AccessibilityService() {
         val text = node.text?.toString()?.lowercase()?.trim() ?: ""
         val desc = node.contentDescription?.toString()?.lowercase()?.trim() ?: ""
 
-        if (HOTSPOT_KEYWORDS.any { text.contains(it) || desc.contains(it) }) {
-            // Walk up to find a clickable ancestor (tile containers are often not the text node)
+        // "Hotspot" is the confirmed label; keep common variants as fallback
+        if (text == "hotspot" || desc == "hotspot" ||
+            text.contains("hotspot") || desc.contains("hotspot")
+        ) {
             var target: AccessibilityNodeInfo? = node
             while (target != null && !target.isClickable) {
                 target = target.parent
@@ -119,6 +155,18 @@ class HotspotAccessibilityService : AccessibilityService() {
             if (findAndClickHotspot(child)) return true
         }
         return false
+    }
+
+    private fun isHotspotEnabled(): Boolean {
+        return try {
+            val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+            val method = wifiManager.javaClass.getDeclaredMethod("isWifiApEnabled")
+            method.isAccessible = true
+            method.invoke(wifiManager) as Boolean
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot check hotspot state: ${e.message}")
+            false
+        }
     }
 
     override fun onInterrupt() {}
