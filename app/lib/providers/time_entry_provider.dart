@@ -123,9 +123,15 @@ class TimeEntryProvider extends ChangeNotifier {
       _entries.fold(0.0, (sum, e) => sum + e.totalHours);
 
   double totalHoursForWeek(DateTime monday) {
-    final sunday = monday.add(const Duration(days: 6));
+    // Normalize to midnight so entries whose date is stored as midnight are
+    // not accidentally excluded when monday carries a non-zero time component.
+    final mon = DateTime(monday.year, monday.month, monday.day);
+    final sun = mon.add(const Duration(days: 6));
     return _entries
-        .where((e) => !e.date.isBefore(monday) && !e.date.isAfter(sunday))
+        .where((e) {
+          final d = DateTime(e.date.year, e.date.month, e.date.day);
+          return !d.isBefore(mon) && !d.isAfter(sun);
+        })
         .fold(0.0, (sum, e) => sum + e.totalHours);
   }
 

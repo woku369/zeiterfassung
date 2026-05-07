@@ -217,15 +217,15 @@ class _DashboardTabState extends State<_DashboardTab> {
     final employer = ep.active;
     final ap = context.watch<ActivityProvider>();
     final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
+    // Strip time component so Monday entries (stored as midnight) are not
+    // excluded by a monday DateTime that still carries today's hour/minute.
+    final today = DateTime(now.year, now.month, now.day);
+    final monday = today.subtract(Duration(days: now.weekday - 1));
     final weeklyTarget = employer?.weeklyHours ?? 40.0;
-    final dailyTarget = weeklyTarget / 5;
-    final daysWorked = now.weekday.clamp(1, 5);
-    final weekTarget = dailyTarget * daysWorked;
     final weekHours = tp.totalHoursForWeek(monday);
     final monthHours = tp.totalHoursForMonth();
     final active = tp.activeEntry;
-    final diff = weekHours - weekTarget;
+    final diff = weekHours - weeklyTarget;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -319,7 +319,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Woche', style: Theme.of(context).textTheme.titleSmall),
-                        Text('${_hhmm(weekHours)} / ${_hhmm(weekTarget)}',
+                        Text('${_hhmm(weekHours)} / ${_hhmm(weeklyTarget)}',
                           style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
@@ -327,7 +327,7 @@ class _DashboardTabState extends State<_DashboardTab> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
-                        value: weekTarget > 0 ? (weekHours / weekTarget).clamp(0.0, 1.2) : 0,
+                        value: weeklyTarget > 0 ? (weekHours / weeklyTarget).clamp(0.0, 1.2) : 0,
                         minHeight: 10,
                         color: diff > 0 ? Colors.orange : null,
                       ),
