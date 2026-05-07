@@ -88,6 +88,9 @@ Future<void> _onStart(ServiceInstance service) async {
   final Set<String> inside = {};
   var locations = <Map<String, dynamic>>[];
   final timers = <String, Timer>{}; // locationId → pending clock-out timer
+  // Tracks since when the user has been outside ALL zones (null = inside).
+  // Used by the watchdog to detect stale clock-ins (zone-leave missed by GPS).
+  DateTime? outsideZonesSince = DateTime.now();
 
   // ── Receive commands from main isolate ─────────────────────────────────────
 
@@ -101,7 +104,39 @@ Future<void> _onStart(ServiceInstance service) async {
     locations = incoming;
   });
 
+  // ── Watchdog: warn if auto-clocked-in but outside all zones for a while ───
+  final watchdog = Timer.periodic(const Duration(minutes: 15), (_) async {
+    if (inside.isNotEmpty) return;
+    if (outsideZonesSince == null) return;
+    if (DateTime.now().difference(outsideZonesSince!).inMinutes < 30) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final entryId = prefs.getString(_kAutoEntryKey);
+    if (entryId == null) return; // only watch auto-created entries
+
+    try {
+      final db = await _openDb();
+      final rows = await db.query('time_entries',
+          where: 'id = ? AND end_time IS NULL',
+          whereArgs: [entryId], limit: 1);
+      await db.close();
+      if (rows.isEmpty) {
+        // Already clocked out manually – clear stale flag.
+        await prefs.remove(_kAutoEntryKey);
+        await prefs.remove(_kAutoEntryEmployerKey);
+        return;
+      }
+      final start = DateTime.parse(rows.first['start_time'] as String);
+      final dur = DateTime.now().difference(start);
+      final h = dur.inHours;
+      final m = dur.inMinutes.remainder(60);
+      _notify(notifications, 994, 'Noch eingestempelt?',
+          'Seit ${h}h ${m}m aktiv, aber außerhalb aller Zonen. Ausstempeln vergessen?');
+    } catch (_) {}
+  });
+
   service.on('stop').listen((_) {
+    watchdog.cancel();
     for (final t in timers.values) t.cancel();
     service.stopSelf();
   });
@@ -166,6 +201,12 @@ Future<void> _onStart(ServiceInstance service) async {
             'Zone verlassen: ${loc['name'] as String}',
             'Ausstempeln in 5 Minuten sofern du nicht zurückkehrst.');
       }
+    }
+    // Track outside-all-zones state for the watchdog.
+    if (inside.isNotEmpty) {
+      outsideZonesSince = null;
+    } else if (outsideZonesSince == null) {
+      outsideZonesSince = DateTime.now();
     }
   });
 }
