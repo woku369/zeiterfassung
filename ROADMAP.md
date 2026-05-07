@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-06 – Sync-Vereinheitlichung & robuster Windows-Tray
+> Letztes Update: 2026-05-07 – Auto Clock-in via Geofencing + Watchdog
 
 ---
 
@@ -24,6 +24,31 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.14 – Auto Clock-in via Geofencing + UX-Polishing
+- [x] **Auto Clock-in/out via Geofencing** im Background-Isolate (funktioniert auch bei vollständig geschlossener App):
+  - Zone betreten → SQLite-Insert eines `time_entries`-Datensatzes mit `WorkType` der Zone, `employer_id` der Zone, Notiz `Auto · [Standortname]`
+  - Zone verlassen → 5-Min-Karenzzeit-Timer (GPS-Drift-Toleranz) → dann `end_time` setzen
+  - Re-Entry binnen Karenzzeit → Timer wird gecancelt, kein Clock-out
+  - Übersprung-Logik: kein Auto-Clock-in wenn bereits ein aktiver Eintrag existiert (egal ob manuell oder per Geofence) – Notification „Bereits eingestempelt – Geofencing übersprungen"
+  - Auto-Clock-out **nur** für auto-erstellte Einträge (`geofence_auto_entry_id` in SharedPreferences) – manuelle Einträge werden nie angefasst
+- [x] **Watchdog-Notification** (Periodischer Check alle 15 Min im Background-Isolate):
+  - Wenn auto-erstellter Eintrag offen UND Nutzer ≥30 Min außerhalb aller Zonen → „Noch eingestempelt? Seit Xh Ym aktiv, aber außerhalb aller Zonen"
+  - Notification-ID 994 wird ersetzt (kein Spam, ein einziger aktueller Reminder)
+  - Manuelle Einträge werden bewusst nicht überwacht (legitimes Homeoffice ohne Fehlalarm)
+- [x] **Dashboard-Notiz-Button bei aktivem Eintrag:**
+  - Eintrag-Notiz wird kursiv unter dem Timer angezeigt
+  - „Notiz" / „Notiz bearbeiten"-Button öffnet 3-Zeilen-Dialog mit Hint-Beispielen
+  - Direktes Tätigkeits-Tagging ohne Wechsel in den Einträge-Tab
+- [x] **WorkType in Background-Isolate verfügbar gemacht:** `_sendLocations()` schickt jetzt auch `workType` an das Background-Isolate, damit Auto-Clock-in den richtigen Arbeitstyp setzt
+- [x] **Location-Duplikate-Fix:**
+  - Seed-Guard nutzte `employer.nasUrl` (existiert seit v1.8 nicht mehr) → komplett wirkungslos, jeder Frischinstall seedete erneut → bei Sync wurden Standorte als Dubletten zur NAS gepusht
+  - Neue Logik: Check über SharedPreferences `global_nas_url` + zusätzliches `locations_seeded`-Flag (nur einmal überhaupt seeden)
+  - **`DatabaseHelper.deduplicateLocations()`:** Gruppiert nach Name+Koordinaten (±100 m), behält den Eintrag mit jüngstem `updated_at`, soft-deletet die Duplikate → propagiert via Sync auf alle Geräte
+  - Wird bei jedem `LocationProvider.load()` ausgeführt (idempotent, billig)
+- [x] **Dashboard-Wochenberechnung:**
+  - **Bug behoben:** `monday`-DateTime hatte die aktuelle Uhrzeit (z.B. 09:19) → alle Montags-Einträge mit `date = 2026-05-04 00:00:00` lagen technisch „vor" diesem `monday`-Wert und wurden aus der Wochensumme gefiltert. Fix: beide Seiten der Vergleiche werden auf Mitternacht normalisiert
+  - **Soll-Anzeige:** zeigt jetzt das volle Wochenziel (z.B. 8h) statt tagesanteilig (`weeklyHours/5 × Werktag`); Balken bleibt über die Woche stabil
 
 ### v1.13 – Sync-Vereinheitlichung & robuster Windows-Tray
 - [x] **Ein einziger Sync-Befehl:** Reports-Tab-Sync entfernt – einzige Sync-Schaltfläche in den Einstellungen synchronisiert nun *alles* (Arbeitgeber, Standorte, Einträge, Whitelist + Activity-Settings)
@@ -222,6 +247,9 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] **Whitelist-Sync mit korrektem LWW verifizieren:** Whitelist auf Windows ändern → APK syncen → muss übernommen werden (auch wenn APK später erneut sync't, darf sie die Windows-Werte nicht überschreiben)
 - [ ] **Backup-Restore-Test:** Backup auf NAS → neue Einträge anlegen → altes Backup wiederherstellen → Sync → fehlende Einträge müssen vom NAS zurückkommen
 - [ ] **Boot-Persistenz auf Xiaomi verifizieren:** Geofencing aktivieren → Telefon neu starten → Service muss ohne App-Öffnen wieder laufen
+- [ ] **Auto Clock-in/out auf Xiaomi verifizieren:** Geofencing-Zone fahren → Notification + Eintrag erscheint → Zone verlassen → 5 Min Karenz → Eintrag wird geschlossen
+- [ ] **Watchdog-Notification testen:** Auto-Eintrag offen lassen, >30 Min außerhalb aller Zonen bleiben → Reminder muss erscheinen
+- [ ] **Location-Deduplizierung auf NAS verifizieren:** Nach App-Start sollen Dubletten verschwinden, der NAS-Stand muss konsistent werden
 
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
@@ -264,7 +292,9 @@ app/
     services/        sync_service (inkl. NAS-Backup-Endpoints),
                      export_service, import_service, gps_service,
                      holiday_service, geofencing_service (mit Boot-Flag),
-                     geofencing_background (autoStart:false, Channels im Hauptisolate),
+                     geofencing_background (autoStart:false, Channels im Hauptisolate;
+                       schreibt Auto-Clock-in/out direkt in SQLite,
+                       Watchdog-Notification alle 15 Min für vergessene Clock-outs),
                      imap_service, tray_service (tray_manager + window_manager),
                      backup_service (lokal + NAS), activity_tracking_service,
                      activity_tracking_win32, fusion_engine
@@ -314,7 +344,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.12)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.14)
 
 ---
 
@@ -335,3 +365,5 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge) |
+| Auto Clock-in/out | Funktioniert auch bei geschlossener App (Background-Isolate schreibt direkt in SQLite). 5 Min Karenz beim Verlassen einer Zone gegen GPS-Drift. Auto-Clock-out greift nur bei Einträgen, die selbst per Geofencing erstellt wurden – manuelle Einträge bleiben unangetastet |
+| Geofencing-Watchdog | Schlägt nur Alarm bei auto-erstellten Einträgen, nicht bei manuellen (kein Fehlalarm für legitimes Homeoffice). Schwelle: 30 Min außerhalb aller Zonen. Notification-ID 994 wird ersetzt – kein Spam |

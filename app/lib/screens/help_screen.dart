@@ -143,11 +143,35 @@ class HelpScreen extends StatelessWidget {
               _Step(number: '3', text: 'Radius je nach Gelände: 100–500 m'),
               _Step(number: '4', text: 'Arbeitgeber dem Standort zuordnen'),
               _Step(number: '5', text: 'Tracking oben rechts aktivieren – läuft ab sofort permanent'),
-              _SubHeading('Automatische Arbeitgeber-Erkennung'),
+              _SubHeading('Auto Clock-in / Clock-out'),
               _Para(
-                'Standort betreten → Arbeitgeber wechselt automatisch auf den '
-                'zugeordneten Arbeitgeber. Ein Stempeluhr-Einstempeln '
-                'läuft dann unter dem richtigen Arbeitgeber.',
+                'Sobald du eine Zone betrittst, wird automatisch '
+                'eingestempelt – mit dem Arbeitgeber und dem Arbeitstyp '
+                'der Zone. Beim Verlassen wird nach 5 Minuten Karenz '
+                '(GPS-Drift-Toleranz) automatisch ausgestempelt. Funktioniert '
+                'auch wenn die App komplett geschlossen ist.',
+              ),
+              _KeyValue(label: 'Zone betreten', value: 'Auto-Einstempeln (sofern nicht bereits eingestempelt)'),
+              _KeyValue(label: 'Zone verlassen', value: '5 Min warten → Auto-Ausstempeln'),
+              _KeyValue(label: 'Re-Entry binnen 5 Min', value: 'Karenz wird abgebrochen, kein Clock-out'),
+              _KeyValue(label: 'Manueller Eintrag aktiv', value: 'Wird nie automatisch geschlossen'),
+              _Hint(
+                'Notiz/Tätigkeit zum Auto-Eintrag ergänzen: auf der Übersicht '
+                'beim aktiven Eintrag „Notiz" antippen – Schnelldialog für '
+                'Tätigkeitsbeschreibung. Kein Wechsel in den Einträge-Tab nötig.',
+              ),
+              _SubHeading('Watchdog – Vergessene Clock-outs'),
+              _Para(
+                'Wenn ein Auto-Eintrag noch offen ist und du seit mindestens '
+                '30 Minuten in keiner Zone warst (z.B. weil GPS das Verlassen '
+                'verpasst hat), erscheint eine Erinnerungs-Notification: '
+                '„Noch eingestempelt? Seit Xh Ym …". Wiederholt sich alle '
+                '15 Min als Update derselben Notification – kein Spam.',
+              ),
+              _Hint(
+                'Manuelle Einträge werden NICHT vom Watchdog überwacht – '
+                'wer manuell einstempelt (z.B. Homeoffice) bekommt keine '
+                'Fehlalarme.',
               ),
               _SubHeading('Standorte für dieses Projekt'),
               _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · AG: Gurktaler'),
