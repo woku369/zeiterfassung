@@ -18,7 +18,40 @@ class LocationProvider extends ChangeNotifier {
     await DatabaseHelper.instance.deduplicateLocations();
     _locations = await DatabaseHelper.instance.getLocations();
     if (_locations.isEmpty) await _seedDefaultLocations();
+    await _ensureSpecialLocations();
     notifyListeners();
+  }
+
+  /// Idempotente Pflege-Standorte, die nicht zur Erst-Befüllung gehören
+  /// (z.B. externe Lohnabfüller). Werden bei jedem Load gegengeprüft und nur
+  /// einmalig angelegt – Identifikation per exakter Namensgleichheit.
+  Future<void> _ensureSpecialLocations() async {
+    final existingNames = _locations.map((l) => l.name).toSet();
+    if (existingNames.contains('Pfau Brennerei Klagenfurt')) return;
+
+    // Gurktaler AG als Arbeitgeber zuordnen, sofern vorhanden – Aufwand am
+    // Lohnabfüller wird voll der Gurktaler AG zugerechnet.
+    final employers = await DatabaseHelper.instance.getEmployers();
+    String? gurktalerId;
+    for (final e in employers) {
+      if (e.name.toLowerCase().contains('gurktaler')) {
+        gurktalerId = e.id;
+        break;
+      }
+    }
+
+    final loc = TrackedLocation(
+      id: const Uuid().v4(),
+      name: 'Pfau Brennerei Klagenfurt',
+      latitude: 46.6415142,
+      longitude: 14.2860346,
+      radiusMeters: 150,
+      workType: WorkType.offsite,
+      employerId: gurktalerId,
+    );
+    await DatabaseHelper.instance.insertLocation(loc);
+    _locations.add(loc);
+    _locations.sort((a, b) => a.name.compareTo(b.name));
   }
 
   Future<void> _seedDefaultLocations() async {

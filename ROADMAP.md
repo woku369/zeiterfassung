@@ -26,6 +26,10 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ## Erledigt
 
 ### v1.15 – Sonderarbeitszeiten & Vertragsäquivalent (Gurktaler AG)
+- [x] **Pfau Brennerei Klagenfurt** als Standort eingepflegt (Schleppe-Platz 1, 9020 Klagenfurt am Wörthersee, 46.6415, 14.2860, Radius 150 m, WorkType `offsite`)
+  - Externer Lohnabfüller für Kleinserien – Aufwand inkl. Fahrtzeit voll der Gurktaler AG zugerechnet
+  - Idempotente `LocationProvider._ensureSpecialLocations()` legt den Standort bei jedem Load an, sofern noch nicht vorhanden – Identifikation per exakter Namensgleichheit
+  - `employer_id` wird beim Anlegen automatisch aus dem ersten Arbeitgeber gesetzt, dessen Name „gurktaler" enthält → Geofencing-Auto-Clock-in wechselt automatisch auf Gurktaler AG beim Betreten der Zone
 - [x] **Neue Spalte `is_special_hours` (DB v9, NAS-Migration idempotent):** Markierung für Sonderarbeitszeiten (hauptsächlich Führungen) am `time_entries`-Datensatz
 - [x] **`SurchargeService`:** zentrale Faktor-Berechnung für Vertragsäquivalent
   - Aktiv nur bei Arbeitgeber, dessen Name `gurktaler` enthält
