@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/tracked_location.dart';
 import '../models/work_type.dart';
@@ -9,20 +10,24 @@ class LocationProvider extends ChangeNotifier {
 
   List<TrackedLocation> get locations => _locations;
 
-  /// All active locations – entering one auto-switches the active employer.
   List<TrackedLocation> get activeLocations =>
       _locations.where((l) => l.isActive).toList();
 
   Future<void> load() async {
+    // Remove duplicates first so sync propagates the deletions.
+    await DatabaseHelper.instance.deduplicateLocations();
     _locations = await DatabaseHelper.instance.getLocations();
     if (_locations.isEmpty) await _seedDefaultLocations();
     notifyListeners();
   }
 
   Future<void> _seedDefaultLocations() async {
-    // Skip seeding if any employer has a NAS URL – data will come from sync.
-    final employers = await DatabaseHelper.instance.getEmployers();
-    if (employers.any((e) => e.nasUrl?.isNotEmpty == true)) return;
+    // Only seed on a truly fresh install with no NAS configured.
+    // Uses SharedPreferences global_nas_url (replaces the old employer.nasUrl
+    // check that broke when NAS config was moved to global prefs in v1.8).
+    final prefs = await SharedPreferences.getInstance();
+    if ((prefs.getString('global_nas_url') ?? '').isNotEmpty) return;
+    if (prefs.getBool('locations_seeded') ?? false) return;
     final seeds = [
       TrackedLocation(
         id: const Uuid().v4(),
@@ -78,6 +83,7 @@ class LocationProvider extends ChangeNotifier {
       await DatabaseHelper.instance.insertLocation(loc);
     }
     _locations = seeds;
+    await prefs.setBool('locations_seeded', true);
   }
 
   Future<void> add({

@@ -83,6 +83,7 @@ class GeofencingService {
         'longitude': l.longitude,
         'radiusMeters': l.radiusMeters,
         'employerId': l.employerId,
+        'workType': l.workType.name,
       }).toList(),
     });
   }

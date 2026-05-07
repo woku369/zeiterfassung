@@ -3,6 +3,10 @@ import 'dart:math';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 // Kanal-IDs als Konstanten, damit sie an beiden Stellen übereinstimmen.
 const _kFgChannelId   = 'geofence_service';
@@ -67,6 +71,9 @@ Future<void> configureGeofencingBackground() async {
   );
 }
 
+const _kAutoEntryKey         = 'geofence_auto_entry_id';
+const _kAutoEntryEmployerKey = 'geofence_auto_entry_employer_id';
+
 // ── Background isolate entry point ────────────────────────────────────────────
 
 @pragma('vm:entry-point')
@@ -80,6 +87,7 @@ Future<void> _onStart(ServiceInstance service) async {
 
   final Set<String> inside = {};
   var locations = <Map<String, dynamic>>[];
+  final timers = <String, Timer>{}; // locationId → pending clock-out timer
 
   // ── Receive commands from main isolate ─────────────────────────────────────
 
@@ -93,7 +101,10 @@ Future<void> _onStart(ServiceInstance service) async {
     locations = incoming;
   });
 
-  service.on('stop').listen((_) => service.stopSelf());
+  service.on('stop').listen((_) {
+    for (final t in timers.values) t.cancel();
+    service.stopSelf();
+  });
 
   // ── GPS stream ─────────────────────────────────────────────────────────────
 
@@ -109,7 +120,7 @@ Future<void> _onStart(ServiceInstance service) async {
       accuracy: LocationAccuracy.high,
       distanceFilter: 20,
     ),
-  ).listen((pos) {
+  ).listen((pos) async {
     for (final loc in List<Map<String, dynamic>>.from(locations)) {
       final id = loc['id'] as String;
       final dist = _haversine(
@@ -123,27 +134,112 @@ Future<void> _onStart(ServiceInstance service) async {
 
       if (!wasInside && nowInside) {
         inside.add(id);
+        // Cancel pending clock-out timer if re-entering (GPS drift recovery).
+        timers[id]?.cancel();
+        timers.remove(id);
+
+        await _autoClockIn(loc, notifications);
         service.invoke('zoneChange', {
           'locationId': id,
           'locationName': loc['name'] as String,
           'employerId': loc['employerId'],
           'entered': true,
         });
-        _notify(notifications, id.hashCode,
-            'Standort: ${loc['name']}', 'Arbeitszeit jetzt starten?');
       } else if (wasInside && !nowInside) {
         inside.remove(id);
-        service.invoke('zoneChange', {
-          'locationId': id,
-          'locationName': loc['name'] as String,
-          'employerId': loc['employerId'],
-          'entered': false,
+        // 5-minute grace period before clocking out (handles GPS drift).
+        timers[id]?.cancel();
+        timers[id] = Timer(const Duration(minutes: 5), () async {
+          timers.remove(id);
+          // Only clock out if still outside ALL zones.
+          if (!inside.contains(id)) {
+            await _autoClockOut(notifications);
+            service.invoke('zoneChange', {
+              'locationId': id,
+              'locationName': loc['name'] as String,
+              'employerId': loc['employerId'],
+              'entered': false,
+            });
+          }
         });
         _notify(notifications, id.hashCode + 1,
-            'Standort verlassen: ${loc['name']}', 'Arbeitszeit beenden?');
+            'Zone verlassen: ${loc['name'] as String}',
+            'Ausstempeln in 5 Minuten sofern du nicht zurückkehrst.');
       }
     }
   });
+}
+
+// ── Auto clock-in / clock-out ─────────────────────────────────────────────────
+
+Future<void> _autoClockIn(
+    Map<String, dynamic> loc, FlutterLocalNotificationsPlugin n) async {
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString(_kAutoEntryKey) != null) return; // already clocked in
+
+  final now        = DateTime.now();
+  final id         = const Uuid().v4();
+  final workType   = loc['workType'] as String? ?? 'offsite';
+  final employerId = loc['employerId'] as String?;
+  final name       = loc['name'] as String;
+
+  try {
+    final db = await _openDb();
+    await db.insert('time_entries', {
+      'id':            id,
+      'employer_id':   employerId,
+      'date':          DateTime(now.year, now.month, now.day).toIso8601String(),
+      'start_time':    now.toIso8601String(),
+      'end_time':      null,
+      'work_type':     workType,
+      'day_type':      'workday',
+      'note':          'Auto · $name',
+      'break_minutes': 0,
+      'distance_km':   null,
+      'travel_minutes':null,
+      'updated_at':    now.toIso8601String(),
+    });
+    await db.close();
+
+    await prefs.setString(_kAutoEntryKey, id);
+    if (employerId != null) {
+      await prefs.setString(_kAutoEntryEmployerKey, employerId);
+    }
+    _notify(n, 997, 'Eingestempelt: $name',
+        'Automatisch gestartet. Zum Bearbeiten App öffnen.');
+  } catch (_) {
+    // Silently ignore – user can clock in manually.
+  }
+}
+
+Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
+  final prefs   = await SharedPreferences.getInstance();
+  final entryId = prefs.getString(_kAutoEntryKey);
+  if (entryId == null) return;
+
+  final now = DateTime.now();
+  try {
+    final db = await _openDb();
+    await db.update(
+      'time_entries',
+      {'end_time': now.toIso8601String(), 'updated_at': now.toIso8601String()},
+      where: 'id = ? AND end_time IS NULL',
+      whereArgs: [entryId],
+    );
+    await db.close();
+    _notify(n, 996, 'Ausgestempelt',
+        'Geofencing hat automatisch gestoppt. Zum Bearbeiten App öffnen.');
+  } catch (_) {
+    // Ignore – entry stays open, user clocks out manually.
+  } finally {
+    await prefs.remove(_kAutoEntryKey);
+    await prefs.remove(_kAutoEntryEmployerKey);
+  }
+}
+
+Future<Database> _openDb() async {
+  final path = p.join(await getDatabasesPath(), 'zeiterfassung.db');
+  return openDatabase(path, singleInstance: false);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

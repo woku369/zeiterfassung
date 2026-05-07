@@ -130,12 +130,19 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
   }
 
   void _setupGeofenceCallback() {
-    GeofencingService.instance.onZoneChange = (location, entered) {
-      if (!entered || location.employerId == null) return;
-      final ep = context.read<EmployerProvider>();
-      final employers = ep.employers;
-      final idx = employers.indexWhere((e) => e.id == location.employerId);
-      if (idx != -1) ep.setActive(employers[idx]);
+    GeofencingService.instance.onZoneChange = (location, entered) async {
+      if (!mounted) return;
+      // Switch active employer when entering a zone.
+      if (entered && location.employerId != null) {
+        final ep = context.read<EmployerProvider>();
+        final employers = ep.employers;
+        final idx = employers.indexWhere((e) => e.id == location.employerId);
+        if (idx != -1) ep.setActive(employers[idx]);
+      }
+      // The background isolate already wrote the clock-in/out to the DB.
+      // Give it a short head-start then refresh the UI.
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) context.read<TimeEntryProvider>().refresh();
     };
   }
 

@@ -299,6 +299,32 @@ class DatabaseHelper {
     return rows.map(TrackedLocation.fromMap).toList();
   }
 
+  /// Soft-deletes duplicate locations (same name + coordinates ±100 m).
+  /// Keeps the entry with the most recent updated_at.
+  Future<int> deduplicateLocations() async {
+    final db = await database;
+    final rows = await db.query('tracked_locations',
+        where: 'deleted_at IS NULL', orderBy: 'updated_at DESC');
+    final seen = <String>{}; // dedup key → kept
+    final now = DateTime.now().toIso8601String();
+    int removed = 0;
+    for (final row in rows) {
+      final name = row['name'] as String;
+      final lat  = ((row['latitude']  as num).toDouble() * 1000).round();
+      final lon  = ((row['longitude'] as num).toDouble() * 1000).round();
+      final key  = '${name}_${lat}_$lon';
+      if (seen.contains(key)) {
+        await db.update('tracked_locations',
+            {'deleted_at': now, 'updated_at': now},
+            where: 'id = ?', whereArgs: [row['id']]);
+        removed++;
+      } else {
+        seen.add(key);
+      }
+    }
+    return removed;
+  }
+
   Future<bool> hasLocations() async {
     final db = await database;
     final rows = await db.rawQuery('SELECT COUNT(*) as c FROM tracked_locations');
