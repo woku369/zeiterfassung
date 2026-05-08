@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 
@@ -47,7 +48,41 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
+        findViewById<Button>(R.id.btnTest).setOnClickListener {
+            AppLog.add(this, "--- Manueller Test ---")
+            sendBroadcast(Intent(HotspotAccessibilityService.ACTION_ENABLE_HOTSPOT))
+            Toast.makeText(this, "Trigger gesendet — Log prüfen", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<Button>(R.id.btnLog).setOnClickListener {
+            showLogDialog()
+        }
+
         loadPairedDevices()
+    }
+
+    private fun showLogDialog() {
+        val log = AppLog.get(this)
+        val scrollView = ScrollView(this)
+        val tv = TextView(this).apply {
+            text = log
+            setPadding(32, 24, 32, 24)
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+        scrollView.addView(tv)
+        // Scroll to bottom to show latest entries
+        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+
+        AlertDialog.Builder(this)
+            .setTitle("Debug Log")
+            .setView(scrollView)
+            .setPositiveButton("Schließen", null)
+            .setNeutralButton("Löschen") { _, _ ->
+                AppLog.clear(this)
+                Toast.makeText(this, "Log gelöscht", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun loadPairedDevices() {
@@ -62,17 +97,22 @@ class MainActivity : AppCompatActivity() {
 
         val devices = btAdapter?.bondedDevices?.sortedBy { it.name }?.toList() ?: emptyList()
         val prefs = getSharedPreferences("autohotspot", MODE_PRIVATE)
+        val savedAddress = prefs.getString("target_device_address", null)
 
-        val names = devices.map { "${it.name ?: "Unbekannt"}  (${it.address})" }
+        val names = devices.map { device ->
+            val marker = if (device.address == savedAddress) "✓ " else "   "
+            "$marker${device.name ?: "Unbekannt"}  (${device.address})"
+        }
+
         val listView = findViewById<ListView>(R.id.lvDevices)
         listView.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, names)
-
         listView.setOnItemClickListener { _, _, position, _ ->
             val device: BluetoothDevice = devices[position]
             prefs.edit()
                 .putString("target_device_address", device.address)
                 .putString("target_device_name", device.name ?: device.address)
                 .apply()
+            AppLog.add(this, "Zielgerät gesetzt: ${device.name} (${device.address})")
             Toast.makeText(this, "Gespeichert: ${device.name}", Toast.LENGTH_SHORT).show()
             refreshUI()
         }

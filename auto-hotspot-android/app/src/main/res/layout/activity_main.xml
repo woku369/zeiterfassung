@@ -18,7 +18,7 @@
         android:layout_height="wrap_content"
         android:text="Hotspot automatisch aktivieren wenn Bluetooth verbindet"
         android:textColor="#666666"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="16dp" />
 
     <TextView
         android:id="@+id/tvStatus"
@@ -27,21 +27,45 @@
         android:padding="14dp"
         android:background="#F0F0F0"
         android:fontFamily="monospace"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="12dp" />
 
     <Button
         android:id="@+id/btnAccessibility"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Accessibility Service aktivieren"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="20dp">
+
+        <Button
+            android:id="@+id/btnTest"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Test-Trigger" />
+
+        <Button
+            android:id="@+id/btnLog"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Debug Log" />
+
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Bluetooth-Gerät auswählen (einmal tippen):"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
     <TextView
         android:layout_width="wrap_content"

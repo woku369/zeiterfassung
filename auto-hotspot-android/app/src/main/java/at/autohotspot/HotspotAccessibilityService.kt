@@ -9,7 +9,6 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -18,7 +17,6 @@ class HotspotAccessibilityService : AccessibilityService() {
     companion object {
         const val ACTION_ENABLE_HOTSPOT = "at.autohotspot.ACTION_ENABLE_HOTSPOT"
         const val ACTION_DISABLE_HOTSPOT = "at.autohotspot.ACTION_DISABLE_HOTSPOT"
-        private const val TAG = "AutoHotspot"
         private const val PREF_WE_ENABLED_IT = "we_enabled_hotspot"
     }
 
@@ -32,27 +30,29 @@ class HotspotAccessibilityService : AccessibilityService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_ENABLE_HOTSPOT -> {
-                    if (isHotspotEnabled()) {
-                        Log.d(TAG, "Hotspot already on, nothing to do")
+                    AppLog.add(this@HotspotAccessibilityService, "Trigger empfangen: ENABLE")
+                    val hotspotOn = isHotspotEnabled()
+                    AppLog.add(this@HotspotAccessibilityService, "Hotspot-Status: ${if (hotspotOn) "AN" else "AUS"}")
+                    if (hotspotOn) {
+                        AppLog.add(this@HotspotAccessibilityService, "→ Bereits aktiv, nichts zu tun")
                         return
                     }
-                    Log.d(TAG, "Enable requested")
                     pendingAction = PendingAction.ENABLE
                     retryCount = 0
                     openQuickSettings()
                 }
                 ACTION_DISABLE_HOTSPOT -> {
+                    AppLog.add(this@HotspotAccessibilityService, "Trigger empfangen: DISABLE")
                     val prefs = getSharedPreferences("autohotspot", MODE_PRIVATE)
                     if (!prefs.getBoolean(PREF_WE_ENABLED_IT, false)) {
-                        Log.d(TAG, "We didn't enable it, leaving hotspot alone")
+                        AppLog.add(this@HotspotAccessibilityService, "→ Nicht von uns aktiviert, ignoriere")
                         return
                     }
                     if (!isHotspotEnabled()) {
-                        Log.d(TAG, "Hotspot already off")
+                        AppLog.add(this@HotspotAccessibilityService, "→ Hotspot bereits aus")
                         prefs.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
                         return
                     }
-                    Log.d(TAG, "Disable requested")
                     pendingAction = PendingAction.DISABLE
                     retryCount = 0
                     openQuickSettings()
@@ -62,23 +62,21 @@ class HotspotAccessibilityService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        val flags = if (Build.VERSION.SDK_INT >= 34) RECEIVER_NOT_EXPORTED else 0
+        AppLog.add(this, "Accessibility Service verbunden")
+        val filter = IntentFilter().apply {
+            addAction(ACTION_ENABLE_HOTSPOT)
+            addAction(ACTION_DISABLE_HOTSPOT)
+        }
         if (Build.VERSION.SDK_INT >= 26) {
-            registerReceiver(receiver, IntentFilter().apply {
-                addAction(ACTION_ENABLE_HOTSPOT)
-                addAction(ACTION_DISABLE_HOTSPOT)
-            }, flags)
+            registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(receiver, IntentFilter().apply {
-                addAction(ACTION_ENABLE_HOTSPOT)
-                addAction(ACTION_DISABLE_HOTSPOT)
-            })
+            registerReceiver(receiver, filter)
         }
-        Log.d(TAG, "Accessibility service connected")
     }
 
     private fun openQuickSettings() {
+        AppLog.add(this, "Öffne Quick Settings...")
         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
         handler.postDelayed({ scanAndClick() }, 800)
     }
@@ -87,17 +85,25 @@ class HotspotAccessibilityService : AccessibilityService() {
         if (pendingAction == PendingAction.NONE) return
 
         val root = rootInActiveWindow
-        if (root != null && findAndClickHotspot(root)) {
-            onTileClicked()
-            return
+        if (root != null) {
+            if (findAndClickHotspot(root)) {
+                onTileClicked()
+                return
+            }
         }
 
         retryCount++
         if (retryCount < 5) {
-            Log.d(TAG, "Tile not found, retry $retryCount")
+            AppLog.add(this, "Tile nicht gefunden, Retry $retryCount...")
             handler.postDelayed({ scanAndClick() }, 600)
         } else {
-            Log.w(TAG, "Hotspot tile not found after $retryCount retries")
+            AppLog.add(this, "FEHLER: Tile nach $retryCount Versuchen nicht gefunden")
+            // Log all visible node labels so we know what the tile is actually called
+            root?.let {
+                val labels = mutableListOf<String>()
+                collectNodeLabels(it, labels)
+                AppLog.add(this, "Sichtbare Beschriftungen: ${labels.take(30).joinToString(" | ")}")
+            }
             pendingAction = PendingAction.NONE
         }
     }
@@ -107,11 +113,11 @@ class HotspotAccessibilityService : AccessibilityService() {
         when (pendingAction) {
             PendingAction.ENABLE -> {
                 prefs.edit().putBoolean(PREF_WE_ENABLED_IT, true).apply()
-                Log.d(TAG, "Hotspot enabled by us")
+                AppLog.add(this, "✓ Hotspot aktiviert")
             }
             PendingAction.DISABLE -> {
                 prefs.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
-                Log.d(TAG, "Hotspot disabled by us")
+                AppLog.add(this, "✓ Hotspot deaktiviert")
             }
             PendingAction.NONE -> {}
         }
@@ -137,7 +143,6 @@ class HotspotAccessibilityService : AccessibilityService() {
         val text = node.text?.toString()?.lowercase()?.trim() ?: ""
         val desc = node.contentDescription?.toString()?.lowercase()?.trim() ?: ""
 
-        // "Hotspot" is the confirmed label; keep common variants as fallback
         if (text == "hotspot" || desc == "hotspot" ||
             text.contains("hotspot") || desc.contains("hotspot")
         ) {
@@ -146,6 +151,7 @@ class HotspotAccessibilityService : AccessibilityService() {
                 target = target.parent
             }
             if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                AppLog.add(this, "Tile geklickt (text='$text' desc='$desc')")
                 return true
             }
         }
@@ -157,6 +163,20 @@ class HotspotAccessibilityService : AccessibilityService() {
         return false
     }
 
+    private fun collectNodeLabels(node: AccessibilityNodeInfo, labels: MutableList<String>) {
+        val text = node.text?.toString()?.trim()
+        val desc = node.contentDescription?.toString()?.trim()
+        val label = when {
+            !text.isNullOrEmpty() -> text
+            !desc.isNullOrEmpty() -> desc
+            else -> null
+        }
+        if (label != null) labels.add(label)
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { collectNodeLabels(it, labels) }
+        }
+    }
+
     private fun isHotspotEnabled(): Boolean {
         return try {
             val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
@@ -164,7 +184,7 @@ class HotspotAccessibilityService : AccessibilityService() {
             method.isAccessible = true
             method.invoke(wifiManager) as Boolean
         } catch (e: Exception) {
-            Log.w(TAG, "Cannot check hotspot state: ${e.message}")
+            AppLog.add(this, "isHotspotEnabled Fehler: ${e.message}")
             false
         }
     }
@@ -172,6 +192,7 @@ class HotspotAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        AppLog.add(this, "Accessibility Service gestoppt")
         handler.removeCallbacksAndMessages(null)
         unregisterReceiver(receiver)
     }
