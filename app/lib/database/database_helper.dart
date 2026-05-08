@@ -376,12 +376,8 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final e in employers) {
-      if (e.deletedAt != null) {
-        batch.delete('employers', where: 'id = ?', whereArgs: [e.id]);
-      } else {
-        batch.insert('employers', e.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace);
-      }
+      batch.insert('employers', e.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
   }

@@ -259,6 +259,27 @@ function deduplicateLocations(ts) {
   }
 }
 
+/** Soft-deletes duplicate employers on the server (same name, case-insensitive).
+ *  Keeps the entry with the most recent updated_at. Idempotent. */
+function deduplicateEmployers(ts) {
+  const rows = db.prepare(
+    `SELECT id, name FROM employers
+     WHERE deleted_at IS NULL ORDER BY updated_at DESC`
+  ).all();
+  const seen = new Set();
+  const stmt = db.prepare(
+    `UPDATE employers SET deleted_at = ?, updated_at = ? WHERE id = ?`
+  );
+  for (const row of rows) {
+    const key = row.name.trim().toLowerCase();
+    if (seen.has(key)) {
+      stmt.run(ts, ts, row.id);
+    } else {
+      seen.add(key);
+    }
+  }
+}
+
 // ── Routen ────────────────────────────────────────────────────────────────────
 
 const now = () => new Date().toISOString();
@@ -332,10 +353,9 @@ async function handleRequest(req, res) {
     if (body.locations?.length) pushLocations(body.locations);
     if (body.imap?.length)      pushImap(body.imap);
 
-    // Serverseitige Deduplizierung: gleicher Name + Koordinaten (±100 m) →
-    // ältere Kopien soft-deleten. Verhindert, dass ein Gerät mit alter aktiver
-    // Kopie nach einem Sync das Soft-Delete eines anderen Geräts überschreibt.
+    // Serverseitige Deduplizierung nach jedem Sync-Push.
     deduplicateLocations(ts);
+    deduplicateEmployers(ts);
 
     // Settings-Sync: LWW per key, client sendet {key: {value, updated_at}}
     if (body.settings && typeof body.settings === 'object') {
