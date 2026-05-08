@@ -342,12 +342,10 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final loc in locations) {
-      if (loc.deletedAt != null) {
-        batch.delete('tracked_locations', where: 'id = ?', whereArgs: [loc.id]);
-      } else {
-        batch.insert('tracked_locations', loc.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace);
-      }
+      // Always upsert (never hard-delete) so soft-deleted records stay in local
+      // DB and can be re-propagated if another device resurrects them.
+      batch.insert('tracked_locations', loc.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
   }
