@@ -26,8 +26,10 @@ class LocationProvider extends ChangeNotifier {
   /// (z.B. externe Lohnabfüller). Werden bei jedem Load gegengeprüft und nur
   /// einmalig angelegt – Identifikation per exakter Namensgleichheit.
   Future<void> _ensureSpecialLocations() async {
-    final existingNames = _locations.map((l) => l.name).toSet();
-    if (existingNames.contains('Pfau Brennerei Klagenfurt')) return;
+    // getAllLocationsForSync includes soft-deleted entries – avoids recreating
+    // a location that the user has explicitly deleted.
+    final allLocs = await DatabaseHelper.instance.getAllLocationsForSync();
+    if (allLocs.any((l) => l.name == 'Pfau Brennerei Klagenfurt')) return;
 
     // Gurktaler AG als Arbeitgeber zuordnen, sofern vorhanden – Aufwand am
     // Lohnabfüller wird voll der Gurktaler AG zugerechnet.

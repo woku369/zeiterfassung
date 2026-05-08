@@ -357,14 +357,14 @@ async function handleRequest(req, res) {
       id: e.id, name: e.name, weekly_hours: e.weekly_hours ?? 40,
       fiscal_year_start_month: e.fiscal_year_start_month ?? 4,
       nas_url: e.nas_url ?? null, nas_api_key: e.nas_api_key ?? null,
-      updated_at: ts, deleted_at: e.deleted_at ?? null,
+      updated_at: e.updated_at ?? ts, deleted_at: e.deleted_at ?? null,
     })));
 
     const pushLocations = db.transaction(items => items.forEach(e => stmts.upsertLocation.run({
       id: e.id, name: e.name, latitude: e.latitude, longitude: e.longitude,
       radius_m: e.radius_m ?? 100, work_type: e.work_type ?? 'office',
       is_active: e.is_active ?? 1, employer_id: e.employer_id ?? null,
-      updated_at: ts, deleted_at: e.deleted_at ?? null,
+      updated_at: e.updated_at ?? ts, deleted_at: e.deleted_at ?? null,
     })));
 
     const pushImap = db.transaction(items => items.forEach(e => stmts.upsertImap.run({
@@ -378,7 +378,7 @@ async function handleRequest(req, res) {
     const pushProjects = db.transaction(items => items.forEach(e => stmts.upsertProject.run({
       id: e.id, name: e.name, employer_id: e.employer_id ?? null,
       sort_order: e.sort_order ?? 0,
-      updated_at: ts, deleted_at: e.deleted_at ?? null,
+      updated_at: e.updated_at ?? ts, deleted_at: e.deleted_at ?? null,
     })));
 
     if (body.entries?.length)   pushEntries(body.entries);
