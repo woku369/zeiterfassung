@@ -8,6 +8,7 @@ import 'providers/employer_provider.dart';
 import 'providers/time_entry_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/sync_provider.dart';
+import 'providers/project_provider.dart';
 import 'services/geofencing_service.dart';
 import 'services/tray_service.dart';
 import 'screens/home_screen.dart';
@@ -119,6 +120,7 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
       await ep.reload();
       await lp.load();
       await tp.refresh();
+      await context.read<ProjectProvider>().load();
     });
     sp.startPeriodicSync();
     await sp.syncNow();
