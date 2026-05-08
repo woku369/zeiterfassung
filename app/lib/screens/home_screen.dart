@@ -18,6 +18,7 @@ import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'activity_timeline_screen.dart';
 import '../providers/activity_provider.dart';
+import '../services/geofencing_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -270,6 +271,29 @@ class _DashboardTabState extends State<_DashboardTab> {
           children: [
             if (ep.employers.length > 1)
               _EmployerChipBar(ep: ep),
+            if (Platform.isAndroid)
+              ValueListenableBuilder<List<String>>(
+                valueListenable: GeofencingService.instance.activeZones,
+                builder: (_, zones, __) {
+                  if (zones.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 2),
+                    child: Wrap(
+                      spacing: 6,
+                      children: zones.map((name) => Chip(
+                        avatar: Icon(Icons.location_on,
+                            size: 14,
+                            color: Theme.of(context).colorScheme.primary),
+                        label: Text(name,
+                            style: const TextStyle(fontSize: 12)),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      )).toList(),
+                    ),
+                  );
+                },
+              ),
             const SizedBox(height: 4),
             Card(
               color: active != null ? cs.primaryContainer : cs.surfaceContainerLow,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
@@ -12,6 +13,9 @@ class GeofencingService {
   static final GeofencingService instance = GeofencingService._();
 
   GeofenceCallback? onZoneChange;
+
+  /// Names of zones the user is currently inside (updated in real-time).
+  final ValueNotifier<List<String>> activeZones = ValueNotifier([]);
 
   final _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
@@ -35,7 +39,16 @@ class GeofencingService {
     // Forward zone change events from background isolate to onZoneChange.
     FlutterBackgroundService().on('zoneChange').listen((data) {
       if (data == null) return;
-      onZoneChange?.call(_minimalLocation(data), data['entered'] as bool);
+      final name = data['locationName'] as String;
+      final entered = data['entered'] as bool;
+      final current = List<String>.from(activeZones.value);
+      if (entered) {
+        if (!current.contains(name)) current.add(name);
+      } else {
+        current.remove(name);
+      }
+      activeZones.value = current;
+      onZoneChange?.call(_minimalLocation(data), entered);
     });
   }
 
