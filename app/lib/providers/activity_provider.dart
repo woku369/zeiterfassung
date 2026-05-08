@@ -12,7 +12,7 @@ class ActivityProvider extends ChangeNotifier {
   // Timestamp of last USER-initiated settings change (epoch = never changed locally).
   // Used for LWW sync: only advance when the user explicitly saves settings.
   static const _keySettingsChangedAt = 'activity_settings_changed_at';
-  static const _epochTs = '2000-01-01T00:00:00.000Z';
+  static const epochTs = '2000-01-01T00:00:00.000Z';
 
   List<ActivityLog> _sessions = [];
   List<String> _whitelist = List.from(defaultWhitelist);
@@ -21,7 +21,7 @@ class ActivityProvider extends ChangeNotifier {
   bool _isTracking = false;
   bool _hasPermission = false;
   DateTime _selectedDate = DateTime.now();
-  String _settingsChangedAt = _epochTs;
+  String _settingsChangedAt = epochTs;
 
   List<ActivityLog> get sessions => _sessions;
   List<String> get whitelist => _whitelist;
@@ -51,7 +51,7 @@ class ActivityProvider extends ChangeNotifier {
     if (saved != null) _whitelist = saved;
     _minDurationMinutes = prefs.getInt(_keyMinDuration) ?? 3;
     _idleThresholdMinutes = prefs.getInt(_keyIdleThreshold) ?? 5;
-    _settingsChangedAt = prefs.getString(_keySettingsChangedAt) ?? _epochTs;
+    _settingsChangedAt = prefs.getString(_keySettingsChangedAt) ?? epochTs;
   }
 
   /// Called when the user explicitly saves settings – advances the LWW timestamp.

@@ -98,18 +98,20 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Lokale Settings für den Sync einsammeln
+      // Lokale Settings nur senden wenn der User sie je explizit gespeichert hat.
+      // Fresh-Install (epochTs) sendet nichts – verhindert, dass Default-Werte
+      // eine benutzerdefinierte NAS-Konfiguration überschreiben.
       Map<String, dynamic>? localSettings;
       if (_activityProvider != null) {
         final ap = _activityProvider!;
-        // Use the stored change-timestamp, not DateTime.now(). This ensures
-        // that only the device that last CHANGED the settings wins (true LWW).
         final ts = ap.settingsChangedAt;
-        localSettings = {
-          'activity_whitelist': {'value': ap.whitelist, 'updated_at': ts},
-          'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': ts},
-          'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': ts},
-        };
+        if (ts != ActivityProvider.epochTs) {
+          localSettings = {
+            'activity_whitelist': {'value': ap.whitelist, 'updated_at': ts},
+            'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': ts},
+            'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': ts},
+          };
+        }
       }
 
       final result = await SyncService.instance.sync(
