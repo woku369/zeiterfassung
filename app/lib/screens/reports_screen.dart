@@ -20,11 +20,50 @@ class ReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ep = context.watch<EmployerProvider>();
+    final employer = ep.active;
+    final others = ep.employers.where((e) => e.id != employer?.id).toList();
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Berichte'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Berichte'),
+              if (employer != null)
+                Text(
+                  employer.name,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.65),
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            if (others.isNotEmpty)
+              PopupMenuButton<Employer>(
+                tooltip: 'Arbeitgeber wechseln',
+                icon: const Icon(Icons.swap_horiz),
+                onSelected: (e) => ep.setActive(e),
+                itemBuilder: (_) => others
+                    .map((e) => PopupMenuItem(
+                          value: e,
+                          child: Row(children: [
+                            const Icon(Icons.business_outlined, size: 18),
+                            const SizedBox(width: 10),
+                            Text(e.name),
+                          ]),
+                        ))
+                    .toList(),
+              ),
+          ],
           bottom: const TabBar(tabs: [
             Tab(icon: Icon(Icons.calendar_month_outlined), text: 'Monat'),
             Tab(icon: Icon(Icons.trending_up_outlined), text: 'Wirtschaftsjahr'),
