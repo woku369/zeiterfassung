@@ -562,6 +562,7 @@ class _EntryTile extends StatelessWidget {
   IconData _workTypeIcon(WorkType t) => switch (t) {
     WorkType.homeoffice => Icons.home_outlined,
     WorkType.phoneCall => Icons.phone_outlined,
+    WorkType.email => Icons.email_outlined,
     WorkType.offsite => Icons.place_outlined,
     WorkType.travel => Icons.directions_car_outlined,
     WorkType.office => Icons.business_outlined,

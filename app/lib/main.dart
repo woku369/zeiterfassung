@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:ffi';
+import 'dart:ffi' hide Size;
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
