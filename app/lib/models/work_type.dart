@@ -1,6 +1,7 @@
 enum WorkType {
   homeoffice('Homeoffice', 'home'),
   phoneCall('Telefonat', 'phone'),
+  email('E-Mail', 'email'),
   offsite('Außer-Haus-Termin', 'place'),
   travel('Fahrt', 'directions_car'),
   office('Büro', 'business'),

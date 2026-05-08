@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/time_entry.dart';
 import '../models/employer.dart';
 import '../models/tracked_location.dart';
+import '../models/project.dart';
 import '../database/database_helper.dart';
 
 class SyncResult {
@@ -40,10 +41,11 @@ class SyncService {
     final headers = _headers(apiKey);
     final errors = <String>[];
 
-    // Unsynced time entries + alle Employers/Locations inkl. soft-deleted
+    // Unsynced time entries + alle Employers/Locations/Projects inkl. soft-deleted
     final unsynced  = await db.getUnsyncedEntries();
     final employers = await db.getAllEmployersForSync();
     final locations = await db.getAllLocationsForSync();
+    final projects  = await db.getAllProjectsForSync();
     final lastSync  = await db.getSyncState('last_sync_at') ?? '1970-01-01T00:00:00.000Z';
 
     try {
@@ -52,6 +54,7 @@ class SyncService {
         'entries':   unsynced.map((e) => e.toJson()).toList(),
         'employers': employers.map((e) => e.toJson()).toList(),
         'locations': locations.map((l) => l.toJson()).toList(),
+        'projects':  projects.map((p) => p.toJson()).toList(),
         if (localSettings != null && localSettings.isNotEmpty)
           'settings': localSettings,
       });
@@ -80,6 +83,9 @@ class SyncService {
       final serverLocations = (data['locations'] as List<dynamic>? ?? [])
           .map((e) => TrackedLocation.fromMap(_normalizeLocationMap(e as Map<String, dynamic>)))
           .toList();
+      final serverProjects = (data['projects'] as List<dynamic>? ?? [])
+          .map((e) => Project.fromJson(e as Map<String, dynamic>))
+          .toList();
 
       if (serverEntries.isNotEmpty) {
         await db.insertOrUpdateEntries(serverEntries);
@@ -89,6 +95,9 @@ class SyncService {
       }
       if (serverLocations.isNotEmpty) {
         await db.upsertLocationsFromServer(serverLocations);
+      }
+      if (serverProjects.isNotEmpty) {
+        await db.upsertProjectsFromServer(serverProjects);
       }
 
       // Mark local entries as synced, save sync timestamp
@@ -102,7 +111,7 @@ class SyncService {
 
       return SyncResult(
         pushed: unsynced.length,
-        pulled: serverEntries.length + serverEmployers.length + serverLocations.length,
+        pulled: serverEntries.length + serverEmployers.length + serverLocations.length + serverProjects.length,
         errors: errors,
         serverSettings: rawSettings,
       );

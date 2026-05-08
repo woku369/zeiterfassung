@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../dev_config.dart';
 import '../providers/employer_provider.dart';
 import '../providers/activity_provider.dart';
+import '../providers/project_provider.dart';
 import '../models/employer.dart';
 import '../services/sync_service.dart';
 import '../services/backup_service.dart';
@@ -131,6 +132,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _addEmployer(context),
             ),
           ),
+
+          // ── Projekte (nur Gurktaler AG) ───────────────────────────────
+          if (employer != null &&
+              employer.name.toLowerCase().contains('gurktaler')) ...[
+            const SizedBox(height: 20),
+            Text('Projekte', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _ProjectsCard(employerId: employer.id),
+          ],
 
           // ── Synchronisation ───────────────────────────────────────────
           const SizedBox(height: 20),
@@ -823,6 +833,94 @@ class _SyncCard extends StatelessWidget {
 class _BackupCard extends StatefulWidget {
   @override
   State<_BackupCard> createState() => _BackupCardState();
+}
+
+class _ProjectsCard extends StatelessWidget {
+  final String employerId;
+  const _ProjectsCard({required this.employerId});
+
+  @override
+  Widget build(BuildContext context) {
+    final pp = context.watch<ProjectProvider>();
+    final projects = pp.forEmployer(employerId);
+
+    return Card(
+      child: Column(
+        children: [
+          ...projects.map((p) => ListTile(
+                dense: true,
+                leading: const Icon(Icons.folder_outlined, size: 20),
+                title: Text(p.name),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  tooltip: 'Löschen',
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Projekt löschen?'),
+                        content: Text('"${p.name}" wirklich löschen?'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Abbrechen')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Löschen')),
+                        ],
+                      ),
+                    );
+                    if (ok == true && context.mounted) {
+                      await context.read<ProjectProvider>().remove(p.id);
+                    }
+                  },
+                ),
+              )),
+          if (projects.isNotEmpty) const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.add, size: 20),
+            title: const Text('Projekt hinzufügen'),
+            onTap: () => _addProject(context, employerId),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addProject(BuildContext context, String employerId) async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Neues Projekt'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Projektname',
+            border: OutlineInputBorder(),
+          ),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () {
+              final v = ctrl.text.trim();
+              if (v.isNotEmpty) Navigator.pop(context, v);
+            },
+            child: const Text('Hinzufügen'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && context.mounted) {
+      await context.read<ProjectProvider>().add(name, employerId);
+    }
+  }
 }
 
 class _BackupCardState extends State<_BackupCard> {

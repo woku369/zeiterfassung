@@ -16,6 +16,7 @@ class TimeEntry {
   final double? endLng;
   final int travelMinutes;
   final String? employerId;
+  final String? projectId;
   final bool isSpecialHours;
   final bool isSynced;
   final DateTime createdAt;
@@ -36,6 +37,7 @@ class TimeEntry {
     this.endLng,
     this.travelMinutes = 0,
     this.employerId,
+    this.projectId,
     this.isSpecialHours = false,
     this.isSynced = false,
     required this.createdAt,
@@ -69,6 +71,7 @@ class TimeEntry {
     double? endLng,
     int? travelMinutes,
     String? employerId,
+    String? projectId,
     bool? isSpecialHours,
     bool? isSynced,
     DateTime? createdAt,
@@ -89,6 +92,7 @@ class TimeEntry {
       endLng: endLng ?? this.endLng,
       travelMinutes: travelMinutes ?? this.travelMinutes,
       employerId: employerId ?? this.employerId,
+      projectId: projectId ?? this.projectId,
       isSpecialHours: isSpecialHours ?? this.isSpecialHours,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
@@ -111,6 +115,7 @@ class TimeEntry {
     'end_lng': endLng,
     'travel_minutes': travelMinutes,
     'employer_id': employerId,
+    'project_id': projectId,
     'is_special_hours': isSpecialHours ? 1 : 0,
     'is_synced': isSynced ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
@@ -132,6 +137,7 @@ class TimeEntry {
     endLng: (m['end_lng'] as num?)?.toDouble(),
     travelMinutes: m['travel_minutes'] as int? ?? 0,
     employerId: m['employer_id'] as String?,
+    projectId: m['project_id'] as String?,
     isSpecialHours: (m['is_special_hours'] as int? ?? 0) == 1,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),

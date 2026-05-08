@@ -90,6 +90,15 @@ db.exec(`
     deleted_at       TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS projects (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    employer_id TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS app_settings (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL,
@@ -102,6 +111,9 @@ db.exec(`
 // Idempotente Migrationen für bestehende Installationen
 try {
   db.exec("ALTER TABLE time_entries ADD COLUMN is_special_hours INTEGER NOT NULL DEFAULT 0");
+} catch (_) { /* Spalte existiert bereits */ }
+try {
+  db.exec("ALTER TABLE time_entries ADD COLUMN project_id TEXT");
 } catch (_) { /* Spalte existiert bereits */ }
 
 db.exec(`
@@ -150,17 +162,17 @@ const stmts = {
     INSERT INTO time_entries
       (id,date,start_time,end_time,break_minutes,work_type,day_type,note,
        distance_km,start_lat,start_lng,end_lat,end_lng,travel_minutes,
-       employer_id,is_special_hours,is_synced,created_at,updated_at,deleted_at)
+       employer_id,project_id,is_special_hours,is_synced,created_at,updated_at,deleted_at)
     VALUES
       (@id,@date,@start_time,@end_time,@break_minutes,@work_type,@day_type,@note,
        @distance_km,@start_lat,@start_lng,@end_lat,@end_lng,@travel_minutes,
-       @employer_id,@is_special_hours,1,@created_at,@updated_at,@deleted_at)
+       @employer_id,@project_id,@is_special_hours,1,@created_at,@updated_at,@deleted_at)
     ON CONFLICT(id) DO UPDATE SET
       date=excluded.date, start_time=excluded.start_time, end_time=excluded.end_time,
       break_minutes=excluded.break_minutes, work_type=excluded.work_type,
       day_type=excluded.day_type, note=excluded.note, distance_km=excluded.distance_km,
       travel_minutes=excluded.travel_minutes, employer_id=excluded.employer_id,
-      is_special_hours=excluded.is_special_hours,
+      project_id=excluded.project_id, is_special_hours=excluded.is_special_hours,
       updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
     WHERE excluded.updated_at > time_entries.updated_at
   `),
@@ -221,6 +233,21 @@ const stmts = {
 
   getImapSince: db.prepare(
     `SELECT * FROM imap_config WHERE updated_at > ? ORDER BY updated_at`
+  ),
+
+  // projects
+  upsertProject: db.prepare(`
+    INSERT INTO projects (id,name,employer_id,sort_order,updated_at,deleted_at)
+    VALUES (@id,@name,@employer_id,@sort_order,@updated_at,@deleted_at)
+    ON CONFLICT(id) DO UPDATE SET
+      name=excluded.name, employer_id=excluded.employer_id,
+      sort_order=excluded.sort_order,
+      updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
+    WHERE excluded.updated_at > projects.updated_at
+  `),
+
+  getProjectsSince: db.prepare(
+    `SELECT * FROM projects WHERE updated_at > ? ORDER BY updated_at`
   ),
 
   // app_settings – LWW per key
@@ -322,7 +349,7 @@ async function handleRequest(req, res) {
       distance_km: e.distance_km ?? null, start_lat: e.start_lat ?? null,
       start_lng: e.start_lng ?? null, end_lat: e.end_lat ?? null, end_lng: e.end_lng ?? null,
       travel_minutes: e.travel_minutes ?? 0, employer_id: e.employer_id ?? null,
-      is_special_hours: e.is_special_hours ? 1 : 0,
+      project_id: e.project_id ?? null, is_special_hours: e.is_special_hours ? 1 : 0,
       created_at: e.created_at, updated_at: ts, deleted_at: e.deleted_at ?? null,
     })));
 
@@ -348,10 +375,17 @@ async function handleRequest(req, res) {
       updated_at: ts, deleted_at: e.deleted_at ?? null,
     })));
 
+    const pushProjects = db.transaction(items => items.forEach(e => stmts.upsertProject.run({
+      id: e.id, name: e.name, employer_id: e.employer_id ?? null,
+      sort_order: e.sort_order ?? 0,
+      updated_at: ts, deleted_at: e.deleted_at ?? null,
+    })));
+
     if (body.entries?.length)   pushEntries(body.entries);
     if (body.employers?.length) pushEmployers(body.employers);
     if (body.locations?.length) pushLocations(body.locations);
     if (body.imap?.length)      pushImap(body.imap);
+    if (body.projects?.length)  pushProjects(body.projects);
 
     // Serverseitige Deduplizierung nach jedem Sync-Push.
     deduplicateLocations(ts);
@@ -387,6 +421,7 @@ async function handleRequest(req, res) {
       employers: stmts.getEmployersSince.all(since),
       locations: stmts.getLocationsSince.all(since),
       imap:      stmts.getImapSince.all(since),
+      projects:  stmts.getProjectsSince.all(since),
       settings,
     });
   }
@@ -423,7 +458,7 @@ async function handleRequest(req, res) {
       distance_km: e.distance_km ?? null, start_lat: e.start_lat ?? null,
       start_lng: e.start_lng ?? null, end_lat: e.end_lat ?? null, end_lng: e.end_lng ?? null,
       travel_minutes: e.travel_minutes ?? 0, employer_id: e.employer_id ?? null,
-      is_special_hours: e.is_special_hours ? 1 : 0,
+      project_id: e.project_id ?? null, is_special_hours: e.is_special_hours ? 1 : 0,
       created_at: e.created_at, updated_at: ts, deleted_at: null,
     })));
     push(entries);

@@ -5,6 +5,7 @@ import '../models/employer.dart';
 import '../models/tracked_location.dart';
 import '../models/imap_config.dart';
 import '../models/activity_log.dart';
+import '../models/project.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -15,7 +16,7 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 9, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(path, version: 10, onCreate: _create, onUpgrade: _upgrade);
   }
 
   Future<void> _create(Database db, int _) async {
@@ -48,6 +49,7 @@ class DatabaseHelper {
         end_lng REAL,
         travel_minutes INTEGER NOT NULL DEFAULT 0,
         employer_id TEXT,
+        project_id TEXT,
         is_special_hours INTEGER NOT NULL DEFAULT 0,
         is_synced INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
@@ -61,6 +63,7 @@ class DatabaseHelper {
     ''');
     await _createV2Tables(db);
     await _createV7Tables(db);
+    await _createV10Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -108,6 +111,12 @@ class DatabaseHelper {
             "ALTER TABLE time_entries ADD COLUMN is_special_hours INTEGER NOT NULL DEFAULT 0");
       } catch (_) {}
     }
+    if (oldVersion < 10) {
+      await _createV10Tables(db);
+      try {
+        await db.execute("ALTER TABLE time_entries ADD COLUMN project_id TEXT");
+      } catch (_) {}
+    }
   }
 
   Future<void> _createV2Tables(Database db) async {
@@ -150,6 +159,19 @@ class DatabaseHelper {
         end_time TEXT NOT NULL,
         title TEXT NOT NULL,
         app_name TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createV10Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        employer_id TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        deleted_at TEXT
       )
     ''');
   }
@@ -435,5 +457,53 @@ class DatabaseHelper {
   Future<void> deleteAllActivityLogs() async {
     final db = await database;
     await db.delete('activity_log');
+  }
+
+  // ── projects ──────────────────────────────────────────────────────────────
+
+  Future<void> insertProject(Project p) async {
+    final db = await database;
+    await db.insert('projects', p.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateProject(Project p) async {
+    final db = await database;
+    await db.update('projects', p.toMap(), where: 'id = ?', whereArgs: [p.id]);
+  }
+
+  Future<void> deleteProject(String id) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.update('projects', {'deleted_at': now, 'updated_at': now},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Project>> getProjects({String? employerId}) async {
+    final db = await database;
+    if (employerId != null) {
+      final rows = await db.query('projects',
+          where: 'deleted_at IS NULL AND employer_id = ?',
+          whereArgs: [employerId],
+          orderBy: 'sort_order ASC, name ASC');
+      return rows.map(Project.fromMap).toList();
+    }
+    final rows = await db.query('projects',
+        where: 'deleted_at IS NULL', orderBy: 'sort_order ASC, name ASC');
+    return rows.map(Project.fromMap).toList();
+  }
+
+  Future<List<Project>> getAllProjectsForSync() async {
+    final db = await database;
+    final rows = await db.query('projects', orderBy: 'updated_at ASC');
+    return rows.map(Project.fromMap).toList();
+  }
+
+  Future<void> upsertProjectsFromServer(List<Project> projects) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final p in projects) {
+      batch.insert('projects', p.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 }

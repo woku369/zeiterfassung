@@ -12,6 +12,7 @@ import 'providers/location_provider.dart';
 import 'providers/activity_provider.dart';
 import 'providers/sync_provider.dart';
 import 'providers/suggestion_provider.dart';
+import 'providers/project_provider.dart';
 import 'database/database_helper.dart';
 import 'services/geofencing_service.dart';
 import 'services/geofencing_background.dart';
@@ -88,6 +89,9 @@ void main() async {
   final suggestionProvider = SuggestionProvider();
   await suggestionProvider.init();
 
+  final projectProvider = ProjectProvider();
+  await projectProvider.ensureGurktalerProjects();
+
   // Navigation channel: QS Tile → open timeline
   const navChannel = MethodChannel('zeiterfassung/navigation');
 
@@ -104,6 +108,7 @@ void main() async {
         ChangeNotifierProvider.value(value: activityProvider),
         ChangeNotifierProvider.value(value: syncProvider),
         ChangeNotifierProvider.value(value: suggestionProvider),
+        ChangeNotifierProvider.value(value: projectProvider),
       ],
       child: ZeiterfassungApp(navChannel: navChannel),
     ),

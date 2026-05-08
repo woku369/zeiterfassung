@@ -7,6 +7,7 @@ import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../providers/project_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/surcharge_service.dart';
 
@@ -31,6 +32,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late TextEditingController _kmCtrl;
   late TextEditingController _breakCtrl;
   String? _employerId;
+  String? _projectId;
   bool _isSpecialHours = false;
   int _travelMinutes = 0;
 
@@ -55,6 +57,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     _breakCtrl = TextEditingController(text: _breakMinutes.toString());
     _isSpecialHours = e?.isSpecialHours ?? false;
     _travelMinutes = e?.travelMinutes ?? 0;
+    _projectId = e?.projectId;
   }
 
   Employer? get _selectedEmployer {
@@ -129,6 +132,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       distanceKm: km,
       travelMinutes: _travelMinutes,
       employerId: _employerId,
+      projectId: _isSurchargeEmployer ? _projectId : null,
       isSpecialHours: _isSurchargeEmployer && _isSpecialHours,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
@@ -401,6 +405,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
             DayType.workday  => 1.0,
           }
         : 1.0;
+    final projects = context.read<ProjectProvider>().forEmployer(_employerId);
     return [
       Container(
         padding: const EdgeInsets.all(12),
@@ -420,6 +425,29 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                       fontWeight: FontWeight.w600,
                       color: Colors.amber.shade900)),
             ]),
+            if (projects.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String?>(
+                value: projects.any((p) => p.id == _projectId) ? _projectId : null,
+                decoration: InputDecoration(
+                  labelText: 'Projekt',
+                  prefixIcon: const Icon(Icons.folder_outlined),
+                  border: const OutlineInputBorder(),
+                  fillColor: Colors.white,
+                  filled: true,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('Kein Projekt')),
+                  ...projects.map((p) => DropdownMenuItem<String?>(
+                        value: p.id,
+                        child: Text(p.name),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _projectId = v),
+              ),
+            ],
             const SizedBox(height: 8),
             SwitchListTile.adaptive(
               dense: true,
