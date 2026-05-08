@@ -1,0 +1,4 @@
+// Kopiere diese Datei nach dev_config.dart und trage deine Zugangsdaten ein.
+// dev_config.dart ist in .gitignore – wird nie committet.
+const kDevNasUrl = 'http://100.x.x.x:3000';
+const kDevNasKey = 'dein-api-key';

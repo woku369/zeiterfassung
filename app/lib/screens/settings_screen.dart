@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../dev_config.dart';
 import '../providers/employer_provider.dart';
 import '../providers/activity_provider.dart';
 import '../models/employer.dart';
@@ -465,6 +467,14 @@ class _NasCardState extends State<_NasCard> {
           ],
         ),
         actions: [
+          if (kDebugMode && kDevNasUrl.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                urlCtrl.text = kDevNasUrl;
+                keyCtrl.text = kDevNasKey;
+              },
+              child: const Text('Dev'),
+            ),
           TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Abbrechen')),
