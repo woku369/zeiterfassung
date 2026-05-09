@@ -155,6 +155,7 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Zone verlassen', value: '5 Min warten → Auto-Ausstempeln'),
               _KeyValue(label: 'Re-Entry binnen 5 Min', value: 'Karenz wird abgebrochen, kein Clock-out'),
               _KeyValue(label: 'Manueller Eintrag aktiv', value: 'Wird nie automatisch geschlossen'),
+              _KeyValue(label: 'Auto-Pause', value: 'Bei ≥5h eingestempelt (außer Homeoffice) werden automatisch 30 Min Pause eingetragen'),
               _Hint(
                 'Notiz/Tätigkeit zum Auto-Eintrag ergänzen: auf der Übersicht '
                 'beim aktiven Eintrag „Notiz" antippen – Schnelldialog für '
@@ -189,6 +190,17 @@ class HelpScreen extends StatelessWidget {
                 '"Immer erlauben". HyperOS/MIUI: Akkuoptimierung für '
                 'Zeiterfassung auf "Keine Einschränkungen" setzen, sonst '
                 'beendet das System den Service trotz Foreground-Notification.',
+              ),
+              _SubHeading('Diagnose-Log'),
+              _Para(
+                'Falls Geofencing nicht wie erwartet funktioniert, gibt es '
+                'ein internes Diagnose-Log: Einstellungen → Automatische '
+                'Erfassung → Diagnose-Log. Zeigt alle Clock-in/out-Ereignisse '
+                'des Hintergrund-Dienstes mit Zeitstempel.',
+              ),
+              _Hint(
+                'Log enthält: Zone betreten/verlassen, Clock-in/out-Ergebnisse, '
+                'Karenz-Timer-Ereignisse und Fehler. Kann mit „Löschen" geleert werden.',
               ),
             ],
           ),
@@ -408,6 +420,23 @@ class HelpScreen extends StatelessWidget {
                 'Vorschläge entstehen nur für Zeiträume die noch nicht durch '
                 'bestehende Einträge abgedeckt sind (>50 % Überlappung → kein Vorschlag). '
                 'Manuelles Nachbearbeiten ist immer möglich.',
+              ),
+              _SubHeading('Android – Anruf-Tracking'),
+              _Para(
+                'Neben App-Nutzungsdaten zeigt die Timeline auch deinen '
+                'Anruf-Verlauf – eingehende, ausgehende und verpasste Anrufe '
+                'können direkt als Telefonat-Einträge übernommen werden.',
+              ),
+              _Step(number: '1', text: '"Anrufe"-Berechtigung erteilen (READ_CALL_LOG) – Karte erscheint wenn noch nicht gewährt'),
+              _Step(number: '2', text: 'Timeline öffnen → Abschnitt „Anrufe" zeigt den Verlauf des gewählten Tags'),
+              _Step(number: '3', text: '„Übernehmen" bei einem Anruf → Eintrag-Formular öffnet sich vorausgefüllt mit Tätigkeitsart „Telefonat"'),
+              _KeyValue(label: 'Eingehend', value: 'grüner Pfeil'),
+              _KeyValue(label: 'Ausgehend', value: 'blauer Pfeil'),
+              _KeyValue(label: 'Verpasst', value: 'roter Pfeil'),
+              _Hint(
+                'Datenschutz: Anruf-Log-Daten verlassen das Gerät nicht – '
+                'sie werden weder zum NAS übertragen noch gespeichert. '
+                'Nur der daraus erstellte Zeiteintrag landet in der Datenbank.',
               ),
               _SubHeading('Android – Nutzungsstatistiken'),
               _Step(number: '1', text: 'Übersicht → Aktivitäts-Timeline antippen'),
