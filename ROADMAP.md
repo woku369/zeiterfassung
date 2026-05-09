@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-07 – Auto Clock-in via Geofencing + Watchdog
+> Letztes Update: 2026-05-09 – Projektverwaltung + LWW-Bugfixes + Arbeitgeber-Toggle Berichte
 
 ---
 
@@ -24,6 +24,30 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.16 – Projektverwaltung + Bugfixes
+- [x] **Projektverwaltung (Gurktaler AG):**
+  - `Project`-Modell (`id`, `name`, `employerId`, `sortOrder`, `updatedAt`, `deletedAt`) mit Soft-Delete
+  - `ProjectProvider`: `add()`, `remove()`, `rename()`, `forEmployer()` + automatisches Seeding der 7 Gurktaler-Projekte beim ersten Start: **Führungen, Kräutergarten, Mazeration, Kleinserie, Produktentwicklung, Rezepturoptimierung, Administration**
+  - `ensureGurktalerProjects()` ist idempotent – erkennt Gurktaler AG per `name.contains('gurktaler')`, seedet nur wenn noch keine Projekte existieren
+  - **DB v10:** neue Tabelle `projects` + neue Spalte `project_id` auf `time_entries`
+  - **Eintrag-Formular:** Projekt-Dropdown in den Gurktaler-Sonderoptionen (Auswahl leer = „Kein Projekt")
+  - **Einstellungen:** `_ProjectsCard` – erscheint nur bei Gurktaler AG; Projekte anlegen, umbenennen, löschen
+  - **Berichte:** `_ProjectBreakdownCard` – erscheint nur bei Gurktaler AG; Stunden nach Projekt aufgeschlüsselt, „Kein Projekt" als Sammelkategorie
+  - **NAS:** `projects`-Tabelle + bidirektionaler Sync (LWW via `e.updated_at ?? ts`), `project_id` in `time_entries`
+  - `ProjectProvider.load()` wird nach jedem erfolgreichen Sync automatisch aufgerufen (`_onSyncComplete`)
+- [x] **Arbeitgeber-Toggle in Berichte:**
+  - Arbeitgebername als Subtitle in der AppBar des Berichte-Screens
+  - `PopupMenuButton` mit `Icons.swap_horiz` für direkten Arbeitgeberwechsel ohne Tab-Wechsel
+  - Nur sichtbar wenn ≥2 Arbeitgeber vorhanden
+- [x] **Farbkontrast Gurktaler-Sonderoptionen behoben:** Amber-Hintergrund → Orange-Schema mit expliziten Textfarben (`Colors.black87` / `Colors.grey.shade800`) – gut lesbar in Light + Dark Mode
+- [x] **Bugfix `dart:ffi` ↔ `dart:ui` Size-Konflikt:** `import 'dart:ffi' hide Size;` in `main.dart`
+- [x] **Bugfix `WorkType.email` nicht exhaustiv:** `Icons.email_outlined` in `home_screen.dart` und `entries_screen.dart` ergänzt
+- [x] **Bugfix Geofencing-Duplikate (zwei Root Causes dauerhaft behoben):**
+  1. `LocationProvider._ensureSpecialLocations()` prüfte nur aktive `_locations` statt alle Records inkl. soft-deleted → Standort wurde bei jedem `load()` neu angelegt. Fix: `getAllLocationsForSync()` verwenden
+  2. NAS `pushLocations` / `pushEmployers` verwendete Server-Timestamp `ts` als `updated_at` → „letztes Gerät das sync't gewinnt" statt „letztes Gerät das ändert gewinnt". Soft-Deletes wurden bei nächstem Sync überschrieben. Fix: `e.updated_at ?? ts` in allen Push-Handlern (locations, employers, projects)
+- [x] **Bugfix Whitelist-Reset nach Neuinstallation:** Fresh-Installs senden Settings **nicht** mehr zum NAS (Guard: `settingsChangedAt == epochTs`). Verhindert, dass Default-Werte eine benutzerdefinierte NAS-Whitelist überschreiben. Einmalig gespeicherte Whitelist propagiert korrekt auf alle Geräte.
+- [x] **NAS LWW-Korrektheit vollständig:** `e.updated_at ?? ts` in `pushLocations`, `pushEmployers`, `pushProjects` – Client-Timestamps überleben den Sync-Round-Trip korrekt
 
 ### v1.15 – Sonderarbeitszeiten & Vertragsäquivalent (Gurktaler AG)
 - [x] **Pfau Brennerei Klagenfurt** als Standort eingepflegt (Schleppe-Platz 1, 9020 Klagenfurt am Wörthersee, 46.6415, 14.2860, Radius 150 m, WorkType `offsite`)
@@ -266,12 +290,13 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] Windows-Platform aktiviert, Tray-Widget verifiziert (X-Knopf minimiert ins Tray, Beenden nur über Tray-Menü oder explizitem Close-Icon in der AppBar)
 - [x] NAS-Verbindungstest auf Windows + Android erfolgreich – bidirektionaler Sync verifiziert
 - [x] **Multi-Gerät-Test Soft-Delete:** APK löscht 5 Dubletten → Windows-Sync zieht 2 verbleibende Arbeitgeber – verifiziert
-- [ ] **Whitelist-Sync mit korrektem LWW verifizieren:** Whitelist auf Windows ändern → APK syncen → muss übernommen werden (auch wenn APK später erneut sync't, darf sie die Windows-Werte nicht überschreiben)
+- [x] **Whitelist-Sync mit korrektem LWW verifiziert:** Whitelist auf Gerät ändern → anderes Gerät syncen → Änderungen erscheinen korrekt. Fresh-Installs überschreiben keine bestehenden NAS-Whitelist-Werte mehr (epochTs-Guard)
 - [ ] **Backup-Restore-Test:** Backup auf NAS → neue Einträge anlegen → altes Backup wiederherstellen → Sync → fehlende Einträge müssen vom NAS zurückkommen
 - [ ] **Boot-Persistenz auf Xiaomi verifizieren:** Geofencing aktivieren → Telefon neu starten → Service muss ohne App-Öffnen wieder laufen
 - [ ] **Auto Clock-in/out auf Xiaomi verifizieren:** Geofencing-Zone fahren → Notification + Eintrag erscheint → Zone verlassen → 5 Min Karenz → Eintrag wird geschlossen
 - [ ] **Watchdog-Notification testen:** Auto-Eintrag offen lassen, >30 Min außerhalb aller Zonen bleiben → Reminder muss erscheinen
-- [ ] **Location-Deduplizierung auf NAS verifizieren:** Nach App-Start sollen Dubletten verschwinden, der NAS-Stand muss konsistent werden
+- [x] **Geofencing-Duplikate dauerhaft behoben:** Beide Root Causes beseitigt (ensureSpecialLocations + NAS LWW-Timestamps). Keine Neuerstellung soft-gelöschter Standorte mehr.
+- [ ] **Location-Deduplizierung auf NAS verifizieren:** Nach App-Start sollen verbleibende historische Dubletten verschwinden, der NAS-Stand muss konsistent werden
 
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
@@ -308,9 +333,10 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 app/
   lib/
     models/          time_entry, employer, tracked_location, imap_config,
-                     work_type, activity_log, suggested_entry
+                     work_type, activity_log, suggested_entry, project
     providers/       time_entry_provider, employer_provider, location_provider,
-                     activity_provider, sync_provider, suggestion_provider
+                     activity_provider, sync_provider, suggestion_provider,
+                     project_provider
     services/        sync_service (inkl. NAS-Backup-Endpoints),
                      export_service, import_service, gps_service,
                      holiday_service, geofencing_service (mit Boot-Flag),
@@ -322,7 +348,7 @@ app/
                      activity_tracking_win32, fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v7)
+    database/        database_helper (SQLite v10)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -362,12 +388,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v7: + `activity_log`
 - v8: + `deleted_at` (employers, tracked_locations) – Soft-Delete-Propagation
 - v9: + `is_special_hours` (time_entries) – Sonderarbeitszeit-Flag für Zuschlagsberechnung
+- v10: + `projects` (Tabelle), + `project_id` (time_entries) – Projektzuordnung
 
-**Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync.
+**Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync; `projects` (Tabelle) für bidirektionalen Projekt-Sync.
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.15)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.16)
 
 ---
 
@@ -389,5 +416,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge). Ausnahme: Vertragsäquivalent für Gurktaler AG im Jahresbericht – informativ, beeinflusst Ist-Stunden nicht |
 | Sonderarbeitszeit-Faktoren | Hardcoded für Gurktaler AG (Sa 1.5×, So/Feiertag 2.0×). Andere Arbeitgeber: Spalte ausgeblendet, kein Effekt. Erweiterbar via `SurchargeService` |
+| Projektverwaltung | Projekte sind aktuell Gurktaler AG vorbehalten (Seeding + UI). Andere Arbeitgeber können Projekte anlegen, aber ohne automatisches Seeding. Projektzuordnung optional – Einträge ohne Projekt erscheinen unter „Kein Projekt" im Bericht |
+| NAS-Prozess-Persistenz | Aktuell via `nohup` + `disown` gestartet (Benutzer Wolfgang). Bei NAS-Neustart muss der Server manuell oder per DSM Task Scheduler neu gestartet werden |
 | Auto Clock-in/out | Funktioniert auch bei geschlossener App (Background-Isolate schreibt direkt in SQLite). 5 Min Karenz beim Verlassen einer Zone gegen GPS-Drift. Auto-Clock-out greift nur bei Einträgen, die selbst per Geofencing erstellt wurden – manuelle Einträge bleiben unangetastet |
 | Geofencing-Watchdog | Schlägt nur Alarm bei auto-erstellten Einträgen, nicht bei manuellen (kein Fehlalarm für legitimes Homeoffice). Schwelle: 30 Min außerhalb aller Zonen. Notification-ID 994 wird ersetzt – kein Spam |

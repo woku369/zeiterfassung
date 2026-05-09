@@ -313,6 +313,7 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Zeiteinträge', value: 'Bidirektional, last-write-wins'),
               _KeyValue(label: 'Arbeitgeber', value: 'Inkl. Löschungen (Soft-Delete)'),
               _KeyValue(label: 'Standorte', value: 'Inkl. Löschungen (Soft-Delete)'),
+              _KeyValue(label: 'Projekte', value: 'Inkl. Löschungen (Soft-Delete)'),
               _KeyValue(label: 'Whitelist + Activity-Settings', value: 'LWW per Key – Gerät mit jüngster Änderung gewinnt'),
               _KeyValue(label: 'IMAP-Config', value: 'Bidirektional'),
               _SubHeading('Einstellungen'),
@@ -463,6 +464,46 @@ class HelpScreen extends StatelessWidget {
                 'Datenschutz: Browser-URLs werden nicht erfasst. '
                 'Nur Fenster-Titel bzw. App-Name. '
                 'Windows-Protokoll kann über "Protokoll löschen" entfernt werden.',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.folder_outlined,
+            title: 'Projektzuordnung (Gurktaler AG)',
+            children: const [
+              _Para(
+                'Zeiteinträge können einem Projekt zugeordnet werden. '
+                'Die Projektzuordnung ist aktuell für Gurktaler AG verfügbar '
+                'und erscheint im Formular sowie im Berichte-Screen.',
+              ),
+              _SubHeading('Projekte im Eintrag'),
+              _Step(number: '1', text: 'Eintrag anlegen oder bearbeiten → Gurktaler-Sonderoptionen aufklappen'),
+              _Step(number: '2', text: 'Projekt aus der Dropdown-Liste wählen (leer = kein Projekt)'),
+              _Step(number: '3', text: 'Speichern – Projektzuordnung wird mit dem Eintrag synchronisiert'),
+              _SubHeading('Projekte verwalten'),
+              _Step(number: '1', text: 'Einstellungen → Arbeitgeber Gurktaler AG → Projekte'),
+              _Step(number: '2', text: '„Projekt hinzufügen" – Name eingeben, bestätigen'),
+              _Step(number: '3', text: 'Löschen über das Mülleimer-Icon (Soft-Delete, wird via NAS propagiert)'),
+              _SubHeading('Berichte nach Projekt'),
+              _Para(
+                'Im Berichte-Screen erscheint unter der Monatstabelle eine '
+                'Aufschlüsselung der Stunden nach Projekt. '
+                '"Kein Projekt" fasst alle nicht zugeordneten Einträge zusammen.',
+              ),
+              _SubHeading('Vorhandene Projekte (Gurktaler AG)'),
+              _KeyValue(label: 'Führungen', value: 'Besucherführungen Kräutergarten'),
+              _KeyValue(label: 'Kräutergarten', value: 'Allgemeine Gartenarbeit'),
+              _KeyValue(label: 'Mazeration', value: 'Mazerationsarbeiten'),
+              _KeyValue(label: 'Kleinserie', value: 'Kleinserienfertigung (inkl. Pfau Brennerei)'),
+              _KeyValue(label: 'Produktentwicklung', value: 'Neue Produkte, Rezepturen'),
+              _KeyValue(label: 'Rezepturoptimierung', value: 'Verbesserung bestehender Rezepturen'),
+              _KeyValue(label: 'Administration', value: 'Büro, Buchhaltung, Korrespondenz'),
+              _Hint(
+                'Projekte werden bidirektional mit dem NAS synchronisiert – '
+                'einmal angelegt erscheinen sie auf allen Geräten. '
+                'Ein auf Gerät A gelöschtes Projekt wird beim nächsten Sync '
+                'auch auf Gerät B entfernt.',
               ),
             ],
           ),
