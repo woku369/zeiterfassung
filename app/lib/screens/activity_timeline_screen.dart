@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/activity_provider.dart';
@@ -101,6 +102,35 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
 
   void _dismissSuggestion(String id) {
     context.read<SuggestionProvider>().dismiss(id);
+  }
+
+  // ── Call → entry ───────────────────────────────────────────────────────────
+
+  Future<void> _acceptCall(dynamic call) async {
+    final ep = context.read<EmployerProvider>();
+    final now = DateTime.now();
+    final date = DateTime(call.startTime.year, call.startTime.month, call.startTime.day);
+    final dayType = HolidayService.instance.isHoliday(date)
+        ? DayType.holiday
+        : date.weekday == 6 ? DayType.saturday
+        : date.weekday == 7 ? DayType.sunday
+        : DayType.workday;
+    final entry = TimeEntry(
+      id: '',
+      date: date,
+      startTime: call.startTime,
+      endTime: call.isMissed ? call.startTime.add(const Duration(minutes: 1)) : call.endTime,
+      breakMinutes: 0,
+      workType: WorkType.phoneCall,
+      dayType: dayType,
+      note: call.title,
+      employerId: ep.active?.id,
+      createdAt: now,
+    );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EntryFormScreen(entry: entry, forceNew: true)),
+    );
   }
 
   // ── Raw-session → entry ────────────────────────────────────────────────────
@@ -256,6 +286,49 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
+                          ],
+
+                          // ── Call log section ─────────────────────────
+                          if (Platform.isAndroid) ...[
+                            if (!ap.hasCallLogPermission) ...[
+                              _SectionHeader(
+                                icon: Icons.phone_outlined,
+                                label: 'Anrufe',
+                                color: cs.tertiary,
+                              ),
+                              const SizedBox(height: 4),
+                              Card(
+                                child: ListTile(
+                                  leading: Icon(Icons.lock_outline, color: cs.tertiary),
+                                  title: const Text('Berechtigung für Anruf-Log'),
+                                  subtitle: const Text('Eingehende & ausgehende Anrufe anzeigen'),
+                                  trailing: TextButton(
+                                    onPressed: () async {
+                                      final status = await Permission.phone.request();
+                                      if (status.isGranted) {
+                                        await ap.recheckCallLogPermission();
+                                      } else {
+                                        await openAppSettings();
+                                      }
+                                    },
+                                    child: const Text('Erlauben'),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ] else if (ap.calls.isNotEmpty) ...[
+                              _SectionHeader(
+                                icon: Icons.phone_outlined,
+                                label: 'Anrufe (${ap.calls.length})',
+                                color: cs.tertiary,
+                              ),
+                              const SizedBox(height: 4),
+                              ...ap.calls.map((c) => _CallCard(
+                                call: c,
+                                onAccept: () => _acceptCall(c),
+                              )),
+                              const SizedBox(height: 16),
+                            ],
                           ],
 
                           // ── Raw sessions section ─────────────────────
@@ -715,6 +788,62 @@ class _EmptyPlaceholder extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Call card ─────────────────────────────────────────────────────────────────
+
+class _CallCard extends StatelessWidget {
+  final dynamic call; // ActivityLog with isPhoneCall=true
+  final VoidCallback onAccept;
+  const _CallCard({required this.call, required this.onAccept});
+
+  String _typeLabel(int? type) => switch (type) {
+    1 => '← eingehend',
+    2 => '→ ausgehend',
+    3 => '✕ verpasst',
+    _ => 'Anruf',
+  };
+
+  String _fmt(Duration d) {
+    if (d.inSeconds < 60) return '${d.inSeconds}s';
+    return '${d.inMinutes}m ${d.inSeconds.remainder(60)}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tf = DateFormat('HH:mm');
+    final isMissed = call.callType == 3;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isMissed
+              ? cs.errorContainer
+              : cs.tertiaryContainer,
+          child: Icon(
+            isMissed ? Icons.phone_missed : Icons.phone,
+            size: 18,
+            color: isMissed ? cs.onErrorContainer : cs.onTertiaryContainer,
+          ),
+        ),
+        title: Text(call.title,
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w500)),
+        subtitle: Text(
+          '${tf.format(call.startTime)}  ·  ${_fmt(call.duration)}'
+          '  ·  ${_typeLabel(call.callType as int?)}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: isMissed
+            ? null
+            : TextButton(
+                onPressed: onAccept,
+                child: const Text('Übernehmen'),
+              ),
       ),
     );
   }

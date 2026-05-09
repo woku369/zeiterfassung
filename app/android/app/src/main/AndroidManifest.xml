@@ -31,6 +31,9 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- Anruf-Tracking: Anruf-Log lesen -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+
     <application
         android:label="Zeiterfassung"
         android:name="${applicationName}"

@@ -1,5 +1,6 @@
 package com.example.zeiterfassung
 
+import android.Manifest
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -7,7 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.CallLog
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -33,6 +36,11 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "queryUsageStats" -> {
                 val dateMs = call.argument<Long>("dateMs") ?: System.currentTimeMillis()
                 result.success(queryUsageStats(dateMs))
+            }
+            "hasCallLogPermission" -> result.success(hasCallLogPermission())
+            "queryCallLog" -> {
+                val dateMs = call.argument<Long>("dateMs") ?: System.currentTimeMillis()
+                result.success(queryCallLog(dateMs))
             }
             else -> result.notImplemented()
         }
@@ -108,6 +116,50 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
         return sessions
     }
+
+    // ── Call Log ──────────────────────────────────────────────────────────────
+
+    private fun hasCallLogPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun queryCallLog(dayStartMs: Long): List<Map<String, Any>> {
+        if (!hasCallLogPermission()) return emptyList()
+        val dayEndMs = dayStartMs + 24L * 60 * 60 * 1000
+        val results = mutableListOf<Map<String, Any>>()
+        val uri = CallLog.Calls.CONTENT_URI
+        val projection = arrayOf(
+            CallLog.Calls.CACHED_NAME,
+            CallLog.Calls.NUMBER,
+            CallLog.Calls.DURATION,
+            CallLog.Calls.TYPE,
+            CallLog.Calls.DATE,
+        )
+        context.contentResolver.query(
+            uri, projection,
+            "${CallLog.Calls.DATE} BETWEEN ? AND ?",
+            arrayOf(dayStartMs.toString(), dayEndMs.toString()),
+            "${CallLog.Calls.DATE} ASC"
+        )?.use { cursor ->
+            val nameIdx     = cursor.getColumnIndex(CallLog.Calls.CACHED_NAME)
+            val numberIdx   = cursor.getColumnIndex(CallLog.Calls.NUMBER)
+            val durationIdx = cursor.getColumnIndex(CallLog.Calls.DURATION)
+            val typeIdx     = cursor.getColumnIndex(CallLog.Calls.TYPE)
+            val dateIdx     = cursor.getColumnIndex(CallLog.Calls.DATE)
+            while (cursor.moveToNext()) {
+                results.add(mapOf(
+                    "name"            to (cursor.getString(nameIdx) ?: ""),
+                    "number"          to (cursor.getString(numberIdx) ?: ""),
+                    "durationSeconds" to cursor.getLong(durationIdx),
+                    "type"            to cursor.getInt(typeIdx),
+                    "dateMs"          to cursor.getLong(dateIdx),
+                ))
+            }
+        }
+        return results
+    }
+
+    // ── Usage sessions ────────────────────────────────────────────────────────
 
     private fun buildSession(
         pm: PackageManager,

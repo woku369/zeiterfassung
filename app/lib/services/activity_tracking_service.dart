@@ -155,6 +155,49 @@ class ActivityTrackingService {
     }
   }
 
+  Future<bool> hasCallLogPermission() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await _channel.invokeMethod('hasCallLogPermission') as bool;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<List<ActivityLog>> queryCallLog({required DateTime date}) async {
+    if (!Platform.isAndroid) return [];
+    try {
+      final List<dynamic> raw = await _channel.invokeMethod('queryCallLog', {
+        'dateMs': DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
+      });
+      final calls = <ActivityLog>[];
+      for (final item in raw) {
+        final m = Map<String, dynamic>.from(item as Map);
+        final name = m['name'] as String? ?? '';
+        final number = m['number'] as String? ?? '';
+        final durationSec = (m['durationSeconds'] as num?)?.toInt() ?? 0;
+        final type = (m['type'] as num?)?.toInt() ?? 0;
+        final dateMs = (m['dateMs'] as num).toInt();
+        final display = name.isNotEmpty ? name : number;
+        final start = DateTime.fromMillisecondsSinceEpoch(dateMs);
+        final end = start.add(Duration(seconds: durationSec));
+        calls.add(ActivityLog(
+          id: 'call_${dateMs}_$number',
+          startTime: start,
+          endTime: end,
+          title: display,
+          appName: 'phone',
+          isPhoneCall: true,
+          phoneNumber: number,
+          callType: type,
+        ));
+      }
+      return calls;
+    } on PlatformException {
+      return [];
+    }
+  }
+
   Future<bool> hasAndroidUsagePermission() async {
     if (!Platform.isAndroid) return true;
     try {

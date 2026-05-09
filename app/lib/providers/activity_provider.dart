@@ -15,6 +15,8 @@ class ActivityProvider extends ChangeNotifier {
   static const epochTs = '2000-01-01T00:00:00.000Z';
 
   List<ActivityLog> _sessions = [];
+  List<ActivityLog> _calls = [];
+  bool _hasCallLogPermission = false;
   List<String> _whitelist = List.from(defaultWhitelist);
   int _minDurationMinutes = 3;
   int _idleThresholdMinutes = 5;
@@ -24,6 +26,8 @@ class ActivityProvider extends ChangeNotifier {
   String _settingsChangedAt = epochTs;
 
   List<ActivityLog> get sessions => _sessions;
+  List<ActivityLog> get calls => _calls;
+  bool get hasCallLogPermission => _hasCallLogPermission;
   List<String> get whitelist => _whitelist;
   int get minDurationMinutes => _minDurationMinutes;
   int get idleThresholdMinutes => _idleThresholdMinutes;
@@ -39,9 +43,17 @@ class ActivityProvider extends ChangeNotifier {
     await _loadSettings();
     if (Platform.isAndroid) {
       _hasPermission = await ActivityTrackingService.instance.hasAndroidUsagePermission();
+      _hasCallLogPermission = await ActivityTrackingService.instance.hasCallLogPermission();
     } else {
       _hasPermission = true;
     }
+    notifyListeners();
+  }
+
+  Future<void> recheckCallLogPermission() async {
+    if (!Platform.isAndroid) return;
+    _hasCallLogPermission = await ActivityTrackingService.instance.hasCallLogPermission();
+    if (_hasCallLogPermission) await loadSessions(_selectedDate);
     notifyListeners();
   }
 
@@ -137,6 +149,9 @@ class ActivityProvider extends ChangeNotifier {
         whitelist: _whitelist,
         minDurationMinutes: _minDurationMinutes,
       );
+      if (_hasCallLogPermission) {
+        _calls = await ActivityTrackingService.instance.queryCallLog(date: date);
+      }
     } else if (Platform.isWindows) {
       _sessions = await DatabaseHelper.instance.getActivityLogsForDate(date);
     }
