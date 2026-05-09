@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-09 – Projektverwaltung + LWW-Bugfixes + Arbeitgeber-Toggle Berichte
+> Letztes Update: 2026-05-09 – Anruf-Tracking + Geofencing-Diagnose + Auto-Pause + Bugfixes
 
 ---
 
@@ -24,6 +24,26 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.17 – Anruf-Tracking + Geofencing-Diagnose + Auto-Pause
+- [x] **Anruf-Tracking in Activity Timeline (Android):**
+  - `READ_CALL_LOG`-Berechtigung in AndroidManifest
+  - Kotlin `UsageStatsPlugin`: `hasCallLogPermission` + `queryCallLog` via `CallLog.Calls` ContentProvider
+  - `ActivityLog`-Modell: neue Felder `isPhoneCall`, `phoneNumber`, `callType`; `isMissed`-Getter
+  - `ActivityTrackingService`: `queryCallLog()` + `hasCallLogPermission()` Methoden
+  - `ActivityProvider`: lädt Anruf-Log wenn Berechtigung vorhanden; `recheckCallLogPermission()`
+  - Activity-Timeline: eigener „Anrufe"-Abschnitt mit eingehenden/ausgehenden/verpassten Anrufen; Berechtigungs-Karte wenn noch nicht gewährt; „Übernehmen" erstellt `phoneCall`-Eintrag
+- [x] **Geofencing-Diagnose-Log + Log-Viewer in Einstellungen:**
+  - Hintergrund-Dienst schreibt strukturiertes Diagnose-Log (SharedPreferences, max. 500 Zeilen)
+  - Neuer Abschnitt in den Einstellungen mit scrollbarer Log-Ansicht und Löschen-Button
+  - Erleichtert die Fehlersuche bei Geofencing-Problemen ohne ADB/Logcat
+- [x] **Auto-Pause 30 Min bei ≥5h Eingestempelt (nicht Homeoffice):**
+  - `TimeEntryProvider` setzt beim Clock-out automatisch `break_minutes = 30` wenn `workedSeconds ≥ 5h` und Arbeitstyp nicht Homeoffice
+  - Gilt auch im Background-Isolate (`geofencing_background.dart`)
+  - Manuelle Pausenüberschreibung am Clock-out-Dialog funktioniert korrekt (Bugfix: manuelle Eingabe hatte keinen Vorrang)
+- [x] **Bugfix Auto Clock-in fehlte `created_at`:** Background-Insert in SQLite war unvollständig → Geofencing-Auto-Clock-in hat nie funktioniert. Fix: `created_at` wird jetzt korrekt übergeben.
+- [x] **Bugfix `ensureSpecialLocations` bei leerem DB:** Frischinstall ohne Standorte löste trotzdem Gurktaler-Standort-Seed aus → Duplikate bei erstem Sync. Fix: Guard auf `hasLocations()` vor `_ensureSpecialLocations()`.
+- [x] **Bugfix MIUI/Xiaomi SQLite-Crash beim App-Start:** `db.execute('PRAGMA journal_mode=WAL')` im `onOpen`-Callback ist auf HyperOS/MIUI nicht erlaubt (nur `query`/`rawQuery`). Fix: `rawQuery` statt `execute`.
 
 ### v1.16 – Projektverwaltung + Bugfixes
 - [x] **Projektverwaltung (Gurktaler AG):**
@@ -301,8 +321,8 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
-- [ ] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe anzeigen und direkt als Eintrag übernehmen
-- [ ] **Anruf-Overlay:** Schwebender Button über der Phone-App bei aktivem Anruf (SYSTEM_ALERT_WINDOW) – sofortige Arbeitszeiterfassung ohne App-Wechsel; erst nach Praxistest des Dashboard-Buttons evaluieren
+- [x] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe in der Activity-Timeline anzeigen und direkt als Eintrag übernehmen *(v1.17)*
+- [ ] **Anruf-Overlay:** Schwebender Button über der Phone-App bei aktivem Anruf (SYSTEM_ALERT_WINDOW) – sofortige Arbeitszeiterfassung ohne App-Wechsel
 
 ### Mittelfristig – Fusion-Engine Erweiterungen
 - [ ] **Standort-Scoring:** GPS-Besuchshistorie loggen → Aufenthalt in definierten Zonen erhöht Confidence
@@ -406,6 +426,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Stempeluhr-Import E-Ort | „Mobil" wurde initial als Fahrt importiert – Korrektur via `fix_worktypes.py` |
 | Hintergrund-GPS Android | Erfordert „Immer erlauben" – Android 12+ zeigt separaten Dialog |
 | HyperOS/MIUI Akkuoptimierung | Xiaomi/HyperOS beendet Hintergrunddienste aggressiv – App in Akkuoptimierung auf „Keine Einschränkungen" setzen, sonst kein zuverlässiger Background-Service |
+| HyperOS/MIUI SQLite | `execute()` im `onOpen`-Callback nicht erlaubt → App-Crash beim Start. Behoben via `rawQuery('PRAGMA journal_mode=WAL')` (v1.17) |
 | IMAP ohne SSL | Port 143 möglich, nicht empfohlen für produktive Nutzung |
 | Windows Tray | Funktioniert. X-Knopf minimiert ins Tray (`setPreventClose` nach `addListener`), Beenden über Tray-Menü oder explizites Close-Icon in der AppBar mit Bestätigungsdialog |
 | Settings-Sync Timing | LWW basiert auf "Gerät hat Setting zuletzt geändert" – nicht auf Sync-Reihenfolge. Erfordert konsistente Systemuhren auf allen Geräten |
