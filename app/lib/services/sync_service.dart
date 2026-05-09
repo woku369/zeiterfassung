@@ -41,6 +41,12 @@ class SyncService {
     final headers = _headers(apiKey);
     final errors = <String>[];
 
+    // Dedup before building payload so soft-deletes are included in this push.
+    // Without this, NAS-originated duplicates (different ID, same name+coords)
+    // only get soft-deleted after the response is processed, and those deletions
+    // would miss this sync cycle, leaving duplicates until the next periodic sync.
+    await db.deduplicateLocations();
+
     // Unsynced time entries + alle Employers/Locations/Projects inkl. soft-deleted
     final unsynced  = await db.getUnsyncedEntries();
     final employers = await db.getAllEmployersForSync();
@@ -95,6 +101,10 @@ class SyncService {
       }
       if (serverLocations.isNotEmpty) {
         await db.upsertLocationsFromServer(serverLocations);
+        // Dedup again: NAS may have sent a different "kept" copy (different ID,
+        // same name+coords). Without this second pass those would survive until
+        // the next load() and miss the current sync push.
+        await db.deduplicateLocations();
       }
       if (serverProjects.isNotEmpty) {
         await db.upsertProjectsFromServer(serverProjects);
