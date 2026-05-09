@@ -410,20 +410,20 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.amber.shade50,
+          color: Colors.orange.shade50,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.amber.shade200),
+          border: Border.all(color: Colors.orange.shade300),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(Icons.star_outline, size: 18, color: Colors.amber.shade800),
+              Icon(Icons.star_outline, size: 18, color: Colors.orange.shade800),
               const SizedBox(width: 6),
               Text('Gurktaler-Sonderoptionen',
                   style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Colors.amber.shade900)),
+                      color: Colors.orange.shade900)),
             ]),
             if (projects.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -453,29 +453,29 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               dense: true,
               contentPadding: EdgeInsets.zero,
               title: const Text('Sonderarbeitszeit (Führung u. ä.)',
-                  style: TextStyle(fontSize: 14)),
+                  style: TextStyle(fontSize: 14, color: Colors.black87)),
               subtitle: Text(
                 _workType == WorkType.homeoffice
                     ? 'Homeoffice ist immer zuschlagsfrei.'
                     : isWeekendOrHoliday
                         ? 'Zuschlag laut Tagesart × ${factor.toStringAsFixed(1)}'
                         : 'Werktag → kein Zuschlag, gilt als Mehrarbeit.',
-                style: const TextStyle(fontSize: 11),
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
               ),
               value: _isSpecialHours,
               onChanged: (v) => setState(() => _isSpecialHours = v),
             ),
-            const Divider(height: 16),
+            const Divider(height: 16, color: Colors.orange),
             Row(children: [
               Icon(Icons.directions_car_outlined,
-                  size: 18, color: Colors.grey.shade700),
+                  size: 18, color: Colors.grey.shade800),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _travelMinutes > 0
                       ? 'Fahrtzeit: $_travelMinutes Min. (Hin+Rück)'
                       : 'Fahrtzeit (Hin+Rück) hinzufügen:',
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade900),
                 ),
               ),
               if (_travelMinutes > 0) ...[
