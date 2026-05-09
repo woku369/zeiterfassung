@@ -169,10 +169,22 @@ class _DashboardTabState extends State<_DashboardTab> {
   }
 
   Future<void> _clockOut() async {
+    final tp = context.read<TimeEntryProvider>();
+    final active = tp.activeEntry;
+    // Pause vorschlagen wenn ≥5h und kein Homeoffice
+    int suggestedBreak = 0;
+    if (active != null) {
+      final durationMinutes = DateTime.now().difference(active.startTime).inMinutes;
+      if (durationMinutes >= 300 && active.workType != WorkType.homeoffice) {
+        suggestedBreak = 30;
+      }
+    }
     final result = await showDialog<Map<String, dynamic>>(
-      context: context, builder: (_) => const _ClockOutDialog());
+      context: context,
+      builder: (_) => _ClockOutDialog(initialBreakMinutes: suggestedBreak),
+    );
     if (result == null || !mounted) return;
-    await context.read<TimeEntryProvider>().clockOut(
+    await tp.clockOut(
       breakMinutes: result['breakMinutes'] as int,
       note: result['note'] as String,
     );
@@ -628,14 +640,21 @@ class _ClockInDialogState extends State<_ClockInDialog> {
 }
 
 class _ClockOutDialog extends StatefulWidget {
-  const _ClockOutDialog();
+  final int initialBreakMinutes;
+  const _ClockOutDialog({this.initialBreakMinutes = 0});
   @override
   State<_ClockOutDialog> createState() => _ClockOutDialogState();
 }
 
 class _ClockOutDialogState extends State<_ClockOutDialog> {
   final _noteCtrl = TextEditingController();
-  int _breakMinutes = 0;
+  late int _breakMinutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _breakMinutes = widget.initialBreakMinutes;
+  }
 
   @override
   void dispose() {
