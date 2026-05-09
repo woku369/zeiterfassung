@@ -29,6 +29,7 @@ class LocationProvider extends ChangeNotifier {
     // getAllLocationsForSync includes soft-deleted entries – avoids recreating
     // a location that the user has explicitly deleted.
     final allLocs = await DatabaseHelper.instance.getAllLocationsForSync();
+    if (allLocs.isEmpty) return; // DB leer = vor erstem Sync; NAS bringt Standorte selbst
     if (allLocs.any((l) => l.name == 'Pfau Brennerei Klagenfurt')) return;
 
     // Gurktaler AG als Arbeitgeber zuordnen, sofern vorhanden – Aufwand am
