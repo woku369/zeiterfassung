@@ -21,7 +21,7 @@ class DatabaseHelper {
       version: 10,
       onCreate: _create,
       onUpgrade: _upgrade,
-      onOpen: (db) async => db.execute('PRAGMA journal_mode=WAL'),
+      onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
     );
   }
 
