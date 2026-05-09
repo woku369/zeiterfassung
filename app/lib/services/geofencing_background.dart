@@ -248,6 +248,7 @@ Future<void> _autoClockIn(
       'break_minutes': 0,
       'distance_km':   null,
       'travel_minutes':null,
+      'created_at':    now.toIso8601String(),
       'updated_at':    now.toIso8601String(),
     });
     await db.close();
@@ -258,8 +259,8 @@ Future<void> _autoClockIn(
     }
     _notify(n, 997, 'Eingestempelt: $name',
         'Automatisch gestartet. Tippen, um Notiz/Tätigkeit zu ergänzen.');
-  } catch (_) {
-    // Silently ignore – user can clock in manually.
+  } catch (e) {
+    _notify(n, 998, 'Auto-Einstempeln fehlgeschlagen', e.toString());
   }
 }
 
@@ -290,7 +291,9 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
 
 Future<Database> _openDb() async {
   final path = p.join(await getDatabasesPath(), 'zeiterfassung.db');
-  return openDatabase(path, singleInstance: false);
+  final db = await openDatabase(path, singleInstance: false);
+  await db.execute('PRAGMA journal_mode=WAL');
+  return db;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

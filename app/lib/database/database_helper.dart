@@ -16,7 +16,13 @@ class DatabaseHelper {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
-    return openDatabase(path, version: 10, onCreate: _create, onUpgrade: _upgrade);
+    return openDatabase(
+      path,
+      version: 10,
+      onCreate: _create,
+      onUpgrade: _upgrade,
+      onOpen: (db) async => db.execute('PRAGMA journal_mode=WAL'),
+    );
   }
 
   Future<void> _create(Database db, int _) async {
