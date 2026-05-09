@@ -16,8 +16,10 @@ import '../services/backup_service.dart';
 import '../providers/sync_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/activity_tracking_service.dart';
+import '../providers/trip_provider.dart';
 import 'locations_screen.dart';
 import 'imap_screen.dart';
+import 'trip_log_screen.dart';
 import 'activity_timeline_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -181,6 +183,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   MaterialPageRoute(builder: (_) => const ImapScreen()),
                 ),
               ),
+              if (Platform.isAndroid) ...[
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                _FahrtenbuchTile(),
+              ],
             ]),
           ),
 
@@ -755,6 +761,35 @@ class _HolidayCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FahrtenbuchTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final prov = context.watch<TripProvider>();
+    return ListTile(
+      leading: const Icon(Icons.directions_car_outlined),
+      title: const Text('Fahrtenbuch'),
+      subtitle: const Text('Fahrten ab 15 km/h automatisch aufzeichnen'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (prov.trackingEnabled)
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TripLogScreen()),
+              ),
+              child: const Text('Einträge'),
+            ),
+          Switch(
+            value: prov.trackingEnabled,
+            onChanged: (v) => prov.setTrackingEnabled(v),
+          ),
+        ],
       ),
     );
   }

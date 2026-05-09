@@ -6,6 +6,7 @@ import '../models/tracked_location.dart';
 import '../models/imap_config.dart';
 import '../models/activity_log.dart';
 import '../models/project.dart';
+import '../models/trip_record.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -18,7 +19,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -70,6 +71,7 @@ class DatabaseHelper {
     await _createV2Tables(db);
     await _createV7Tables(db);
     await _createV10Tables(db);
+    await _createV11Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -122,6 +124,9 @@ class DatabaseHelper {
       try {
         await db.execute("ALTER TABLE time_entries ADD COLUMN project_id TEXT");
       } catch (_) {}
+    }
+    if (oldVersion < 11) {
+      await _createV11Tables(db);
     }
   }
 
@@ -180,6 +185,56 @@ class DatabaseHelper {
         deleted_at TEXT
       )
     ''');
+  }
+
+  Future<void> _createV11Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS trips (
+        id TEXT PRIMARY KEY,
+        start_time TEXT NOT NULL,
+        end_time TEXT,
+        start_lat REAL NOT NULL,
+        start_lng REAL NOT NULL,
+        end_lat REAL,
+        end_lng REAL,
+        start_address TEXT,
+        end_address TEXT,
+        distance_km REAL NOT NULL DEFAULT 0,
+        linked_entry_id TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ── trips ─────────────────────────────────────────────────────────────────
+
+  Future<void> insertTrip(TripRecord t) async {
+    final db = await database;
+    await db.insert('trips', t.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateTrip(TripRecord t) async {
+    final db = await database;
+    await db.update('trips', t.toMap(), where: 'id = ?', whereArgs: [t.id]);
+  }
+
+  Future<void> deleteTrip(String id) async {
+    final db = await database;
+    await db.delete('trips', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<TripRecord>> getTrips({int limit = 200}) async {
+    final db = await database;
+    final rows = await db.query('trips',
+        orderBy: 'start_time DESC', limit: limit);
+    return rows.map(TripRecord.fromMap).toList();
+  }
+
+  Future<TripRecord?> getOpenTrip() async {
+    final db = await database;
+    final rows = await db.query('trips',
+        where: 'end_time IS NULL', orderBy: 'start_time DESC', limit: 1);
+    return rows.isEmpty ? null : TripRecord.fromMap(rows.first);
   }
 
   // ── time_entries ──────────────────────────────────────────────────────────

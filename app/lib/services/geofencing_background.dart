@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqlite_api.dart';
 import 'package:uuid/uuid.dart';
 
 // ── Geofence-Log ─────────────────────────────────────────────────────────────
@@ -100,6 +101,8 @@ Future<void> configureGeofencingBackground() async {
 
 const _kAutoEntryKey         = 'geofence_auto_entry_id';
 const _kAutoEntryEmployerKey = 'geofence_auto_entry_employer_id';
+const kTripTrackingKey       = 'trip_tracking_active';
+const _kOpenTripKey          = 'trip_open_id';
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -115,9 +118,19 @@ Future<void> _onStart(ServiceInstance service) async {
   final Set<String> inside = {};
   var locations = <Map<String, dynamic>>[];
   final timers = <String, Timer>{}; // locationId → pending clock-out timer
-  // Tracks since when the user has been outside ALL zones (null = inside).
-  // Used by the watchdog to detect stale clock-ins (zone-leave missed by GPS).
   DateTime? outsideZonesSince = DateTime.now();
+
+  // ── Trip tracking state ────────────────────────────────────────────────────
+  String?   _tripId;
+  DateTime? _tripStart;
+  double?   _tripStartLat, _tripStartLng;
+  double?   _tripLastLat,  _tripLastLng;
+  double    _tripDistKm = 0;
+  Timer?    _tripStopTimer;       // fires when speed drops for >2 min
+  bool      _tripActive = false;  // currently in a "moving" phase
+  static const _kSpeedStartMs  = 4.2;  // 15 km/h  – trip begins
+  static const _kSpeedStopMs   = 1.4;  // 5  km/h  – stop candidate
+  static const _kMinDistKm     = 0.3;  // ignore micro-trips
 
   // ── Receive commands from main isolate ─────────────────────────────────────
 
@@ -260,6 +273,73 @@ Future<void> _onStart(ServiceInstance service) async {
     } else if (outsideZonesSince == null) {
       outsideZonesSince = DateTime.now();
     }
+
+    // ── Trip tracking ──────────────────────────────────────────────────────
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(kTripTrackingKey) ?? false) {
+      final speed = pos.speed >= 0 ? pos.speed : 0.0; // m/s; -1 = unavailable
+
+      if (!_tripActive && speed >= _kSpeedStartMs) {
+        // Start a new trip
+        _tripId       = const Uuid().v4();
+        _tripStart    = now;
+        _tripStartLat = pos.latitude;
+        _tripStartLng = pos.longitude;
+        _tripLastLat  = pos.latitude;
+        _tripLastLng  = pos.longitude;
+        _tripDistKm   = 0;
+        _tripActive   = true;
+        _tripStopTimer?.cancel();
+        _tripStopTimer = null;
+        await prefs.setString(_kOpenTripKey, _tripId!);
+        await _log('TRIP-START', 'id=$_tripId  speed=${(speed * 3.6).toStringAsFixed(1)}km/h');
+        // Persist skeleton so UI can show "Fahrt läuft"
+        await _insertOpenTrip(
+            _tripId!, _tripStart!, pos.latitude, pos.longitude);
+      } else if (_tripActive) {
+        // Accumulate distance
+        if (_tripLastLat != null && _tripLastLng != null) {
+          final d = _haversine(
+              _tripLastLat!, _tripLastLng!, pos.latitude, pos.longitude);
+          if (d < 0.5) _tripDistKm += d; // ignore GPS jumps > 500 m
+        }
+        _tripLastLat = pos.latitude;
+        _tripLastLng = pos.longitude;
+
+        if (speed < _kSpeedStopMs) {
+          // Start stop-candidate timer if not already running
+          _tripStopTimer ??= Timer(const Duration(minutes: 2), () async {
+            _tripStopTimer = null;
+            if (!_tripActive) return;
+            _tripActive = false;
+            await _finalizeTrip(
+              id:       _tripId!,
+              endLat:   _tripLastLat!,
+              endLng:   _tripLastLng!,
+              distKm:   _tripDistKm,
+              notifications: notifications,
+            );
+            _tripId = _tripDistKm = 0;
+            await prefs.remove(_kOpenTripKey);
+          });
+        } else {
+          // Still moving – cancel any pending stop
+          _tripStopTimer?.cancel();
+          _tripStopTimer = null;
+        }
+      }
+    } else if (_tripActive) {
+      // Trip tracking was disabled mid-trip – finalize cleanly
+      _tripActive = false;
+      _tripStopTimer?.cancel();
+      _tripStopTimer = null;
+      if (_tripId != null && _tripLastLat != null) {
+        await _finalizeTrip(
+          id: _tripId!, endLat: _tripLastLat!, endLng: _tripLastLng!,
+          distKm: _tripDistKm, notifications: notifications);
+      }
+      await prefs.remove(_kOpenTripKey);
+    }
   });
 }
 
@@ -365,8 +445,63 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
 Future<Database> _openDb() async {
   final path = p.join(await getDatabasesPath(), 'zeiterfassung.db');
   final db = await openDatabase(path, singleInstance: false);
-  await db.execute('PRAGMA journal_mode=WAL');
+  await db.rawQuery('PRAGMA journal_mode=WAL');
   return db;
+}
+
+Future<void> _insertOpenTrip(
+    String id, DateTime start, double lat, double lng) async {
+  try {
+    final db = await _openDb();
+    await db.insert('trips', {
+      'id':         id,
+      'start_time': start.toIso8601String(),
+      'end_time':   null,
+      'start_lat':  lat,
+      'start_lng':  lng,
+      'distance_km': 0.0,
+      'created_at': start.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.close();
+  } catch (e) {
+    await _log('TRIP-ERROR', 'insertOpenTrip: $e');
+  }
+}
+
+Future<void> _finalizeTrip({
+  required String id,
+  required double endLat,
+  required double endLng,
+  required double distKm,
+  required FlutterLocalNotificationsPlugin notifications,
+}) async {
+  if (distKm < _kMinDistKm) {
+    // Too short – delete skeleton
+    try {
+      final db = await _openDb();
+      await db.delete('trips', where: 'id = ?', whereArgs: [id]);
+      await db.close();
+    } catch (_) {}
+    await _log('TRIP-SKIP', 'Zu kurz: ${distKm.toStringAsFixed(2)} km');
+    return;
+  }
+  final now = DateTime.now();
+  try {
+    final db = await _openDb();
+    await db.update('trips', {
+      'end_time':   now.toIso8601String(),
+      'end_lat':    endLat,
+      'end_lng':    endLng,
+      'distance_km': distKm,
+    }, where: 'id = ?', whereArgs: [id]);
+    await db.close();
+    await _log('TRIP-END', 'id=$id  dist=${distKm.toStringAsFixed(2)}km');
+    _notify(notifications, 991,
+        'Fahrt beendet: ${distKm.toStringAsFixed(1)} km',
+        'Im Fahrtenbuch dokumentiert. Tippen zum Übernehmen.');
+  } catch (e) {
+    await _log('TRIP-ERROR', 'finalizeTrip: $e');
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
