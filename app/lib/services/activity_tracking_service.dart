@@ -7,11 +7,28 @@ import '../models/activity_log.dart';
 import 'activity_tracking_win32.dart';
 
 const defaultWhitelist = [
+  // Apps
   'chrome', 'firefox', 'edge', 'opera', 'brave',
   'word', 'excel', 'powerpoint', 'libreoffice', 'writer', 'calc', 'impress',
   'acrobat', 'foxit', 'sumatra',
   'outlook', 'thunderbird',
   'teams', 'zoom', 'slack',
+  // Gurktaler – Produkte & Rohstoffe
+  'aqua', 'gurktaler', 'mazerat', 'destillat', 'kräuter', 'tank',
+  'kalkulation', 'garten',
+  'thymian', 'salbei', 'oregano', 'pfefferminze', 'schokominze',
+  'zitronenmelisse', 'zitronengras', 'zitronenverbene', 'zitrus',
+  'gurki', 'sanddorn', 'alpen',
+  // Gurktaler – Partner & Kunden
+  'burger', 'spiller', 'underberg', 'stranner', 'dudli', 'maunz', 'dencker',
+  'mozart', 'schlumberger', 'top spirit', 'pfau', 'ruhdorfer', 'jufa',
+  'dom', 'kalidz', 'grames',
+  // Gurktaler – Prozesse & Termine
+  'termin', 'führung',
+  'alkohol', 'likör', 'aroma', 'farbstoff',
+  'kleinflasche', 'kleinserie',
+  // Lieferanten & Regionen
+  'rüdesheim', 'rheinberg', 'heiligenstädter', 'bio', 'lacon',
 ];
 
 class ActivityTrackingService {
