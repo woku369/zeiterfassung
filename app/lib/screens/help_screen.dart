@@ -551,6 +551,49 @@ class HelpScreen extends StatelessWidget {
               ),
             ],
           ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.phone_android_outlined,
+            title: 'Android – Gerätebesonderheiten',
+            children: const [
+              _Para(
+                'Je nach Hersteller und Android-Variante kann sich die App '
+                'unterschiedlich verhalten – vor allem beim Geofencing-Hintergrunddienst.',
+              ),
+              _SubHeading('Xiaomi / HyperOS / MIUI'),
+              _KeyValue(label: 'Akkuoptimierung', value: 'Einstellungen → Apps → Zeiterfassung → Akku → Keine Einschränkungen'),
+              _KeyValue(label: 'Hintergrund starten', value: 'Einstellungen → Apps → Zeiterfassung → Weitere Berechtigungen → Im Hintergrund starten: An'),
+              _KeyValue(label: 'Gesperrter Bildschirm', value: 'App muss unter „Beim Sperren des Bildschirms gesperrte Apps" NICHT gelistet sein'),
+              _Hint(
+                'HyperOS beendet Hintergrunddienste sehr aggressiv. '
+                'Ohne "Keine Einschränkungen" funktioniert Geofencing nach '
+                'einigen Minuten nicht mehr. Der Diagnose-Log in den '
+                'Einstellungen zeigt ob der Dienst läuft.',
+              ),
+              _SubHeading('Doogee / Unisoc'),
+              _KeyValue(label: 'Akkuoptimierung', value: 'Einstellungen → Akku → Energiesparoptimierung → Zeiterfassung: Nicht optimieren'),
+              _KeyValue(label: 'Besonderheiten', value: 'Kein MIUI – Standardverhalten, weniger aggressiv'),
+              _Hint(
+                'Auf dem Doogee U11 Pro (11-Zoll-Tablet, Android 15) '
+                'ist die App für Außer-Haus-Termine konzipiert. '
+                'Das Layout ist phone-optimiert und läuft auch auf dem großen '
+                'Display – GPS, Geofencing und Anruf-Tracking funktionieren identisch.',
+              ),
+              _SubHeading('Samsung (One UI)'),
+              _KeyValue(label: 'Akkuoptimierung', value: 'Einstellungen → Akku → Hintergrundnutzung → Zeiterfassung: Nicht eingeschränkt'),
+              _KeyValue(label: 'Schlafmodus', value: 'Einstellungen → Akku → Adaptiver Akku → App aus Schlafmodus ausschließen'),
+              _SubHeading('Allgemein – Android 10+'),
+              _KeyValue(label: 'Hintergrund-GPS', value: '„Immer erlauben" auswählen wenn Android nach Standortberechtigung fragt'),
+              _KeyValue(label: 'Geofencing prüfen', value: 'Einstellungen → Automatische Erfassung → Diagnose-Log'),
+              _KeyValue(label: 'Boot-Persistenz', value: 'Tracking aktivieren → Telefon neu starten → Dienst läuft automatisch weiter'),
+              _Hint(
+                'Der Diagnose-Log (Einstellungen → Automatische Erfassung → '
+                'Diagnose-Log) zeigt alle Clock-in/out-Ereignisse mit Zeitstempel. '
+                'Falls Geofencing auf einem neuen Gerät nicht funktioniert, '
+                'ist das der erste Anlaufpunkt.',
+              ),
+            ],
+          ),
           SizedBox(height: 24),
         ],
       ),

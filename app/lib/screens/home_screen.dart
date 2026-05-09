@@ -17,6 +17,7 @@ import 'entry_form_screen.dart';
 import 'reports_screen.dart';
 import 'settings_screen.dart';
 import 'activity_timeline_screen.dart';
+import 'help_screen.dart';
 import '../providers/activity_provider.dart';
 import '../services/geofencing_service.dart';
 
@@ -88,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       body: IndexedStack(
         index: _navIndex,
-        children: const [_DashboardTab(), EntriesScreen(), ReportsScreen(), SettingsScreen()],
+        children: const [_DashboardTab(), EntriesScreen(), ReportsScreen(), SettingsScreen(), HelpScreen()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
@@ -98,6 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.list_alt_outlined), selectedIcon: Icon(Icons.list_alt), label: 'Einträge'),
           NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Berichte'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Einstellungen'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Handbuch'),
         ],
       ),
     );
