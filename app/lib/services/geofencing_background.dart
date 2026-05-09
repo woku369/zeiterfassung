@@ -327,15 +327,33 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
   final now = DateTime.now();
   try {
     final db = await _openDb();
+    // Gesetzliche Pause: ab 5h automatisch 30 Min., außer Homeoffice.
+    final rows = await db.query('time_entries',
+        columns: ['start_time', 'work_type', 'break_minutes'],
+        where: 'id = ? AND end_time IS NULL',
+        whereArgs: [entryId], limit: 1);
+    int breakMinutes = 0;
+    if (rows.isNotEmpty) {
+      final existing = rows.first;
+      final start = DateTime.parse(existing['start_time'] as String);
+      final durationMinutes = now.difference(start).inMinutes;
+      final workType = existing['work_type'] as String;
+      final alreadySet = (existing['break_minutes'] as int?) ?? 0;
+      if (alreadySet == 0 && durationMinutes >= 300 && workType != 'homeoffice') {
+        breakMinutes = 30;
+        await _log('PAUSE', 'Auto 30 Min. eingetragen (${durationMinutes}min Arbeitszeit)');
+      }
+    }
     await db.update(
       'time_entries',
-      {'end_time': now.toIso8601String(), 'updated_at': now.toIso8601String()},
+      {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes, 'updated_at': now.toIso8601String()},
       where: 'id = ? AND end_time IS NULL',
       whereArgs: [entryId],
     );
     await db.close();
+    final breakNote = breakMinutes > 0 ? ' · 30 Min. Pause eingetragen' : '';
     _notify(n, 996, 'Ausgestempelt',
-        'Geofencing hat automatisch gestoppt. Zum Bearbeiten App öffnen.');
+        'Geofencing hat automatisch gestoppt.$breakNote Zum Bearbeiten App öffnen.');
   } catch (_) {
     // Ignore – entry stays open, user clocks out manually.
   } finally {

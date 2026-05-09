@@ -63,9 +63,16 @@ class TimeEntryProvider extends ChangeNotifier {
 
   Future<void> clockOut({int breakMinutes = 0, String note = ''}) async {
     if (_activeEntry == null) return;
+    final now = DateTime.now();
+    // Gesetzliche Pause: ab 5h Arbeitszeit automatisch 30 Min. eintragen,
+    // außer der Nutzer hat bereits eine Pause gesetzt oder es ist Homeoffice.
+    final durationMinutes = now.difference(_activeEntry!.startTime).inMinutes;
+    final autoBreak = breakMinutes == 0 &&
+        durationMinutes >= 300 &&
+        _activeEntry!.workType != WorkType.homeoffice;
     final updated = _activeEntry!.copyWith(
-      endTime: DateTime.now(),
-      breakMinutes: breakMinutes,
+      endTime: now,
+      breakMinutes: autoBreak ? 30 : breakMinutes,
       note: note,
     );
     await DatabaseHelper.instance.updateEntry(updated);
