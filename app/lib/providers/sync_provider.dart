@@ -104,14 +104,23 @@ class SyncProvider extends ChangeNotifier {
       Map<String, dynamic>? localSettings;
       if (_activityProvider != null) {
         final ap = _activityProvider!;
-        final ts = ap.settingsChangedAt;
-        if (ts != ActivityProvider.epochTs) {
-          localSettings = {
-            'activity_whitelist': {'value': ap.whitelist, 'updated_at': ts},
-            'activity_min_duration_minutes': {'value': ap.minDurationMinutes, 'updated_at': ts},
-            'activity_idle_threshold_minutes': {'value': ap.idleThresholdMinutes, 'updated_at': ts},
-          };
+        // Send per-key entries only if that key was ever locally changed.
+        // This prevents a device that only changed min_duration from
+        // overwriting another device's whitelist on the NAS.
+        localSettings = {};
+        if (ap.whitelistChangedAt != ActivityProvider.epochTs) {
+          localSettings['activity_whitelist'] =
+              {'value': ap.whitelist, 'updated_at': ap.whitelistChangedAt};
         }
+        if (ap.minDurationChangedAt != ActivityProvider.epochTs) {
+          localSettings['activity_min_duration_minutes'] =
+              {'value': ap.minDurationMinutes, 'updated_at': ap.minDurationChangedAt};
+        }
+        if (ap.idleThresholdChangedAt != ActivityProvider.epochTs) {
+          localSettings['activity_idle_threshold_minutes'] =
+              {'value': ap.idleThresholdMinutes, 'updated_at': ap.idleThresholdChangedAt};
+        }
+        if (localSettings.isEmpty) localSettings = null;
       }
 
       final result = await SyncService.instance.sync(

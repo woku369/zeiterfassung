@@ -260,7 +260,7 @@ const stmts = {
     WHERE excluded.updated_at > app_settings.updated_at
   `),
 
-  getAllSettings: db.prepare(`SELECT key, value FROM app_settings`),
+  getAllSettings: db.prepare(`SELECT key, value, updated_at FROM app_settings`),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -407,11 +407,13 @@ async function handleRequest(req, res) {
       pushSettings(body.settings);
     }
 
-    // Alle Settings zurückschicken (NAS ist master)
+    // Alle Settings zurückschicken inkl. updated_at für client-seitiges LWW per Key.
     const rawSettings = stmts.getAllSettings.all();
     const settings = {};
     for (const row of rawSettings) {
       try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
+      // Companion timestamp key so the client can apply its own per-key LWW.
+      if (row.updated_at) settings[`${row.key}_updated_at`] = row.updated_at;
     }
 
     return send(res, 200, {

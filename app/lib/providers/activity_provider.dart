@@ -9,9 +9,13 @@ class ActivityProvider extends ChangeNotifier {
   static const _keyWhitelist = 'activity_whitelist';
   static const _keyMinDuration = 'activity_min_duration_minutes';
   static const _keyIdleThreshold = 'activity_idle_threshold_minutes';
-  // Timestamp of last USER-initiated settings change (epoch = never changed locally).
-  // Used for LWW sync: only advance when the user explicitly saves settings.
-  static const _keySettingsChangedAt = 'activity_settings_changed_at';
+  // Per-key LWW timestamps – epoch means "never changed locally".
+  // Only the keys the user actually changed get a non-epoch timestamp,
+  // so a device that only changes min_duration can't overwrite another
+  // device's whitelist on the NAS.
+  static const _keyWhitelistTs    = 'activity_whitelist_changed_at';
+  static const _keyMinDurationTs  = 'activity_min_duration_changed_at';
+  static const _keyIdleThresholdTs= 'activity_idle_threshold_changed_at';
   static const epochTs = '2000-01-01T00:00:00.000Z';
 
   List<ActivityLog> _sessions = [];
@@ -23,7 +27,12 @@ class ActivityProvider extends ChangeNotifier {
   bool _isTracking = false;
   bool _hasPermission = false;
   DateTime _selectedDate = DateTime.now();
-  String _settingsChangedAt = epochTs;
+  // Per-key timestamps (start at epoch = never locally changed).
+  String _whitelistTs     = epochTs;
+  String _minDurationTs   = epochTs;
+  String _idleThresholdTs = epochTs;
+  // Track which keys were touched by the user since last save.
+  final Set<String> _dirtyKeys = {};
 
   List<ActivityLog> get sessions => _sessions;
   List<ActivityLog> get calls => _calls;
@@ -34,8 +43,10 @@ class ActivityProvider extends ChangeNotifier {
   bool get isTracking => _isTracking;
   bool get hasPermission => _hasPermission;
   DateTime get selectedDate => _selectedDate;
-  /// Timestamp to use as updated_at when pushing settings to NAS.
-  String get settingsChangedAt => _settingsChangedAt;
+  /// Per-key timestamps for sync payload.
+  String get whitelistChangedAt     => _whitelistTs;
+  String get minDurationChangedAt   => _minDurationTs;
+  String get idleThresholdChangedAt => _idleThresholdTs;
 
   bool get isSupported => Platform.isWindows || Platform.isAndroid;
 
@@ -63,57 +74,88 @@ class ActivityProvider extends ChangeNotifier {
     if (saved != null) _whitelist = saved;
     _minDurationMinutes = prefs.getInt(_keyMinDuration) ?? 3;
     _idleThresholdMinutes = prefs.getInt(_keyIdleThreshold) ?? 5;
-    _settingsChangedAt = prefs.getString(_keySettingsChangedAt) ?? epochTs;
+    // Load per-key timestamps; fall back to legacy single timestamp if present.
+    final legacy = prefs.getString('activity_settings_changed_at');
+    _whitelistTs     = prefs.getString(_keyWhitelistTs)     ?? legacy ?? epochTs;
+    _minDurationTs   = prefs.getString(_keyMinDurationTs)   ?? legacy ?? epochTs;
+    _idleThresholdTs = prefs.getString(_keyIdleThresholdTs) ?? legacy ?? epochTs;
   }
 
-  /// Called when the user explicitly saves settings – advances the LWW timestamp.
+  /// Called when the user explicitly saves settings.
+  /// Only advances the LWW timestamp for keys the user actually changed.
   Future<void> saveSettings() async {
-    _settingsChangedAt = DateTime.now().toIso8601String();
+    final now = DateTime.now().toIso8601String();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_keyWhitelist, _whitelist);
     await prefs.setInt(_keyMinDuration, _minDurationMinutes);
     await prefs.setInt(_keyIdleThreshold, _idleThresholdMinutes);
-    await prefs.setString(_keySettingsChangedAt, _settingsChangedAt);
+    if (_dirtyKeys.contains(_keyWhitelist)) {
+      _whitelistTs = now;
+      await prefs.setString(_keyWhitelistTs, now);
+    }
+    if (_dirtyKeys.contains(_keyMinDuration)) {
+      _minDurationTs = now;
+      await prefs.setString(_keyMinDurationTs, now);
+    }
+    if (_dirtyKeys.contains(_keyIdleThreshold)) {
+      _idleThresholdTs = now;
+      await prefs.setString(_keyIdleThresholdTs, now);
+    }
+    _dirtyKeys.clear();
     notifyListeners();
   }
 
   void setWhitelist(List<String> list) {
     _whitelist = list;
+    _dirtyKeys.add(_keyWhitelist);
   }
 
-  /// Vom NAS empfangene Settings übernehmen.
-  /// Schreibt Werte direkt in Prefs, OHNE _settingsChangedAt zu aktualisieren,
-  /// damit das Gerät beim nächsten Sync nicht seine alten Werte als "neu" deklariert.
+  /// Vom NAS empfangene Settings übernehmen (LWW per Key).
+  /// Übernimmt einen Wert nur wenn der NAS-Timestamp neuer ist als der lokale.
+  /// Berührt die lokalen Timestamps NICHT, damit dieses Gerät beim nächsten
+  /// Sync nicht seine alten Werte fälschlicherweise als "neu" deklariert.
   Future<void> applyServerSettings(Map<String, dynamic> settings) async {
     bool changed = false;
+    final prefs = await SharedPreferences.getInstance();
+
     if (settings.containsKey('activity_whitelist')) {
       final raw = settings['activity_whitelist'];
-      if (raw is List) { _whitelist = List<String>.from(raw); changed = true; }
+      final serverTs = settings['activity_whitelist_updated_at'] as String? ?? epochTs;
+      if (raw is List && serverTs.compareTo(_whitelistTs) > 0) {
+        _whitelist = List<String>.from(raw);
+        await prefs.setStringList(_keyWhitelist, _whitelist);
+        changed = true;
+      }
     }
     if (settings.containsKey('activity_min_duration_minutes')) {
       final v = settings['activity_min_duration_minutes'];
-      if (v is int) { _minDurationMinutes = v; changed = true; }
+      final serverTs = settings['activity_min_duration_updated_at'] as String? ?? epochTs;
+      if (v is int && serverTs.compareTo(_minDurationTs) > 0) {
+        _minDurationMinutes = v;
+        await prefs.setInt(_keyMinDuration, _minDurationMinutes);
+        changed = true;
+      }
     }
     if (settings.containsKey('activity_idle_threshold_minutes')) {
       final v = settings['activity_idle_threshold_minutes'];
-      if (v is int) { _idleThresholdMinutes = v; changed = true; }
+      final serverTs = settings['activity_idle_threshold_updated_at'] as String? ?? epochTs;
+      if (v is int && serverTs.compareTo(_idleThresholdTs) > 0) {
+        _idleThresholdMinutes = v;
+        await prefs.setInt(_keyIdleThreshold, _idleThresholdMinutes);
+        changed = true;
+      }
     }
-    if (changed) {
-      // Persist values without touching _settingsChangedAt.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_keyWhitelist, _whitelist);
-      await prefs.setInt(_keyMinDuration, _minDurationMinutes);
-      await prefs.setInt(_keyIdleThreshold, _idleThresholdMinutes);
-      notifyListeners();
-    }
+    if (changed) notifyListeners();
   }
 
   void setMinDuration(int minutes) {
     _minDurationMinutes = minutes.clamp(1, 60);
+    _dirtyKeys.add(_keyMinDuration);
   }
 
   void setIdleThreshold(int minutes) {
     _idleThresholdMinutes = minutes.clamp(1, 30);
+    _dirtyKeys.add(_keyIdleThreshold);
   }
 
   // ── Windows tracking ──────────────────────────────────────────────────────
