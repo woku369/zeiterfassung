@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,6 +8,32 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+
+// ── Geofence-Log ─────────────────────────────────────────────────────────────
+
+const kGeofenceLogFilename = 'geofence_log.txt';
+const _kMaxLogLines = 2000;
+
+Future<String> geofenceLogPath() async =>
+    p.join(await getDatabasesPath(), kGeofenceLogFilename);
+
+Future<void> _log(String tag, String msg) async {
+  try {
+    final path = await geofenceLogPath();
+    final ts = DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ');
+    final line = '$ts  [$tag]  $msg\n';
+    final file = File(path);
+    await file.writeAsString(line, mode: FileMode.append, flush: true);
+    // Trim to last _kMaxLogLines lines
+    final content = await file.readAsString();
+    final lines = content.split('\n').where((l) => l.isNotEmpty).toList();
+    if (lines.length > _kMaxLogLines) {
+      await file.writeAsString(
+        '${lines.skip(lines.length - _kMaxLogLines).join('\n')}\n',
+      );
+    }
+  } catch (_) {}
+}
 
 // Kanal-IDs als Konstanten, damit sie an beiden Stellen übereinstimmen.
 const _kFgChannelId   = 'geofence_service';
@@ -102,6 +129,7 @@ Future<void> _onStart(ServiceInstance service) async {
     final newIds = incoming.map((l) => l['id'] as String).toSet();
     inside.removeWhere((id) => !newIds.contains(id));
     locations = incoming;
+    _log('INIT', 'Zonen geladen: ${incoming.map((l) => l['name']).join(', ')}');
   });
 
   // ── Watchdog: warn if auto-clocked-in but outside all zones for a while ───
@@ -150,12 +178,36 @@ Future<void> _onStart(ServiceInstance service) async {
     return;
   }
 
+  DateTime? _lastGpsLog;
+
   Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 20,
     ),
   ).listen((pos) async {
+    final now = DateTime.now();
+
+    // GPS-Log: höchstens alle 30 s, aber immer wenn Zonen aktiv sind
+    if (_lastGpsLog == null ||
+        now.difference(_lastGpsLog!).inSeconds >= 30 ||
+        locations.isNotEmpty) {
+      _lastGpsLog = now;
+      final nearbyParts = <String>[];
+      for (final loc in locations) {
+        final d = _haversine(pos.latitude, pos.longitude,
+            (loc['latitude'] as num).toDouble(),
+            (loc['longitude'] as num).toDouble());
+        final r = (loc['radiusMeters'] as num).toDouble();
+        nearbyParts.add('${loc['name']}=${d.toStringAsFixed(0)}m/${r.toStringAsFixed(0)}m');
+      }
+      await _log('GPS',
+          'lat=${pos.latitude.toStringAsFixed(6)} '
+          'lon=${pos.longitude.toStringAsFixed(6)} '
+          'acc=${pos.accuracy.toStringAsFixed(0)}m  '
+          '${nearbyParts.join('  ')}');
+    }
+
     for (final loc in List<Map<String, dynamic>>.from(locations)) {
       final id = loc['id'] as String;
       final dist = _haversine(
@@ -169,10 +221,9 @@ Future<void> _onStart(ServiceInstance service) async {
 
       if (!wasInside && nowInside) {
         inside.add(id);
-        // Cancel pending clock-out timer if re-entering (GPS drift recovery).
         timers[id]?.cancel();
         timers.remove(id);
-
+        await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
         await _autoClockIn(loc, notifications);
         service.invoke('zoneChange', {
           'locationId': id,
@@ -182,12 +233,12 @@ Future<void> _onStart(ServiceInstance service) async {
         });
       } else if (wasInside && !nowInside) {
         inside.remove(id);
-        // 5-minute grace period before clocking out (handles GPS drift).
+        await _log('EXIT', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  Karenz 5 min');
         timers[id]?.cancel();
         timers[id] = Timer(const Duration(minutes: 5), () async {
           timers.remove(id);
-          // Only clock out if still outside ALL zones.
           if (!inside.contains(id)) {
+            await _log('CLOCK-OUT', 'Auto nach Karenz  ${loc['name']}');
             await _autoClockOut(notifications);
             service.invoke('zoneChange', {
               'locationId': id,
@@ -195,6 +246,8 @@ Future<void> _onStart(ServiceInstance service) async {
               'employerId': loc['employerId'],
               'entered': false,
             });
+          } else {
+            await _log('CANCEL', 'Karenz abgebrochen – wieder in Zone ${loc['name']}');
           }
         });
         _notify(notifications, id.hashCode + 1,
@@ -202,7 +255,6 @@ Future<void> _onStart(ServiceInstance service) async {
             'Ausstempeln in 5 Minuten sofern du nicht zurückkehrst.');
       }
     }
-    // Track outside-all-zones state for the watchdog.
     if (inside.isNotEmpty) {
       outsideZonesSince = null;
     } else if (outsideZonesSince == null) {
@@ -231,6 +283,7 @@ Future<void> _autoClockIn(
         where: 'end_time IS NULL', limit: 1);
     if (active.isNotEmpty) {
       await db.close();
+      await _log('SKIP', 'Bereits eingestempelt – $name übersprungen');
       _notify(n, 995, 'Bei $name angekommen',
           'Bereits eingestempelt – Geofencing übersprungen.');
       return;
@@ -257,9 +310,11 @@ Future<void> _autoClockIn(
     if (employerId != null) {
       await prefs.setString(_kAutoEntryEmployerKey, employerId);
     }
+    await _log('CLOCK-IN', 'OK  $name  workType=$workType  employerId=$employerId');
     _notify(n, 997, 'Eingestempelt: $name',
         'Automatisch gestartet. Tippen, um Notiz/Tätigkeit zu ergänzen.');
   } catch (e) {
+    await _log('ERROR', 'Clock-in fehlgeschlagen: $e');
     _notify(n, 998, 'Auto-Einstempeln fehlgeschlagen', e.toString());
   }
 }

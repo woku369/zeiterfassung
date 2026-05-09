@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../dev_config.dart';
@@ -180,6 +183,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ]),
           ),
+
+          // ── Geofencing-Log ────────────────────────────────────────────
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: 20),
+            Text('Diagnose', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            const _GeofenceLogCard(),
+          ],
 
           // ── Aktivitäts-Tracking ────────────────────────────────────────
           if (context.watch<ActivityProvider>().isSupported) ...[
@@ -1036,6 +1047,145 @@ class _BackupCardState extends State<_BackupCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Geofencing-Log ────────────────────────────────────────────────────────────
+
+class _GeofenceLogCard extends StatelessWidget {
+  const _GeofenceLogCard();
+
+  Future<String> _logPath() async =>
+      p.join(await getDatabasesPath(), 'geofence_log.txt');
+
+  Future<String> _readLog() async {
+    final file = File(await _logPath());
+    if (!await file.exists()) return '(noch keine Einträge)';
+    final lines = await file.readAsLines();
+    // Letzte 300 Zeilen anzeigen
+    final show = lines.length > 300 ? lines.sublist(lines.length - 300) : lines;
+    return show.join('\n');
+  }
+
+  Future<void> _clearLog(BuildContext context) async {
+    final file = File(await _logPath());
+    if (await file.exists()) await file.delete();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Log gelöscht')),
+      );
+    }
+  }
+
+  void _showLog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => _GeofenceLogDialog(
+        logContent: _readLog(),
+        onClear: () => _clearLog(context),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.bug_report_outlined),
+        title: const Text('Geofencing-Log'),
+        subtitle: const Text('GPS-Positionen, Zonen-Events, Clock-in/out'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _showLog(context),
+      ),
+    );
+  }
+}
+
+class _GeofenceLogDialog extends StatefulWidget {
+  final Future<String> logContent;
+  final VoidCallback onClear;
+  const _GeofenceLogDialog({required this.logContent, required this.onClear});
+
+  @override
+  State<_GeofenceLogDialog> createState() => _GeofenceLogDialogState();
+}
+
+class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
+  late Future<String> _future;
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.logContent;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Geofencing-Log'),
+      contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.65,
+        child: FutureBuilder<String>(
+          future: _future,
+          builder: (_, snap) {
+            if (!snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return Scrollbar(
+              controller: _scroll,
+              child: SingleChildScrollView(
+                controller: _scroll,
+                child: SelectableText(
+                  snap.data!,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.5),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          icon: const Icon(Icons.copy, size: 16),
+          label: const Text('Kopieren'),
+          onPressed: () async {
+            final text = await widget.logContent;
+            await Clipboard.setData(ClipboardData(text: text));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Log in Zwischenablage'), duration: Duration(seconds: 2)),
+              );
+            }
+          },
+        ),
+        TextButton.icon(
+          icon: const Icon(Icons.delete_outline, size: 16),
+          label: const Text('Löschen'),
+          onPressed: () {
+            widget.onClear();
+            Navigator.pop(context);
+          },
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Schließen'),
+        ),
+      ],
     );
   }
 }
