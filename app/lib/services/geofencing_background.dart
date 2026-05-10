@@ -382,7 +382,6 @@ Future<void> _autoClockIn(
       'distance_km':   null,
       'travel_minutes':null,
       'created_at':    now.toIso8601String(),
-      'updated_at':    now.toIso8601String(),
     });
     await db.close();
 
@@ -426,7 +425,7 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
     }
     await db.update(
       'time_entries',
-      {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes, 'updated_at': now.toIso8601String()},
+      {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes},
       where: 'id = ? AND end_time IS NULL',
       whereArgs: [entryId],
     );
