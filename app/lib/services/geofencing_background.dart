@@ -196,6 +196,9 @@ Future<void> _onStart(ServiceInstance service) async {
   }
 
   DateTime? _lastGpsLog;
+  // Previous GPS position + time, used to compute speed when pos.speed == -1
+  double?   _prevLat, _prevLng;
+  DateTime? _prevTime;
 
   Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
@@ -204,6 +207,21 @@ Future<void> _onStart(ServiceInstance service) async {
     ),
   ).listen((pos) async {
     final now = DateTime.now();
+
+    // Effective speed in m/s: prefer GPS Doppler, fall back to position-derived.
+    // GPS speed is often -1 (unavailable) for the first few fixes on a cold start,
+    // which would suppress TRIP-START even at highway speed.
+    double effectiveSpeed = pos.speed >= 0 ? pos.speed : 0.0;
+    if (effectiveSpeed < _kSpeedStartMs && _prevLat != null && _prevTime != null) {
+      final dtSec = now.difference(_prevTime!).inMilliseconds / 1000.0;
+      if (dtSec > 0 && dtSec < 30) {
+        effectiveSpeed =
+            _haversine(_prevLat!, _prevLng!, pos.latitude, pos.longitude) / dtSec;
+      }
+    }
+    _prevLat  = pos.latitude;
+    _prevLng  = pos.longitude;
+    _prevTime = now;
 
     // GPS-Log: höchstens alle 30 s, aber immer wenn Zonen aktiv sind
     if (_lastGpsLog == null ||
@@ -221,7 +239,8 @@ Future<void> _onStart(ServiceInstance service) async {
       await _log('GPS',
           'lat=${pos.latitude.toStringAsFixed(6)} '
           'lon=${pos.longitude.toStringAsFixed(6)} '
-          'acc=${pos.accuracy.toStringAsFixed(0)}m  '
+          'acc=${pos.accuracy.toStringAsFixed(0)}m '
+          'spd=${(effectiveSpeed * 3.6).toStringAsFixed(1)}km/h  '
           '${nearbyParts.join('  ')}');
     }
 
@@ -320,9 +339,8 @@ Future<void> _onStart(ServiceInstance service) async {
     }
 
     if (prefs.getBool(kTripTrackingKey) ?? false) {
-      final speed = pos.speed >= 0 ? pos.speed : 0.0; // m/s; -1 = unavailable
 
-      if (!_tripActive && speed >= _kSpeedStartMs) {
+      if (!_tripActive && effectiveSpeed >= _kSpeedStartMs) {
         // Start a new trip
         _tripId       = const Uuid().v4();
         _tripStart    = now;
@@ -336,7 +354,7 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
         await prefs.setString(_kOpenTripKey, _tripId!);
-        await _log('TRIP-START', 'id=$_tripId  speed=${(speed * 3.6).toStringAsFixed(1)}km/h');
+        await _log('TRIP-START', 'id=$_tripId  speed=${(effectiveSpeed * 3.6).toStringAsFixed(1)}km/h');
         // Persist skeleton so UI can show "Fahrt läuft"
         await _insertOpenTrip(
             _tripId!, _tripStart!, pos.latitude, pos.longitude);
@@ -345,12 +363,12 @@ Future<void> _onStart(ServiceInstance service) async {
         if (_tripLastLat != null && _tripLastLng != null) {
           final d = _haversine(
               _tripLastLat!, _tripLastLng!, pos.latitude, pos.longitude);
-          if (d < 0.5) _tripDistKm += d; // ignore GPS jumps > 500 m
+          if (d < 500) _tripDistKm += d / 1000; // d is in metres; skip jumps > 500 m
         }
         _tripLastLat = pos.latitude;
         _tripLastLng = pos.longitude;
 
-        if (speed < _kSpeedStopMs) {
+        if (effectiveSpeed < _kSpeedStopMs) {
           // Start stop-candidate timer if not already running
           _tripStopTimer ??= Timer(const Duration(minutes: 2), () async {
             _tripStopTimer = null;
