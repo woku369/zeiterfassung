@@ -93,6 +93,6 @@ class TripRecord {
         endAddress: m['end_address'] as String?,
         distanceKm: (m['distance_km'] as num? ?? 0).toDouble(),
         linkedEntryId: m['linked_entry_id'] as String?,
-        createdAt: m['created_at'] as String,
+        createdAt: (m['created_at'] as String?) ?? DateTime.now().toIso8601String(),
       );
 }

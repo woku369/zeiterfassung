@@ -553,6 +553,40 @@ class HelpScreen extends StatelessWidget {
           ),
           SizedBox(height: 8),
           _Section(
+            icon: Icons.directions_car_outlined,
+            title: 'Fahrtenbuch',
+            children: const [
+              _Para(
+                'Das Fahrtenbuch zeichnet Fahrten automatisch auf – '
+                'entweder geschwindigkeitsbasiert (ab 15 km/h) oder beim '
+                'Verbinden mit einem definierten Bluetooth-Gerät (z.B. Autoradio).',
+              ),
+              _SubHeading('Einrichtung'),
+              _Step(number: '1', text: 'Einstellungen → Automatische Erfassung → Fahrtenbuch einschalten'),
+              _Step(number: '2', text: 'Optional: „Bluetooth-Auslöser" antippen → Gerät aus gekoppelten BT-Geräten wählen → Speichern'),
+              _Step(number: '3', text: 'Android fragt einmalig nach Bluetooth-Berechtigung → erlauben'),
+              _SubHeading('Aufzeichnung – Geschwindigkeit'),
+              _KeyValue(label: 'Start', value: 'Sobald GPS-Tempo ≥ 15 km/h erreicht wird'),
+              _KeyValue(label: 'Stop', value: '2 Minuten nach Unterschreiten von 5 km/h'),
+              _KeyValue(label: 'Mindestdistanz', value: '300 m – kürzere Fahrten werden verworfen'),
+              _SubHeading('Aufzeichnung – Bluetooth'),
+              _KeyValue(label: 'Start', value: 'Sofort bei BT-Verbindung mit dem gewählten Gerät'),
+              _KeyValue(label: 'Stop', value: 'Bei BT-Trennung (Fahrtende oder Signalverlust)'),
+              _KeyValue(label: 'Voraussetzung', value: 'Gerät muss in Android-BT-Einstellungen gekoppelt sein'),
+              _SubHeading('Fahrtenliste & Übernahme'),
+              _KeyValue(label: 'Öffnen', value: 'Einstellungen → Automatische Erfassung → Fahrtenbuch → Einträge'),
+              _KeyValue(label: 'Adressen', value: 'Werden automatisch per Nominatim (OpenStreetMap) aufgelöst'),
+              _KeyValue(label: 'Übernehmen', value: '„Übernehmen"-Button → Eintragsformular öffnet vorausgefüllt (Außendienst, Distanz, Adressen als Notiz)'),
+              _KeyValue(label: 'Verknüpft', value: 'Nach Übernahme erscheint ein ✓-Symbol – keine Doppelübernahme möglich'),
+              _Hint(
+                'BT-Trigger und Geschwindigkeitserkennung sind parallel aktiv. '
+                'BT-Fahrten enden beim Trennen, unabhängig von der Geschwindigkeit. '
+                'Manuelle Fahrtenerfassung ist weiterhin möglich (Eintrag direkt anlegen).',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
             icon: Icons.phone_android_outlined,
             title: 'Android – Gerätebesonderheiten',
             children: const [

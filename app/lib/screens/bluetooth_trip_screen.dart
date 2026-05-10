@@ -26,10 +26,13 @@ class _BluetoothTripScreenState extends State<BluetoothTripScreen> {
   Future<void> _load() async {
     try {
       final watchlist = await BluetoothTripService.loadWatchlist();
-      final raw = await _btChannel.invokeMethod<List>('getPairedDevices');
+      final raw = await _btChannel.invokeListMethod<Map>('getPairedDevices');
       final devices = (raw ?? [])
-          .cast<Map>()
-          .map((m) => {'name': m['name'] as String, 'address': m['address'] as String})
+          .map((m) => {
+                'name': (m['name'] ?? 'Unbekannt').toString(),
+                'address': (m['address'] ?? '').toString(),
+              })
+          .where((m) => m['address']!.isNotEmpty)
           .toList();
       setState(() {
         _paired = devices;

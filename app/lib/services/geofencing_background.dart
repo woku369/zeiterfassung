@@ -283,10 +283,9 @@ Future<void> _onStart(ServiceInstance service) async {
 
     // ── Bluetooth trigger (written by BluetoothTripReceiver.kt) ───────────
     final btEvent = prefs.getString(_kBtEventKey);
-    if (btEvent != null) {
-      await prefs.remove(_kBtEventKey); // consume once
-      if (btEvent.startsWith('connect:') && !_tripActive &&
-          (prefs.getBool(kTripTrackingKey) ?? false)) {
+    if (btEvent != null && (prefs.getBool(kTripTrackingKey) ?? false)) {
+      await prefs.remove(_kBtEventKey); // consume only when tracking enabled
+      if (btEvent.startsWith('connect:') && !_tripActive) {
         final mac = btEvent.substring(8);
         _tripId       = const Uuid().v4();
         _tripStart    = now;
@@ -308,9 +307,12 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripActive   = false;
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
+        // Use startLat/Lng as fallback if no GPS tick yet after connect
+        final endLat = _tripLastLat ?? _tripStartLat ?? pos.latitude;
+        final endLng = _tripLastLng ?? _tripStartLng ?? pos.longitude;
         await _log('TRIP-END', 'BT-Disconnect $mac  id=$_tripId  dist=${_tripDistKm.toStringAsFixed(2)}km');
         await _finalizeTrip(
-          id: _tripId!, endLat: _tripLastLat!, endLng: _tripLastLng!,
+          id: _tripId!, endLat: endLat, endLng: endLng,
           distKm: _tripDistKm, notifications: notifications);
         _tripId = null; _tripDistKm = 0;
         await prefs.remove(_kOpenTripKey);
@@ -353,7 +355,8 @@ Future<void> _onStart(ServiceInstance service) async {
           _tripStopTimer ??= Timer(const Duration(minutes: 2), () async {
             _tripStopTimer = null;
             if (!_tripActive) return;
-            _tripActive = false;
+            _tripActive   = false;
+            _btTripActive = false;
             await _finalizeTrip(
               id:       _tripId!,
               endLat:   _tripLastLat!,
@@ -372,7 +375,8 @@ Future<void> _onStart(ServiceInstance service) async {
       }
     } else if (_tripActive) {
       // Trip tracking was disabled mid-trip – finalize cleanly
-      _tripActive = false;
+      _tripActive   = false;
+      _btTripActive = false;
       _tripStopTimer?.cancel();
       _tripStopTimer = null;
       if (_tripId != null && _tripLastLat != null) {

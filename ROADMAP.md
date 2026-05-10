@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-09 – Anruf-Tracking + Geofencing-Diagnose + Auto-Pause + Bugfixes
+> Letztes Update: 2026-05-10 – Fahrtenbuch + Bluetooth-Trigger + Bugfixes
 
 ---
 
@@ -20,12 +20,38 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 | Xiaomi Poco X7 Pro | Smartphone | HyperOS 3.0.5.0 (Android 16) | Mobil, GPS, Geofencing |
 | Surface Pro 8 | Tablet/Laptop Win11/64 | Windows 11 | Mobiler Windows-Einsatz |
 | Surface Pro 7 | Tablet/Laptop Win11/64 | Windows 11 | Büro Gurk |
+| Doogee U11 Pro | Tablet Android 16 | Android 16 | Außendienst-Tablet |
 
 ---
 
 ## Erledigt
 
-### v1.17 – Anruf-Tracking + Geofencing-Diagnose + Auto-Pause
+### v1.17 – Fahrtenbuch + Bluetooth-Trigger + Bugfixes
+- [x] **Fahrtenbuch (GPS-basiert):**
+  - `TripRecord`-Modell, DB-Schema v11 (`trips`-Tabelle)
+  - Geschwindigkeits-Erkennung im Geofencing-Hintergrunddienst: Start ≥15 km/h, Stop nach 2 Min < 5 km/h, Min-Distanz 300 m
+  - `NominatimService`: Reverse-Geocoding via OpenStreetMap → Straße, Ort
+  - `TripProvider`: Laden, Löschen, Verknüpfen, lazy Adressauflösung
+  - `TripLogScreen`: Fahrtenliste mit Adressen, Zeit, Distanz, „Übernehmen"-Button (öffnet Eintragsformular vorausgefüllt)
+  - Toggle in Einstellungen → Automatische Erfassung (Android only)
+- [x] **Bluetooth-Fahrtauslöser:**
+  - `BluetoothTripReceiver.kt`: BroadcastReceiver für `ACL_CONNECTED`/`ACL_DISCONNECTED`
+  - Schreibt Event in SharedPreferences → Hintergrunddienst liest beim nächsten GPS-Tick
+  - `BluetoothTripScreen`: Mehrfachauswahl aus gekoppelten BT-Geräten (MethodChannel → `bondedDevices`)
+  - BT-Verbindung startet Fahrt sofort (ohne Geschwindigkeitsschwelle), BT-Trennung beendet sie
+  - Parallelbetrieb mit Geschwindigkeitserkennung als Fallback
+- [x] **Bugfixes v1.17:**
+  - `updated_at` im Geofencing-Auto-Clock-in entfernt (Spalte existiert nicht in `time_entries`) → Auto-Einstempeln funktioniert wieder
+  - `static const` in Dart-Funktionskörper → top-level Konstanten verschoben (Compiler-Error)
+  - Kettenzuweisung `_tripId = _tripDistKm = 0` → Typfehler behoben
+  - BT-Event wird jetzt erst konsumiert wenn Trip-Tracking aktiv ist (verhindert verlorene Events)
+  - Null-Safety bei BT-Disconnect vor erstem GPS-Tick: `startLat/Lng` als Fallback
+  - `_btTripActive` wird in allen Finalisierungs-Pfaden zurückgesetzt
+  - `TripRecord.fromMap`: `created_at`-Fallback wenn DB-Feld null
+  - MethodChannel-Cast in `BluetoothTripScreen` typsicher gemacht
+  - Handbuch-Tab im Geofencing-Log (Einträge-Button immer sichtbar)
+
+### v1.16 – Anruf-Tracking + Geofencing-Diagnose + Auto-Pause
 - [x] **Anruf-Tracking in Activity Timeline (Android):**
   - `READ_CALL_LOG`-Berechtigung in AndroidManifest
   - Kotlin `UsageStatsPlugin`: `hasCallLogPermission` + `queryCallLog` via `CallLog.Calls` ContentProvider
@@ -45,7 +71,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] **Bugfix `ensureSpecialLocations` bei leerem DB:** Frischinstall ohne Standorte löste trotzdem Gurktaler-Standort-Seed aus → Duplikate bei erstem Sync. Fix: Guard auf `hasLocations()` vor `_ensureSpecialLocations()`.
 - [x] **Bugfix MIUI/Xiaomi SQLite-Crash beim App-Start:** `db.execute('PRAGMA journal_mode=WAL')` im `onOpen`-Callback ist auf HyperOS/MIUI nicht erlaubt (nur `query`/`rawQuery`). Fix: `rawQuery` statt `execute`.
 
-### v1.16 – Projektverwaltung + Bugfixes
+### v1.15 – Projektverwaltung + Bugfixes
 - [x] **Projektverwaltung (Gurktaler AG):**
   - `Project`-Modell (`id`, `name`, `employerId`, `sortOrder`, `updatedAt`, `deletedAt`) mit Soft-Delete
   - `ProjectProvider`: `add()`, `remove()`, `rename()`, `forEmployer()` + automatisches Seeding der 7 Gurktaler-Projekte beim ersten Start: **Führungen, Kräutergarten, Mazeration, Kleinserie, Produktentwicklung, Rezepturoptimierung, Administration**
@@ -409,12 +435,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v8: + `deleted_at` (employers, tracked_locations) – Soft-Delete-Propagation
 - v9: + `is_special_hours` (time_entries) – Sonderarbeitszeit-Flag für Zuschlagsberechnung
 - v10: + `projects` (Tabelle), + `project_id` (time_entries) – Projektzuordnung
+- v11: + `trips` (Tabelle) – Fahrtenbuch mit GPS-Tracking und Adressauflösung
 
 **Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync; `projects` (Tabelle) für bidirektionalen Projekt-Sync.
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.16)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.17)
 
 ---
 
