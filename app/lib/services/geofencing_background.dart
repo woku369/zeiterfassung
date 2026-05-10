@@ -103,6 +103,9 @@ const _kAutoEntryKey         = 'geofence_auto_entry_id';
 const _kAutoEntryEmployerKey = 'geofence_auto_entry_employer_id';
 const kTripTrackingKey       = 'trip_tracking_active';
 const _kOpenTripKey          = 'trip_open_id';
+const _kSpeedStartMs         = 4.2;  // 15 km/h – trip begins
+const _kSpeedStopMs          = 1.4;  // 5 km/h  – stop candidate
+const _kMinDistKm            = 0.3;  // ignore micro-trips
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -128,9 +131,6 @@ Future<void> _onStart(ServiceInstance service) async {
   double    _tripDistKm = 0;
   Timer?    _tripStopTimer;       // fires when speed drops for >2 min
   bool      _tripActive = false;  // currently in a "moving" phase
-  static const _kSpeedStartMs  = 4.2;  // 15 km/h  – trip begins
-  static const _kSpeedStopMs   = 1.4;  // 5  km/h  – stop candidate
-  static const _kMinDistKm     = 0.3;  // ignore micro-trips
 
   // ── Receive commands from main isolate ─────────────────────────────────────
 
@@ -319,7 +319,7 @@ Future<void> _onStart(ServiceInstance service) async {
               distKm:   _tripDistKm,
               notifications: notifications,
             );
-            _tripId = _tripDistKm = 0;
+            _tripId = null; _tripDistKm = 0;
             await prefs.remove(_kOpenTripKey);
           });
         } else {
