@@ -423,14 +423,18 @@ class DatabaseHelper {
 
   Future<void> upsertLocationsFromServer(List<TrackedLocation> locations) async {
     final db = await database;
-    final batch = db.batch();
     for (final loc in locations) {
-      // Always upsert (never hard-delete) so soft-deleted records stay in local
-      // DB and can be re-propagated if another device resurrects them.
-      batch.insert('tracked_locations', loc.toMap(),
+      // Name-based merge: if a local record with the same name but a different
+      // UUID exists (e.g. created by seed on reinstall), remove it first so we
+      // don't accumulate duplicates every time NAS data is pulled down.
+      await db.delete(
+        'tracked_locations',
+        where: 'name = ? AND id != ?',
+        whereArgs: [loc.name, loc.id],
+      );
+      await db.insert('tracked_locations', loc.toMap(),
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    await batch.commit(noResult: true);
   }
 
   Future<List<TrackedLocation>> getAllLocations() async {

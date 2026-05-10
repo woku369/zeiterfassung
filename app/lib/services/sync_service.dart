@@ -50,9 +50,44 @@ class SyncService {
     // Unsynced time entries + alle Employers/Locations/Projects inkl. soft-deleted
     final unsynced  = await db.getUnsyncedEntries();
     final employers = await db.getAllEmployersForSync();
-    final locations = await db.getAllLocationsForSync();
+    var   locations = await db.getAllLocationsForSync();
     final projects  = await db.getAllProjectsForSync();
     final lastSync  = await db.getSyncState('last_sync_at') ?? '1970-01-01T00:00:00.000Z';
+
+    // On first-ever sync, pull NAS locations BEFORE pushing local seeds.
+    // This prevents fresh-install seeds (random UUIDs) from reaching the NAS
+    // and creating permanent duplicates that survive every subsequent sync.
+    if (lastSync == '1970-01-01T00:00:00.000Z') {
+      try {
+        final prePullResp = await http.post(
+          Uri.parse('$url/api/sync'),
+          headers: headers,
+          body: jsonEncode({
+            'last_sync': lastSync,
+            'entries': [],
+            'employers': [],
+            'locations': [],
+            'projects': [],
+          }),
+        ).timeout(const Duration(seconds: 30));
+        if (prePullResp.statusCode == 200) {
+          final prePullData = jsonDecode(prePullResp.body) as Map<String, dynamic>;
+          final prePullLocations = (prePullData['locations'] as List<dynamic>? ?? [])
+              .map((e) => TrackedLocation.fromMap(
+                    _normalizeLocationMap(e as Map<String, dynamic>)))
+              .toList();
+          if (prePullLocations.isNotEmpty) {
+            // Replace local seed UUIDs with NAS canonical UUIDs via name-based merge.
+            await db.upsertLocationsFromServer(prePullLocations);
+            // Reload so the main push uses the reconciled UUIDs, not seed UUIDs.
+            locations = await db.getAllLocationsForSync();
+          }
+        }
+      } catch (_) {
+        // Pre-pull failed (offline, wrong URL) — proceed; subsequent syncs will
+        // dedup via deduplicateLocations() once the connection is established.
+      }
+    }
 
     try {
       final body = jsonEncode({
