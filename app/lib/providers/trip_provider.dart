@@ -17,9 +17,13 @@ class TripProvider extends ChangeNotifier {
       _trips.where((t) => !t.isComplete).firstOrNull;
 
   Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    _trackingEnabled = prefs.getBool(kTripTrackingKey) ?? false;
-    _trips = await DatabaseHelper.instance.getTrips();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _trackingEnabled = prefs.getBool(kTripTrackingKey) ?? false;
+      _trips = await DatabaseHelper.instance.getTrips();
+    } catch (_) {
+      _trips = [];
+    }
     notifyListeners();
   }
 

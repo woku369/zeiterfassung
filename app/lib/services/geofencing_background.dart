@@ -379,7 +379,7 @@ Future<void> _onStart(ServiceInstance service) async {
       _btTripActive = false;
       _tripStopTimer?.cancel();
       _tripStopTimer = null;
-      if (_tripId != null && _tripLastLat != null) {
+      if (_tripId != null && _tripLastLat != null && _tripLastLng != null) {
         await _finalizeTrip(
           id: _tripId!, endLat: _tripLastLat!, endLng: _tripLastLng!,
           distKm: _tripDistKm, notifications: notifications);
