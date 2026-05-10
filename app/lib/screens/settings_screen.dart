@@ -777,14 +777,13 @@ class _FahrtenbuchTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (prov.trackingEnabled)
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TripLogScreen()),
-              ),
-              child: const Text('Einträge'),
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TripLogScreen()),
             ),
+            child: const Text('Einträge'),
+          ),
           Switch(
             value: prov.trackingEnabled,
             onChanged: (v) => prov.setTrackingEnabled(v),
