@@ -34,6 +34,11 @@
     <!-- Anruf-Tracking: Anruf-Log lesen -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
+    <!-- Bluetooth-Fahrtenbuch: gekoppelte Geräte lesen + Verbindungsstatus -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
     <application
         android:label="Zeiterfassung"
         android:name="${applicationName}"
@@ -85,6 +90,16 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <!-- Xiaomi/MIUI Schnellstart -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Bluetooth-Fahrtenbuch: ACL connect/disconnect Events empfangen -->
+        <receiver
+            android:name=".BluetoothTripReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
 

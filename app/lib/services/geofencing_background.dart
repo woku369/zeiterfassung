@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -106,6 +107,8 @@ const _kOpenTripKey          = 'trip_open_id';
 const _kSpeedStartMs         = 4.2;  // 15 km/h – trip begins
 const _kSpeedStopMs          = 1.4;  // 5 km/h  – stop candidate
 const _kMinDistKm            = 0.3;  // ignore micro-trips
+const kBtTripDevicesKey      = 'bt_trip_devices';   // JSON list of MAC addresses
+const _kBtEventKey           = 'bt_trip_event';     // written by BluetoothTripReceiver
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -130,7 +133,8 @@ Future<void> _onStart(ServiceInstance service) async {
   double?   _tripLastLat,  _tripLastLng;
   double    _tripDistKm = 0;
   Timer?    _tripStopTimer;       // fires when speed drops for >2 min
-  bool      _tripActive = false;  // currently in a "moving" phase
+  bool      _tripActive = false;   // currently in a "moving" phase
+  bool      _btTripActive = false; // trip was started by BT connect
 
   // ── Receive commands from main isolate ─────────────────────────────────────
 
@@ -276,6 +280,43 @@ Future<void> _onStart(ServiceInstance service) async {
 
     // ── Trip tracking ──────────────────────────────────────────────────────
     final prefs = await SharedPreferences.getInstance();
+
+    // ── Bluetooth trigger (written by BluetoothTripReceiver.kt) ───────────
+    final btEvent = prefs.getString(_kBtEventKey);
+    if (btEvent != null) {
+      await prefs.remove(_kBtEventKey); // consume once
+      if (btEvent.startsWith('connect:') && !_tripActive &&
+          (prefs.getBool(kTripTrackingKey) ?? false)) {
+        final mac = btEvent.substring(8);
+        _tripId       = const Uuid().v4();
+        _tripStart    = now;
+        _tripStartLat = pos.latitude;
+        _tripStartLng = pos.longitude;
+        _tripLastLat  = pos.latitude;
+        _tripLastLng  = pos.longitude;
+        _tripDistKm   = 0;
+        _tripActive   = true;
+        _btTripActive = true;
+        _tripStopTimer?.cancel();
+        _tripStopTimer = null;
+        await prefs.setString(_kOpenTripKey, _tripId!);
+        await _log('TRIP-START', 'BT-Connect $mac  id=$_tripId');
+        await _insertOpenTrip(_tripId!, _tripStart!, pos.latitude, pos.longitude);
+      } else if (btEvent.startsWith('disconnect:') && _tripActive && _btTripActive) {
+        final mac = btEvent.substring(11);
+        _btTripActive = false;
+        _tripActive   = false;
+        _tripStopTimer?.cancel();
+        _tripStopTimer = null;
+        await _log('TRIP-END', 'BT-Disconnect $mac  id=$_tripId  dist=${_tripDistKm.toStringAsFixed(2)}km');
+        await _finalizeTrip(
+          id: _tripId!, endLat: _tripLastLat!, endLng: _tripLastLng!,
+          distKm: _tripDistKm, notifications: notifications);
+        _tripId = null; _tripDistKm = 0;
+        await prefs.remove(_kOpenTripKey);
+      }
+    }
+
     if (prefs.getBool(kTripTrackingKey) ?? false) {
       final speed = pos.speed >= 0 ? pos.speed : 0.0; // m/s; -1 = unavailable
 
@@ -289,6 +330,7 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripLastLng  = pos.longitude;
         _tripDistKm   = 0;
         _tripActive   = true;
+        _btTripActive = false;
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
         await prefs.setString(_kOpenTripKey, _tripId!);

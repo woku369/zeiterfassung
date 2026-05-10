@@ -20,6 +20,7 @@ import '../providers/trip_provider.dart';
 import 'locations_screen.dart';
 import 'imap_screen.dart';
 import 'trip_log_screen.dart';
+import 'bluetooth_trip_screen.dart';
 import 'activity_timeline_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -770,26 +771,44 @@ class _FahrtenbuchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<TripProvider>();
-    return ListTile(
-      leading: const Icon(Icons.directions_car_outlined),
-      title: const Text('Fahrtenbuch'),
-      subtitle: const Text('Fahrten ab 15 km/h automatisch aufzeichnen'),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TripLogScreen()),
-            ),
-            child: const Text('Einträge'),
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.directions_car_outlined),
+          title: const Text('Fahrtenbuch'),
+          subtitle: const Text('Fahrten ab 15 km/h automatisch aufzeichnen'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TripLogScreen()),
+                ),
+                child: const Text('Einträge'),
+              ),
+              Switch(
+                value: prov.trackingEnabled,
+                onChanged: (v) => prov.setTrackingEnabled(v),
+              ),
+            ],
           ),
-          Switch(
-            value: prov.trackingEnabled,
-            onChanged: (v) => prov.setTrackingEnabled(v),
+        ),
+        if (prov.trackingEnabled) ...[
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.bluetooth_outlined),
+            title: const Text('Bluetooth-Auslöser'),
+            subtitle: const Text(
+                'Aufzeichnung bei Verbindung mit definiertem Gerät starten'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BluetoothTripScreen()),
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
