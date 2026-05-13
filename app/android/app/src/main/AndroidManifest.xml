@@ -31,8 +31,9 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- Anruf-Tracking: Anruf-Log lesen -->
+    <!-- Anruf-Tracking: Anruf-Log lesen + Kontaktnamen live nachschlagen -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <!-- Bluetooth-Fahrtenbuch: gekoppelte Geräte lesen + Verbindungsstatus -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />

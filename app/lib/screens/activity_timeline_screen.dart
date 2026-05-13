@@ -38,7 +38,7 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
     final ap = context.read<ActivityProvider>();
     await ap.recheckPermission();
     if (ap.hasPermission) {
-      await ap.loadSessions(ap.selectedDate);
+      await ap.loadSessions(DateTime.now());
     }
     if (mounted) {
       await _generateSuggestions();
@@ -107,6 +107,7 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
   // ── Call → entry ───────────────────────────────────────────────────────────
 
   Future<void> _acceptCall(dynamic call) async {
+    final ap = context.read<ActivityProvider>();
     final ep = context.read<EmployerProvider>();
     final now = DateTime.now();
     final date = DateTime(call.startTime.year, call.startTime.month, call.startTime.day);
@@ -131,6 +132,7 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
       context,
       MaterialPageRoute(builder: (_) => EntryFormScreen(entry: entry, forceNew: true)),
     );
+    if (mounted) await ap.markCallAdopted(call.id);
   }
 
   // ── Raw-session → entry ────────────────────────────────────────────────────
@@ -172,6 +174,10 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
           builder: (_) => EntryFormScreen(entry: prefilled, forceNew: true)),
     );
     if (mounted) {
+      final ap = context.read<ActivityProvider>();
+      for (final s in selected) {
+        await ap.markSessionAdopted(s.id);
+      }
       setState(() => _selected.clear());
       await _generateSuggestions();
     }
@@ -325,7 +331,8 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                               const SizedBox(height: 4),
                               ...ap.calls.map((c) => _CallCard(
                                 call: c,
-                                onAccept: () => _acceptCall(c),
+                                adopted: ap.isCallAdopted(c.id),
+                                onAccept: ap.isCallAdopted(c.id) ? null : () => _acceptCall(c),
                               )),
                               const SizedBox(height: 16),
                             ],
@@ -345,37 +352,60 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                             ),
                             const SizedBox(height: 4),
                             ...ap.sessions.map((s) {
-                              final checked =
-                                  _selected.contains(s.id);
-                              return Card(
-                                margin:
-                                    const EdgeInsets.only(bottom: 6),
-                                color: checked
-                                    ? cs.primaryContainer
-                                    : null,
-                                child: CheckboxListTile(
-                                  value: checked,
-                                  onChanged: (v) => setState(() {
-                                    if (v == true) {
-                                      _selected.add(s.id);
-                                    } else {
-                                      _selected.remove(s.id);
-                                    }
-                                  }),
-                                  title: Text(s.title,
-                                      maxLines: 1,
-                                      overflow:
-                                          TextOverflow.ellipsis),
-                                  subtitle: Text(
-                                    '${tf.format(s.startTime)} – '
-                                    '${tf.format(s.endTime)}'
-                                    '  ·  ${_fmt(s.duration)}',
+                              final checked  = _selected.contains(s.id);
+                              final adopted  = ap.isSessionAdopted(s.id);
+                              return Opacity(
+                                opacity: adopted ? 0.45 : 1.0,
+                                child: Card(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  color: adopted
+                                      ? cs.surfaceContainerLow
+                                      : checked
+                                          ? cs.primaryContainer
+                                          : null,
+                                  child: CheckboxListTile(
+                                    value: checked,
+                                    onChanged: adopted
+                                        ? null
+                                        : (v) => setState(() {
+                                            if (v == true) {
+                                              _selected.add(s.id);
+                                            } else {
+                                              _selected.remove(s.id);
+                                            }
+                                          }),
+                                    title: Row(
+                                      children: [
+                                        if (adopted) ...[
+                                          Icon(Icons.check_circle_outline,
+                                              size: 14,
+                                              color: cs.onSurfaceVariant),
+                                          const SizedBox(width: 4),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            s.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: adopted
+                                                ? TextStyle(
+                                                    color: cs.onSurfaceVariant,
+                                                    decoration:
+                                                        TextDecoration.lineThrough)
+                                                : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      '${tf.format(s.startTime)} – '
+                                      '${tf.format(s.endTime)}'
+                                      '  ·  ${_fmt(s.duration)}',
+                                    ),
+                                    secondary: _AppIcon(appName: s.appName),
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
                                   ),
-                                  secondary:
-                                      _AppIcon(appName: s.appName),
-                                  controlAffinity:
-                                      ListTileControlAffinity
-                                          .leading,
                                 ),
                               );
                             }),
@@ -797,8 +827,9 @@ class _EmptyPlaceholder extends StatelessWidget {
 
 class _CallCard extends StatelessWidget {
   final dynamic call; // ActivityLog with isPhoneCall=true
-  final VoidCallback onAccept;
-  const _CallCard({required this.call, required this.onAccept});
+  final bool adopted;
+  final VoidCallback? onAccept;
+  const _CallCard({required this.call, required this.adopted, required this.onAccept});
 
   String _typeLabel(int? type) => switch (type) {
     1 => '← eingehend',
@@ -817,33 +848,44 @@ class _CallCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tf = DateFormat('HH:mm');
     final isMissed = call.callType == 3;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isMissed
-              ? cs.errorContainer
-              : cs.tertiaryContainer,
-          child: Icon(
-            isMissed ? Icons.phone_missed : Icons.phone,
-            size: 18,
-            color: isMissed ? cs.onErrorContainer : cs.onTertiaryContainer,
+    return Opacity(
+      opacity: adopted ? 0.45 : 1.0,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 6),
+        color: adopted ? cs.surfaceContainerLow : null,
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: isMissed
+                ? cs.errorContainer
+                : cs.tertiaryContainer,
+            child: Icon(
+              isMissed ? Icons.phone_missed : Icons.phone,
+              size: 18,
+              color: isMissed ? cs.onErrorContainer : cs.onTertiaryContainer,
+            ),
           ),
+          title: Text(call.title,
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                decoration: adopted ? TextDecoration.lineThrough : null,
+                color: adopted ? cs.onSurfaceVariant : null,
+              )),
+          subtitle: Text(
+            '${tf.format(call.startTime)}  ·  ${_fmt(call.duration)}'
+            '  ·  ${_typeLabel(call.callType as int?)}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          trailing: adopted
+              ? Icon(Icons.check_circle_outline,
+                  size: 18, color: cs.onSurfaceVariant)
+              : isMissed
+                  ? null
+                  : TextButton(
+                      onPressed: onAccept,
+                      child: const Text('Übernehmen'),
+                    ),
         ),
-        title: Text(call.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: Text(
-          '${tf.format(call.startTime)}  ·  ${_fmt(call.duration)}'
-          '  ·  ${_typeLabel(call.callType as int?)}',
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: isMissed
-            ? null
-            : TextButton(
-                onPressed: onAccept,
-                child: const Text('Übernehmen'),
-              ),
       ),
     );
   }

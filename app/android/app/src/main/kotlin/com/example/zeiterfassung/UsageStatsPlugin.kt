@@ -7,8 +7,10 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.CallLog
+import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -147,9 +149,12 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             val typeIdx     = cursor.getColumnIndex(CallLog.Calls.TYPE)
             val dateIdx     = cursor.getColumnIndex(CallLog.Calls.DATE)
             while (cursor.moveToNext()) {
+                val cachedName = cursor.getString(nameIdx)?.takeIf { it.isNotBlank() }
+                val number     = cursor.getString(numberIdx) ?: ""
+                val name       = cachedName ?: lookupContactName(number)
                 results.add(mapOf(
-                    "name"            to (cursor.getString(nameIdx) ?: ""),
-                    "number"          to (cursor.getString(numberIdx) ?: ""),
+                    "name"            to name,
+                    "number"          to number,
                     "durationSeconds" to cursor.getLong(durationIdx),
                     "type"            to cursor.getInt(typeIdx),
                     "dateMs"          to cursor.getLong(dateIdx),
@@ -157,6 +162,25 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
         }
         return results
+    }
+
+    private fun lookupContactName(number: String): String {
+        if (number.isBlank()) return ""
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) return ""
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(number)
+        )
+        return try {
+            context.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) ?: "" else ""
+            } ?: ""
+        } catch (_: Exception) { "" }
     }
 
     // ── Usage sessions ────────────────────────────────────────────────────────

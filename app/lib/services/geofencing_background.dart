@@ -209,12 +209,14 @@ Future<void> _onStart(ServiceInstance service) async {
     final now = DateTime.now();
 
     // Effective speed in m/s: prefer GPS Doppler, fall back to position-derived.
-    // GPS speed is often -1 (unavailable) for the first few fixes on a cold start,
-    // which would suppress TRIP-START even at highway speed.
+    // Fallback only activates when pos.speed == -1 (GPS explicitly unavailable).
+    // Do NOT fall back when pos.speed == 0 — that is a valid "stationary" reading
+    // and using position-derived speed there would produce false triggers from
+    // GPS jitter on a stationary device.
     double effectiveSpeed = pos.speed >= 0 ? pos.speed : 0.0;
-    if (effectiveSpeed < _kSpeedStartMs && _prevLat != null && _prevTime != null) {
+    if (pos.speed < 0 && _prevLat != null && _prevTime != null) {
       final dtSec = now.difference(_prevTime!).inMilliseconds / 1000.0;
-      if (dtSec > 0 && dtSec < 30) {
+      if (dtSec >= 2 && dtSec < 30) {
         effectiveSpeed =
             _haversine(_prevLat!, _prevLng!, pos.latitude, pos.longitude) / dtSec;
       }
@@ -444,7 +446,6 @@ Future<void> _autoClockIn(
       'note':          'Auto · $name',
       'break_minutes': 0,
       'distance_km':   null,
-      'travel_minutes':null,
       'created_at':    now.toIso8601String(),
     });
     await db.close();

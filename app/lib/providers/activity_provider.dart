@@ -9,6 +9,8 @@ class ActivityProvider extends ChangeNotifier {
   static const _keyWhitelist = 'activity_whitelist';
   static const _keyMinDuration = 'activity_min_duration_minutes';
   static const _keyIdleThreshold = 'activity_idle_threshold_minutes';
+  static const _keyAdoptedCalls    = 'activity_adopted_calls';
+  static const _keyAdoptedSessions = 'activity_adopted_sessions';
   // Per-key LWW timestamps – epoch means "never changed locally".
   // Only the keys the user actually changed get a non-epoch timestamp,
   // so a device that only changes min_duration can't overwrite another
@@ -21,6 +23,8 @@ class ActivityProvider extends ChangeNotifier {
   List<ActivityLog> _sessions = [];
   List<ActivityLog> _calls = [];
   bool _hasCallLogPermission = false;
+  final Set<String> _adoptedCallIds    = {};
+  final Set<String> _adoptedSessionIds = {};
   List<String> _whitelist = List.from(defaultWhitelist);
   int _minDurationMinutes = 3;
   int _idleThresholdMinutes = 5;
@@ -37,6 +41,8 @@ class ActivityProvider extends ChangeNotifier {
   List<ActivityLog> get sessions => _sessions;
   List<ActivityLog> get calls => _calls;
   bool get hasCallLogPermission => _hasCallLogPermission;
+  bool isCallAdopted(String id)    => _adoptedCallIds.contains(id);
+  bool isSessionAdopted(String id) => _adoptedSessionIds.contains(id);
   List<String> get whitelist => _whitelist;
   int get minDurationMinutes => _minDurationMinutes;
   int get idleThresholdMinutes => _idleThresholdMinutes;
@@ -79,6 +85,25 @@ class ActivityProvider extends ChangeNotifier {
     _whitelistTs     = prefs.getString(_keyWhitelistTs)     ?? legacy ?? epochTs;
     _minDurationTs   = prefs.getString(_keyMinDurationTs)   ?? legacy ?? epochTs;
     _idleThresholdTs = prefs.getString(_keyIdleThresholdTs) ?? legacy ?? epochTs;
+    // Adopted sets
+    final adoptedCalls    = prefs.getStringList(_keyAdoptedCalls);
+    if (adoptedCalls != null) _adoptedCallIds.addAll(adoptedCalls);
+    final adoptedSessions = prefs.getStringList(_keyAdoptedSessions);
+    if (adoptedSessions != null) _adoptedSessionIds.addAll(adoptedSessions);
+  }
+
+  Future<void> markCallAdopted(String id) async {
+    _adoptedCallIds.add(id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyAdoptedCalls, _adoptedCallIds.toList());
+    notifyListeners();
+  }
+
+  Future<void> markSessionAdopted(String id) async {
+    _adoptedSessionIds.add(id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyAdoptedSessions, _adoptedSessionIds.toList());
+    notifyListeners();
   }
 
   /// Called when the user explicitly saves settings.

@@ -522,7 +522,10 @@ class _EmployerChipBar extends StatelessWidget {
             child: ChoiceChip(
               label: Text(e.name),
               selected: active,
-              onSelected: (_) => ep.setActive(e),
+              onSelected: (_) {
+                ep.setActive(e);
+                context.read<TimeEntryProvider>().setActiveEmployer(e.id);
+              },
               avatar: active ? const Icon(Icons.check, size: 16) : null,
             ),
           );
