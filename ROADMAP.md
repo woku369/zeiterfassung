@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-10 – Fahrtenbuch + Bluetooth-Trigger + Bugfixes
+> Letztes Update: 2026-05-13 – Bugfix-Welle + Urlaubstage/Krankenstand/ZA auf Roadmap
 
 ---
 
@@ -25,6 +25,29 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.18 – Bugfixes: Activity-Timeline + Geofencing + UX
+- [x] **Adopted-State in Activity-Timeline (Issue #1):**
+  - `ActivityProvider` verwaltet `_adoptedCallIds` und `_adoptedSessionIds` (Sets, in SharedPreferences persistent)
+  - Neue Methoden `markCallAdopted(id)` / `markSessionAdopted(id)`
+  - Nach „Übernehmen" werden Anruf/Session-Karten sofort gedimmt (Opacity 0.45), Titel durchgestrichen, Häkchen-Icon statt Button
+  - Zustand bleibt auch nach App-Neustart und Datumswechsel erhalten
+- [x] **Kontaktnamen für ältere Anrufe (Issue #2):**
+  - `UsageStatsPlugin.kt`: neues `lookupContactName(number)` via `ContactsContract.PhoneLookup` als Fallback wenn `CACHED_NAME` leer
+  - `READ_CONTACTS`-Berechtigung in AndroidManifest ergänzt
+  - Anrufe aus beliebig fernen Monaten zeigen nun den Kontaktnamen wenn dieser heute im Adressbuch ist
+- [x] **Auto Clock-in `travel_minutes`-Crash behoben (Issue #3):**
+  - `_autoClockIn` übergab `'travel_minutes': null` an SQLite – Spalte ist `NOT NULL DEFAULT 0`
+  - Fix: Key aus INSERT entfernt → Default greift automatisch
+- [x] **Wochenstunden aktualisieren sich bei Arbeitgeberwechsel (Issue #6):**
+  - `_EmployerChipBar.onSelected` ruft jetzt `TimeEntryProvider.setActiveEmployer(e.id)` auf
+  - Wochenbalken und Stundensaldo werden sofort neu berechnet – kein Tab-Wechsel mehr nötig
+- [x] **Activity-Timeline öffnet immer den heutigen Tag (Issue #7):**
+  - `_load()` in `ActivityTimelineScreen` lädt stets `DateTime.now()` statt des zuletzt angezeigten `ap.selectedDate`
+- [x] **Fahrten-Distanz-Bug behoben (Issue #4 + vorherige Commits):**
+  - `_haversine()` gibt Meter zurück – Filter war `d < 0.5` (halbe Meter) → nie aktiv
+  - Fix: `if (d < 500) _tripDistKm += d / 1000` (500 m Sprung-Filter, korrekte Einheitenumrechnung)
+  - `effectiveSpeed`-Fallback nur bei `pos.speed < 0` (GPS liefert explizit keine Geschwindigkeit) – kein Jitter bei liegendem Telefon
 
 ### v1.17 – Fahrtenbuch + Bluetooth-Trigger + Bugfixes
 - [x] **Fahrtenbuch (GPS-basiert):**
@@ -322,6 +345,29 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Offen / In Arbeit
 
+### Kurzfristig – Urlaub, Krankenstand & Zeitausgleich
+
+- [ ] **Urlaubstage-Verwaltung (pro Arbeitgeber):**
+  - Jahres-Kontingent pro AG konfigurierbar (z.B. 25 Tage KV, Gurktaler möglicherweise 26 – noch zu prüfen)
+  - `WorkType.vacation` existiert bereits – fehlend: Jahressaldo, Resturlaub-Anzeige, Warnhinweis bei Überziehung
+  - Konsumierte Tage im Wirtschaftsjahr-Bericht pro AG anzeigen (bereits teilweise: „Tage Urlaub" in v1.4)
+  - Ziel: nachweisbarer Nachweis der Konsumation (Arbeitgeber muss keine Rücklage für offene Urlaube bilden)
+  - Umsetzung: `vacation_days_per_year` als Feld auf `employers`; Jahressaldo = Kontingent − konsumierte Tage; eigene Kachel im Jahresbericht
+
+- [ ] **Krankenstand-Verwaltung:**
+  - `WorkType.sick` existiert bereits – fehlend: Tages-Übersicht, Jahresstatistik
+  - Krank = krank für **beide AG gleichzeitig** (kein AG-Split beim Krankenstand)
+  - Eintrag einmal anlegen → automatisch für alle aktiven AG des Tages übernehmen (oder Hinweis beim Eintragen)
+  - Im Jahresbericht: Krankstandstage pro Jahr anzeigen
+
+- [ ] **Zeitausgleich-Modell (ZA) – Konzept zu skizzieren:**
+  - `WorkType.compensatoryLeave` existiert bereits
+  - Fehlt: ZA-Konto = aufgelaufene Überstunden (Ist − Soll, kumuliert) → ZA-Anspruch in Stunden/Tagen
+  - Konsumation als `compensatoryLeave`-Eintrag bucht gegen das ZA-Konto
+  - Saldo-Anzeige analog Resturlaub im Jahresbericht
+  - Pro AG separat (Überstunden bei AG A begründen kein ZA bei AG B)
+  - *Design-Frage noch offen:* Übertrag ins Folgejahr? Verfall? Auszahlung?
+
 ### Kurzfristig – Datenqualität
 - [ ] **Tätigkeitsart-Konzept überarbeiten:** Aktuell vermischt WorkType Arbeitsort und Tätigkeit
   - Trennung in **Arbeitsort** (Homeoffice, Gurk, Außer Haus, Sonstiges) und **Tätigkeit** (Freitext + Projektzuordnung)
@@ -381,8 +427,8 @@ app/
     models/          time_entry, employer, tracked_location, imap_config,
                      work_type, activity_log, suggested_entry, project
     providers/       time_entry_provider, employer_provider, location_provider,
-                     activity_provider, sync_provider, suggestion_provider,
-                     project_provider
+                     activity_provider (+ adopted-State für Anrufe/Sessions),
+                     sync_provider, suggestion_provider, project_provider
     services/        sync_service (inkl. NAS-Backup-Endpoints),
                      export_service, import_service, gps_service,
                      holiday_service, geofencing_service (mit Boot-Flag),
@@ -394,16 +440,18 @@ app/
                      activity_tracking_win32, fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v10)
+    database/        database_helper (SQLite v11)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
-    kotlin/          MainActivity, UsageStatsPlugin, ActivityTrackingTileService,
+    kotlin/          MainActivity, UsageStatsPlugin (+ live ContactsContract-Fallback),
+                     BluetoothTripReceiver, ActivityTrackingTileService,
                      ZeiterfassungBootReceiver (eigener Receiver,
                      legt Channels an bevor BackgroundService gestartet wird)
                      Permissions: ACCESS_BACKGROUND_LOCATION, POST_NOTIFICATIONS,
                                   PACKAGE_USAGE_STATS, FOREGROUND_SERVICE,
-                                  FOREGROUND_SERVICE_LOCATION, RECEIVE_BOOT_COMPLETED
+                                  FOREGROUND_SERVICE_LOCATION, RECEIVE_BOOT_COMPLETED,
+                                  READ_CALL_LOG, READ_CONTACTS
                      Service: flutter_background_service
                               (autoStart:false, manuell + via eigenem BootReceiver)
   windows/           Ordner aktiv – Tray verifiziert
