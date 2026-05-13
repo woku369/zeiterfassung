@@ -158,7 +158,7 @@ class ActivityTrackingService {
         if (!_matchesWhitelist(title, whitelist) &&
             !_matchesWhitelist(pkg, whitelist)) continue;
         logs.add(ActivityLog(
-          id: const Uuid().v4(),
+          id: 'session_${startMs}_$pkg',
           startTime: start,
           endTime: end,
           title: title,

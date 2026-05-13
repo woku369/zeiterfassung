@@ -37,6 +37,12 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
     });
     final ap = context.read<ActivityProvider>();
     await ap.recheckPermission();
+    // Silently request contacts permission if call log is already granted
+    // (needed for live contact name lookup on older calls).
+    if (Platform.isAndroid) {
+      final contactsStatus = await Permission.contacts.status;
+      if (!contactsStatus.isGranted) await Permission.contacts.request();
+    }
     if (ap.hasPermission) {
       await ap.loadSessions(DateTime.now());
     }
@@ -310,8 +316,11 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                                   subtitle: const Text('Eingehende & ausgehende Anrufe anzeigen'),
                                   trailing: TextButton(
                                     onPressed: () async {
-                                      final status = await Permission.phone.request();
-                                      if (status.isGranted) {
+                                      final statuses = await [
+                                        Permission.phone,
+                                        Permission.contacts,
+                                      ].request();
+                                      if (statuses[Permission.phone]?.isGranted == true) {
                                         await ap.recheckCallLogPermission();
                                       } else {
                                         await openAppSettings();
