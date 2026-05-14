@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-13 – Bugfix-Welle + Urlaubstage/Krankenstand/ZA auf Roadmap
+> Letztes Update: 2026-05-14 – v1.19 Urlaubstage/Krankenstand implementiert
 
 ---
 
@@ -25,6 +25,26 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.19 – Urlaubstage, Krankenstand & Jahressaldo
+- [x] **`vacation_days_per_year` pro Arbeitgeber (DB v12):**
+  - Neues Feld auf `Employer`-Modell (int, Default 25) – `toMap`, `fromMap`, `copyWith`, `toJson` vollständig
+  - DB-Migration v12: `ALTER TABLE employers ADD COLUMN vacation_days_per_year INTEGER NOT NULL DEFAULT 25`
+  - NAS-Backend `server.js`: Schema + `upsertEmployer`-Statement + idempotente Migration für bestehende Server-DBs
+- [x] **Einstellungen – Arbeitgeber-Dialog:**
+  - Neues Textfeld „Urlaubstage/Jahr" (Standard 25) – kann pro AG unterschiedlich gesetzt werden (z.B. 26 für Gurktaler per Dienstvertrag)
+- [x] **Wirtschaftsjahr-Bericht:**
+  - Urlaubszeile ist **immer sichtbar** (war bisher nur bei `_vacationDays > 0`)
+  - Zeigt `verbraucht / Kontingent Tage` mit Fortschrittsbalken (`.clamp(0.0, 1.0)`)
+  - Zusätzlich: „Resturlaub: X Tage" (oder „Überzogen: X Tage" in Rot)
+  - Kontingent kommt aus `employer.vacationDaysPerYear` statt hartkodierter `25`
+- [x] **Krankenstand-Auto-Duplikation:**
+  - Beim Speichern eines `WorkType.sick`-Eintrags wird für jeden weiteren Arbeitgeber automatisch eine identische Eintragung angelegt
+  - Info-Text im Formular: „Krankenstand – wird automatisch für alle Arbeitgeber eingetragen."
+- [x] **Handbuch:** neue Sektion „Urlaub, Krankenstand & Zeitausgleich"
+- [x] **Bugfixes v1.19:**
+  - `server.js` fehlte `vacation_days_per_year` in Schema + Upsert → Wert wurde bei jedem NAS-Sync verworfen (auf Default 25 zurückgesetzt)
+  - `entry_form_screen.dart`: fehlender `mounted`-Check nach `await addEntry()` vor `context.read<EmployerProvider>()` → potenzieller Zugriff auf deaktivierten Context
 
 ### v1.18 – Bugfixes: Activity-Timeline + Geofencing + UX
 - [x] **Adopted-State in Activity-Timeline (Issue #1):**
@@ -345,28 +365,18 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Offen / In Arbeit
 
-### Kurzfristig – Urlaub, Krankenstand & Zeitausgleich
+### Kurzfristig – Zeitausgleich-Modell
 
-- [ ] **Urlaubstage-Verwaltung (pro Arbeitgeber):**
-  - Jahres-Kontingent pro AG konfigurierbar (z.B. 25 Tage KV, Gurktaler möglicherweise 26 – noch zu prüfen)
-  - `WorkType.vacation` existiert bereits – fehlend: Jahressaldo, Resturlaub-Anzeige, Warnhinweis bei Überziehung
-  - Konsumierte Tage im Wirtschaftsjahr-Bericht pro AG anzeigen (bereits teilweise: „Tage Urlaub" in v1.4)
-  - Ziel: nachweisbarer Nachweis der Konsumation (Arbeitgeber muss keine Rücklage für offene Urlaube bilden)
-  - Umsetzung: `vacation_days_per_year` als Feld auf `employers`; Jahressaldo = Kontingent − konsumierte Tage; eigene Kachel im Jahresbericht
+- [x] **Urlaubstage-Verwaltung (pro Arbeitgeber):** *(implementiert in v1.19)*
+- [x] **Krankenstand-Auto-Duplikation:** *(implementiert in v1.19)*
 
-- [ ] **Krankenstand-Verwaltung:**
-  - `WorkType.sick` existiert bereits – fehlend: Tages-Übersicht, Jahresstatistik
-  - Krank = krank für **beide AG gleichzeitig** (kein AG-Split beim Krankenstand)
-  - Eintrag einmal anlegen → automatisch für alle aktiven AG des Tages übernehmen (oder Hinweis beim Eintragen)
-  - Im Jahresbericht: Krankstandstage pro Jahr anzeigen
-
-- [ ] **Zeitausgleich-Modell (ZA) – Konzept zu skizzieren:**
+- [ ] **Zeitausgleich-Modell (ZA) – Konzept noch offen:**
   - `WorkType.compensatoryLeave` existiert bereits
   - Fehlt: ZA-Konto = aufgelaufene Überstunden (Ist − Soll, kumuliert) → ZA-Anspruch in Stunden/Tagen
   - Konsumation als `compensatoryLeave`-Eintrag bucht gegen das ZA-Konto
   - Saldo-Anzeige analog Resturlaub im Jahresbericht
   - Pro AG separat (Überstunden bei AG A begründen kein ZA bei AG B)
-  - *Design-Frage noch offen:* Übertrag ins Folgejahr? Verfall? Auszahlung?
+  - *Design-Fragen offen:* Übertrag ins Folgejahr? Verfall? Auszahlung?
 
 ### Kurzfristig – Datenqualität
 - [ ] **Tätigkeitsart-Konzept überarbeiten:** Aktuell vermischt WorkType Arbeitsort und Tätigkeit
@@ -440,7 +450,7 @@ app/
                      activity_tracking_win32, fusion_engine
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v11)
+    database/        database_helper (SQLite v12)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -484,12 +494,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v9: + `is_special_hours` (time_entries) – Sonderarbeitszeit-Flag für Zuschlagsberechnung
 - v10: + `projects` (Tabelle), + `project_id` (time_entries) – Projektzuordnung
 - v11: + `trips` (Tabelle) – Fahrtenbuch mit GPS-Tracking und Adressauflösung
+- v12: + `vacation_days_per_year` (employers) – Urlaubskontingent pro Arbeitgeber
 
 **Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync; `projects` (Tabelle) für bidirektionalen Projekt-Sync.
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.17)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.19)
 
 ---
 

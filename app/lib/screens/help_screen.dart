@@ -538,6 +538,36 @@ class HelpScreen extends StatelessWidget {
           ),
           SizedBox(height: 8),
           _Section(
+            icon: Icons.beach_access_outlined,
+            title: 'Urlaub, Krankenstand & Zeitausgleich',
+            children: const [
+              _Para(
+                'Abwesenheiten (Urlaub, Krankenstand, Zeitausgleich) werden als '
+                'eigene Eintragstypen erfasst. Sie zählen nicht als Arbeitszeit.',
+              ),
+              _SubHeading('Urlaubstage-Kontingent'),
+              _Step(number: '1', text: 'Einstellungen → Arbeitgeber bearbeiten → „Urlaubstage/Jahr" eingeben'),
+              _Step(number: '2', text: 'Standard: 25 Tage (KV). Gurktaler AG ggf. 26 Tage (laut Dienstvertrag prüfen)'),
+              _Step(number: '3', text: 'Im Wirtschaftsjahr-Bericht erscheint: verbrauchte Tage / Kontingent + Resturlaub'),
+              _SubHeading('Krankenstand eintragen'),
+              _Step(number: '1', text: 'Eintrag anlegen → Tätigkeitsart „Krankenstand" wählen'),
+              _Step(number: '2', text: 'Krank = krank für beide Arbeitgeber – Eintrag wird automatisch für alle AG dupliziert'),
+              _Step(number: '3', text: 'Kein Arbeitgeber manuell auswählen nötig; App übernimmt die Verteilung'),
+              _SubHeading('Zeitausgleich'),
+              _Step(number: '1', text: 'Eintrag anlegen → Tätigkeitsart „Zeitausgleich" wählen'),
+              _Step(number: '2', text: 'ZA-Tage erscheinen im Wirtschaftsjahr-Bericht unter Abwesenheiten'),
+              _SubHeading('Jahresbericht – Abwesenheitsübersicht'),
+              _KeyValue(label: 'Urlaub', value: 'verbraucht / Kontingent + Resturlaub (Progressbalken)'),
+              _KeyValue(label: 'Krankenstand', value: 'Anzahl Krankentage im Wirtschaftsjahr'),
+              _KeyValue(label: 'Zeitausgleich', value: 'Anzahl ZA-Tage im Wirtschaftsjahr'),
+              _Hint(
+                'Die Urlaubszeile ist immer sichtbar (auch bei 0 Tagen) – '
+                'so ist der Resturlaub stets auf einen Blick erkennbar.',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
             icon: Icons.description_outlined,
             title: 'Monatsberichte & Export',
             children: [

@@ -140,7 +140,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     if (_isNew) {
       await tp.addEntry(entry);
       // Sick days are duplicated for all employers automatically.
-      if (_workType == WorkType.sick) {
+      if (_workType == WorkType.sick && mounted) {
         final allEmployers = context.read<EmployerProvider>().employers;
         for (final emp in allEmployers) {
           if (emp.id == _employerId) continue;
