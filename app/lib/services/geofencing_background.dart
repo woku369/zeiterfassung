@@ -136,6 +136,21 @@ Future<void> _onStart(ServiceInstance service) async {
   bool      _tripActive = false;   // currently in a "moving" phase
   bool      _btTripActive = false; // trip was started by BT connect
 
+  // Dynamic GPS accuracy: medium (balanced power) normally, high during trip.
+  StreamSubscription<Position>? _posSub;
+  Timer? _keepAlive;
+  late void Function(Position) _posHandler;
+
+  void _restartGps(LocationAccuracy acc) {
+    _posSub?.cancel();
+    _posSub = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: acc,
+        distanceFilter: acc == LocationAccuracy.high ? 10 : 30,
+      ),
+    ).listen(_posHandler);
+  }
+
   // ── Receive commands from main isolate ─────────────────────────────────────
 
   service.on('setLocations').listen((data) {
@@ -180,8 +195,25 @@ Future<void> _onStart(ServiceInstance service) async {
     } catch (_) {}
   });
 
+  // Keep-alive: update foreground notification every minute so MIUI/HyperOS
+  // treats the service as actively working and doesn't suspend the isolate.
+  // Without this, the 2-min trip-stop timer may be delayed by hours on MIUI.
+  _keepAlive = Timer.periodic(const Duration(minutes: 1), (_) {
+    if (service is AndroidServiceInstance) {
+      final msg = _tripActive
+          ? 'Fahrt läuft · ${_tripDistKm.toStringAsFixed(1)} km'
+          : inside.isNotEmpty
+              ? 'Zone aktiv · Stempel läuft'
+              : 'Bereit';
+      (service as AndroidServiceInstance).setForegroundNotificationInfo(
+          title: 'Standort-Erkennung aktiv', content: msg);
+    }
+  });
+
   service.on('stop').listen((_) {
     watchdog.cancel();
+    _keepAlive?.cancel();
+    _posSub?.cancel();
     for (final t in timers.values) t.cancel();
     service.stopSelf();
   });
@@ -200,12 +232,7 @@ Future<void> _onStart(ServiceInstance service) async {
   double?   _prevLat, _prevLng;
   DateTime? _prevTime;
 
-  Geolocator.getPositionStream(
-    locationSettings: const LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 20,
-    ),
-  ).listen((pos) async {
+  _posHandler = (pos) async {
     final now = DateTime.now();
 
     // Effective speed in m/s: prefer GPS Doppler, fall back to position-derived.
@@ -317,6 +344,7 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripDistKm   = 0;
         _tripActive   = true;
         _btTripActive = true;
+        _restartGps(LocationAccuracy.high);
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
         await prefs.setString(_kOpenTripKey, _tripId!);
@@ -326,6 +354,7 @@ Future<void> _onStart(ServiceInstance service) async {
         final mac = btEvent.substring(11);
         _btTripActive = false;
         _tripActive   = false;
+        _restartGps(LocationAccuracy.medium);
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
         // Use startLat/Lng as fallback if no GPS tick yet after connect
@@ -353,6 +382,7 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripDistKm   = 0;
         _tripActive   = true;
         _btTripActive = false;
+        _restartGps(LocationAccuracy.high);
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
         await prefs.setString(_kOpenTripKey, _tripId!);
@@ -377,6 +407,7 @@ Future<void> _onStart(ServiceInstance service) async {
             if (!_tripActive) return;
             _tripActive   = false;
             _btTripActive = false;
+            _restartGps(LocationAccuracy.medium);
             await _finalizeTrip(
               id:       _tripId!,
               endLat:   _tripLastLat!,
@@ -397,6 +428,7 @@ Future<void> _onStart(ServiceInstance service) async {
       // Trip tracking was disabled mid-trip – finalize cleanly
       _tripActive   = false;
       _btTripActive = false;
+      _restartGps(LocationAccuracy.medium);
       _tripStopTimer?.cancel();
       _tripStopTimer = null;
       if (_tripId != null && _tripLastLat != null && _tripLastLng != null) {
@@ -406,7 +438,9 @@ Future<void> _onStart(ServiceInstance service) async {
       }
       await prefs.remove(_kOpenTripKey);
     }
-  });
+  };
+
+  _restartGps(LocationAccuracy.medium);
 }
 
 // ── Auto clock-in / clock-out ─────────────────────────────────────────────────
