@@ -297,6 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             result['name']!,
             result['hours']!,
             fiscalYearStartMonth: result['fiscalMonth']!,
+            vacationDaysPerYear: result['vacationDays'] ?? 25,
           );
     }
   }
@@ -309,6 +310,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               name: result['name'],
               weeklyHours: result['hours'],
               fiscalYearStartMonth: result['fiscalMonth'],
+              vacationDaysPerYear: result['vacationDays'],
             ),
           );
     }
@@ -319,6 +321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final hoursCtrl =
         TextEditingController(text: existing?.weeklyHours.toString() ?? '40');
+    final vacationCtrl = TextEditingController(
+        text: (existing?.vacationDaysPerYear ?? 25).toString());
     int fiscalMonth = existing?.fiscalYearStartMonth ?? 4;
     const monthNames = [
       'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -351,6 +355,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     suffixText: 'h'),
               ),
               const SizedBox(height: 12),
+              TextField(
+                controller: vacationCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Urlaubstage/Jahr',
+                    border: OutlineInputBorder(),
+                    suffixText: 'Tage'),
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 value: fiscalMonth,
                 decoration: const InputDecoration(
@@ -376,9 +389,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final name = nameCtrl.text.trim();
                 final hours =
                     double.tryParse(hoursCtrl.text.replaceAll(',', '.')) ?? 40.0;
+                final vacation = int.tryParse(vacationCtrl.text.trim()) ?? 25;
                 if (name.isEmpty) return;
-                Navigator.pop(context,
-                    {'name': name, 'hours': hours, 'fiscalMonth': fiscalMonth});
+                Navigator.pop(context, {
+                  'name': name,
+                  'hours': hours,
+                  'fiscalMonth': fiscalMonth,
+                  'vacationDays': vacation,
+                });
               },
               child: const Text('Speichern'),
             ),

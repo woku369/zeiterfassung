@@ -19,7 +19,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -33,6 +33,7 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         weekly_hours REAL NOT NULL DEFAULT 40.0,
         fiscal_year_start_month INTEGER NOT NULL DEFAULT 4,
+        vacation_days_per_year INTEGER NOT NULL DEFAULT 25,
         nas_url TEXT,
         nas_api_key TEXT,
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -127,6 +128,12 @@ class DatabaseHelper {
     }
     if (oldVersion < 11) {
       await _createV11Tables(db);
+    }
+    if (oldVersion < 12) {
+      try {
+        await db.execute(
+            'ALTER TABLE employers ADD COLUMN vacation_days_per_year INTEGER NOT NULL DEFAULT 25');
+      } catch (_) {}
     }
   }
 

@@ -3,6 +3,7 @@ class Employer {
   final String name;
   final double weeklyHours;
   final int fiscalYearStartMonth;
+  final int vacationDaysPerYear;
   final String? nasUrl;
   final String? nasApiKey;
   final String updatedAt;
@@ -13,6 +14,7 @@ class Employer {
     required this.name,
     this.weeklyHours = 40.0,
     this.fiscalYearStartMonth = 4,
+    this.vacationDaysPerYear = 25,
     this.nasUrl,
     this.nasApiKey,
     String? updatedAt,
@@ -24,6 +26,7 @@ class Employer {
     String? name,
     double? weeklyHours,
     int? fiscalYearStartMonth,
+    int? vacationDaysPerYear,
     String? nasUrl,
     String? nasApiKey,
   }) =>
@@ -32,6 +35,7 @@ class Employer {
         name: name ?? this.name,
         weeklyHours: weeklyHours ?? this.weeklyHours,
         fiscalYearStartMonth: fiscalYearStartMonth ?? this.fiscalYearStartMonth,
+        vacationDaysPerYear: vacationDaysPerYear ?? this.vacationDaysPerYear,
         nasUrl: nasUrl ?? this.nasUrl,
         nasApiKey: nasApiKey ?? this.nasApiKey,
         updatedAt: DateTime.now().toIso8601String(),
@@ -43,6 +47,7 @@ class Employer {
         'name': name,
         'weekly_hours': weeklyHours,
         'fiscal_year_start_month': fiscalYearStartMonth,
+        'vacation_days_per_year': vacationDaysPerYear,
         'nas_url': nasUrl,
         'nas_api_key': nasApiKey,
         'updated_at': updatedAt,
@@ -54,6 +59,7 @@ class Employer {
         name: m['name'] as String,
         weeklyHours: (m['weekly_hours'] as num?)?.toDouble() ?? 40.0,
         fiscalYearStartMonth: m['fiscal_year_start_month'] as int? ?? 4,
+        vacationDaysPerYear: m['vacation_days_per_year'] as int? ?? 25,
         nasUrl: m['nas_url'] as String?,
         nasApiKey: m['nas_api_key'] as String?,
         updatedAt: m['updated_at'] as String?,

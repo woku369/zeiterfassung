@@ -553,42 +553,40 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                 ),
               const SizedBox(height: 12),
               // ── Abwesenheitsübersicht ────────────────────────────────
-              if (_vacationDays > 0 || _sickDays > 0 || _compensatoryDays > 0)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Abwesenheiten ${_fyLabel}',
-                            style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        if (_vacationDays > 0)
-                          _AbsenceRow(
-                            icon: Icons.beach_access_outlined,
-                            label: 'Urlaub',
-                            days: _vacationDays,
-                            total: 25,
-                            color: Colors.blue.shade600,
-                          ),
-                        if (_sickDays > 0)
-                          _AbsenceRow(
-                            icon: Icons.sick_outlined,
-                            label: 'Krankenstand',
-                            days: _sickDays,
-                            color: Colors.orange.shade700,
-                          ),
-                        if (_compensatoryDays > 0)
-                          _AbsenceRow(
-                            icon: Icons.event_available_outlined,
-                            label: 'Zeitausgleich',
-                            days: _compensatoryDays,
-                            color: Colors.green.shade700,
-                          ),
-                      ],
-                    ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Abwesenheiten ${_fyLabel}',
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      _AbsenceRow(
+                        icon: Icons.beach_access_outlined,
+                        label: 'Urlaub',
+                        days: _vacationDays,
+                        total: employer?.vacationDaysPerYear ?? 25,
+                        color: Colors.blue.shade600,
+                      ),
+                      if (_sickDays > 0)
+                        _AbsenceRow(
+                          icon: Icons.sick_outlined,
+                          label: 'Krankenstand',
+                          days: _sickDays,
+                          color: Colors.orange.shade700,
+                        ),
+                      if (_compensatoryDays > 0)
+                        _AbsenceRow(
+                          icon: Icons.event_available_outlined,
+                          label: 'Zeitausgleich',
+                          days: _compensatoryDays,
+                          color: Colors.green.shade700,
+                        ),
+                    ],
                   ),
                 ),
+              ),
               const SizedBox(height: 12),
               // ── Legende ──────────────────────────────────────────────
               _Legend(),
@@ -852,28 +850,49 @@ class _AbsenceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final remaining = total != null ? total! - days : null;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
-          Expanded(child: Text(label)),
-          if (total != null) ...[
-            Text('$days / $total Tage',
-                style: TextStyle(fontWeight: FontWeight.w600, color: color)),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 80,
-              child: LinearProgressIndicator(
-                value: days / total!,
-                color: color,
-                backgroundColor: color.withOpacity(0.15),
+          Row(
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label)),
+              if (total != null) ...[
+                Text('$days / $total Tage',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 80,
+                  child: LinearProgressIndicator(
+                    value: (days / total!).clamp(0.0, 1.0),
+                    color: color,
+                    backgroundColor: color.withOpacity(0.15),
+                  ),
+                ),
+              ] else
+                Text('$days Tage',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+            ],
+          ),
+          if (remaining != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 26, top: 2),
+              child: Text(
+                remaining >= 0
+                    ? 'Resturlaub: $remaining Tage'
+                    : 'Überzogen: ${-remaining} Tage',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: remaining >= 0
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)
+                      : Colors.red.shade600,
+                ),
               ),
             ),
-          ] else
-            Text('$days Tage',
-                style: TextStyle(fontWeight: FontWeight.w600, color: color)),
         ],
       ),
     );

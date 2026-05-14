@@ -139,6 +139,17 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     );
     if (_isNew) {
       await tp.addEntry(entry);
+      // Sick days are duplicated for all employers automatically.
+      if (_workType == WorkType.sick) {
+        final allEmployers = context.read<EmployerProvider>().employers;
+        for (final emp in allEmployers) {
+          if (emp.id == _employerId) continue;
+          await tp.addEntry(entry.copyWith(
+            id: const Uuid().v4(),
+            employerId: emp.id,
+          ));
+        }
+      }
     } else {
       await tp.updateEntry(entry);
     }
@@ -329,7 +340,9 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Abwesenheitstag – keine Zeiterfassung. Zählt nicht als Arbeitszeit.',
+                        _workType == WorkType.sick
+                            ? 'Krankenstand – wird automatisch für alle Arbeitgeber eingetragen.'
+                            : 'Abwesenheitstag – keine Zeiterfassung. Zählt nicht als Arbeitszeit.',
                         style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(context).colorScheme.onSecondaryContainer),
