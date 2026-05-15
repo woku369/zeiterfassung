@@ -135,6 +135,7 @@ Future<void> _onStart(ServiceInstance service) async {
   Timer?    _tripStopTimer;       // fires when speed drops for >2 min
   bool      _tripActive = false;   // currently in a "moving" phase
   bool      _btTripActive = false; // trip was started by BT connect
+  DateTime? _lastMovementTime;    // last GPS tick with speed >= stop threshold
 
   // Dynamic GPS accuracy: medium (balanced power) normally, high during trip.
   StreamSubscription<Position>? _posSub;
@@ -373,15 +374,16 @@ Future<void> _onStart(ServiceInstance service) async {
 
       if (!_tripActive && effectiveSpeed >= _kSpeedStartMs) {
         // Start a new trip
-        _tripId       = const Uuid().v4();
-        _tripStart    = now;
-        _tripStartLat = pos.latitude;
-        _tripStartLng = pos.longitude;
-        _tripLastLat  = pos.latitude;
-        _tripLastLng  = pos.longitude;
-        _tripDistKm   = 0;
-        _tripActive   = true;
-        _btTripActive = false;
+        _tripId           = const Uuid().v4();
+        _tripStart        = now;
+        _tripStartLat     = pos.latitude;
+        _tripStartLng     = pos.longitude;
+        _tripLastLat      = pos.latitude;
+        _tripLastLng      = pos.longitude;
+        _tripDistKm       = 0;
+        _lastMovementTime = now;
+        _tripActive       = true;
+        _btTripActive     = false;
         _restartGps(LocationAccuracy.high);
         _tripStopTimer?.cancel();
         _tripStopTimer = null;
@@ -401,27 +403,39 @@ Future<void> _onStart(ServiceInstance service) async {
         _tripLastLng = pos.longitude;
 
         if (effectiveSpeed < _kSpeedStopMs) {
-          // Start stop-candidate timer if not already running
+          // Start stop-candidate timer if not already running.
+          // Capture last-movement snapshot for the timer closure: if MIUI suspends
+          // the isolate, the timer fires late and DateTime.now() would produce a
+          // wrong (inflated) end time. Using the snapshot keeps the end time correct.
+          final capturedLastMovement = _lastMovementTime;
           _tripStopTimer ??= Timer(const Duration(minutes: 2), () async {
             _tripStopTimer = null;
             if (!_tripActive) return;
             _tripActive   = false;
             _btTripActive = false;
             _restartGps(LocationAccuracy.medium);
+            // If the service was suspended between the last movement and now
+            // (gap > 15 min), use lastMovement + 2 min as the real end time.
+            final realEnd = capturedLastMovement != null &&
+                DateTime.now().difference(capturedLastMovement).inMinutes > 15
+                ? capturedLastMovement.add(const Duration(minutes: 2))
+                : DateTime.now();
             await _finalizeTrip(
               id:       _tripId!,
               endLat:   _tripLastLat!,
               endLng:   _tripLastLng!,
               distKm:   _tripDistKm,
+              endTime:  realEnd,
               notifications: notifications,
             );
             _tripId = null; _tripDistKm = 0;
             await prefs.remove(_kOpenTripKey);
           });
         } else {
-          // Still moving – cancel any pending stop
+          // Still moving – cancel any pending stop and update last movement time.
           _tripStopTimer?.cancel();
           _tripStopTimer = null;
+          _lastMovementTime = now;
         }
       }
     } else if (_tripActive) {
@@ -571,6 +585,7 @@ Future<void> _finalizeTrip({
   required double endLat,
   required double endLng,
   required double distKm,
+  DateTime? endTime,
   required FlutterLocalNotificationsPlugin notifications,
 }) async {
   if (distKm < _kMinDistKm) {
@@ -583,11 +598,11 @@ Future<void> _finalizeTrip({
     await _log('TRIP-SKIP', 'Zu kurz: ${distKm.toStringAsFixed(2)} km');
     return;
   }
-  final now = DateTime.now();
+  final end = endTime ?? DateTime.now();
   try {
     final db = await _openDb();
     await db.update('trips', {
-      'end_time':   now.toIso8601String(),
+      'end_time':   end.toIso8601String(),
       'end_lat':    endLat,
       'end_lng':    endLng,
       'distance_km': distKm,
