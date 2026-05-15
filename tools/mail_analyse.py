@@ -3,29 +3,34 @@
 mail_analyse.py — Gurktaler E-Mail-Analyse für Zeiterfassung
 ============================================================
 Analysiert Thunderbird-MBOX-Dateien, filtert E-Mails mit Bezug
-zu einem Stichwort (Standard: "gurktaler"), summiert 2 Minuten
-pro E-Mail und erstellt SQL-INSERT-Statements für die
-Zeiterfassung-SQLite-Datenbank.
+zu Gurktaler-spezifischen Stichwörtern (aus der App-Whitelist),
+summiert 2 Minuten pro E-Mail und erstellt SQL-INSERT-Statements
+für die Zeiterfassung-SQLite-Datenbank.
 
 Verwendung (auf dem Windows-PC mit Thunderbird):
   python mail_analyse.py
-  python mail_analyse.py --mbox "C:/Users/.../Thunderbird/..." --keyword gurktaler
-  python mail_analyse.py --mbox pfad1 pfad2  --from 2024-04 --to 2025-03
+  python mail_analyse.py --from 2024-04 --to 2025-03
+  python mail_analyse.py --mbox "C:/Users/.../Thunderbird/Profiles"
+  python mail_analyse.py --keywords gurktaler mazerat underberg
+
+Keywords:
+  Standard: Gurktaler-Whitelist aus activity_tracking_service.dart
+  (Produkte, Partner, Kunden, Rohstoffe — keine App-Namen)
+  Wird automatisch aus der App-SharedPreferences gelesen, falls verfügbar.
 
 Ausgabe:
-  - Tabellarische Auswertung in der Konsole
-  - gurktaler_mails_YYYY-MM-DD.csv   (Monatsübersicht)
-  - gurktaler_insert_YYYY-MM-DD.sql  (SQL für direkte DB-Einspielung)
-  - gurktaler_insert_YYYY-MM-DD.txt  (lesbares Protokoll)
+  gurktaler_mails_YYYY-MM-DD.csv    Monatsübersicht
+  gurktaler_insert_YYYY-MM-DD.sql   SQL für direkte DB-Einspielung
+  gurktaler_bericht_YYYY-MM-DD.txt  Lesbares Protokoll
 """
 
 import argparse
+import json
 import mailbox
-import os
-import re
 import sqlite3
 import sys
 import uuid
+import winreg
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.header import decode_header as _decode_header
@@ -36,15 +41,36 @@ from pathlib import Path
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 
 MINUTES_PER_MAIL = 2
-DEFAULT_START_HOUR = 8   # Tagesbeginn für synthetischen Eintrag
-WORK_TYPE = "other"      # Tätigkeitsart in der DB
+DEFAULT_START_HOUR = 8
+WORK_TYPE = "other"
 NOTE_TEMPLATE = "Mailbearbeitung Gurktaler ({n} Mails)"
+
+# Gurktaler-spezifische Begriffe aus der App-Whitelist.
+# App-Namen (chrome, firefox, word …) bewusst NICHT enthalten —
+# diese passen für Aktivitätserkennung, aber nicht für E-Mail-Filter.
+DEFAULT_KEYWORDS: list[str] = [
+    # Produkte & Rohstoffe
+    "gurktaler", "aqua", "mazerat", "destillat", "kräuter", "tank",
+    "kalkulation", "garten",
+    "thymian", "salbei", "oregano", "pfefferminze", "schokominze",
+    "zitronenmelisse", "zitronengras", "zitronenverbene", "zitrus",
+    "gurki", "sanddorn", "alpen",
+    "alkohol", "likör", "aroma", "farbstoff",
+    "kleinflasche", "kleinserie",
+    # Partner & Kunden
+    "burger", "spiller", "underberg", "stranner", "dudli", "maunz", "dencker",
+    "mozart", "schlumberger", "top spirit", "pfau", "ruhdorfer", "jufa",
+    "dom", "kalidz", "grames",
+    # Prozesse & Termine (bewusst kein generisches "termin")
+    "führung",
+    # Lieferanten & Regionen
+    "rüdesheim", "rheinberg", "heiligenstädter", "bio", "lacon",
+]
 
 
 # ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 def decode_str(value: str | bytes | None, charset: str | None = None) -> str:
-    """Dekodiert einen E-Mail-Header-Wert sicher zu einem Unicode-String."""
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -59,7 +85,6 @@ def decode_str(value: str | bytes | None, charset: str | None = None) -> str:
 
 
 def decode_header(header_value: str | None) -> str:
-    """Dekodiert einen codierten E-Mail-Header vollständig."""
     if not header_value:
         return ""
     parts = []
@@ -69,7 +94,6 @@ def decode_header(header_value: str | None) -> str:
 
 
 def get_msg_date(msg) -> datetime | None:
-    """Extrahiert das Datum einer E-Mail als datetime-Objekt."""
     date_str = msg.get("Date", "")
     if not date_str:
         return None
@@ -77,7 +101,6 @@ def get_msg_date(msg) -> datetime | None:
         return parsedate_to_datetime(date_str)
     except Exception:
         pass
-    # Fallback: rohe Datumsformate
     for fmt in ("%a, %d %b %Y %H:%M:%S %z", "%d %b %Y %H:%M:%S %z"):
         try:
             return datetime.strptime(date_str.strip(), fmt)
@@ -86,89 +109,151 @@ def get_msg_date(msg) -> datetime | None:
     return None
 
 
-def is_relevant(msg, keyword: str) -> bool:
-    """Prüft ob eine E-Mail das Keyword in Von/An/CC/BCC/Betreff enthält."""
-    kw = keyword.lower()
-    fields = [
+def is_relevant(msg, keywords: list[str]) -> bool:
+    """Prüft ob Von/An/CC/BCC/Betreff mindestens ein Keyword enthält."""
+    fields = " ".join([
         decode_header(msg.get("From", "")),
         decode_header(msg.get("To", "")),
         decode_header(msg.get("Cc", "")),
         decode_header(msg.get("Bcc", "")),
         decode_header(msg.get("Subject", "")),
-    ]
-    return any(kw in f.lower() for f in fields)
+    ]).lower()
+    return any(kw.lower() in fields for kw in keywords)
 
 
 def month_key(dt: datetime) -> str:
-    """Gibt einen sortierbaren Monat-Schlüssel zurück: 'YYYY-MM'."""
     return dt.strftime("%Y-%m")
 
 
 def first_workday(year: int, month: int) -> datetime:
-    """Gibt den ersten Werktag (Mo–Fr) des Monats zurück."""
     d = datetime(year, month, 1)
-    while d.weekday() >= 5:   # 5=Sa, 6=So
+    while d.weekday() >= 5:
         d += timedelta(days=1)
     return d
 
 
 def deterministic_uuid(employer_id: str, month: str) -> str:
-    """Erzeugt eine stabile UUID für einen monatlichen Mailbearbeitungs-Eintrag."""
     namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
-    key = f"mail:{employer_id}:{month}"
-    return str(uuid.uuid5(namespace, key))
+    return str(uuid.uuid5(namespace, f"mail:{employer_id}:{month}"))
+
+
+# ── Whitelist aus App-SharedPreferences laden ─────────────────────────────────
+
+def load_whitelist_from_app() -> list[str] | None:
+    """
+    Versucht die Whitelist aus den SharedPreferences der Zeiterfassung-App
+    zu lesen. Speicherort (Windows): JSON-Datei im AppData-Verzeichnis
+    oder Windows-Registry (shared_preferences_windows).
+    Gibt None zurück wenn nicht gefunden.
+    """
+    home = Path.home()
+
+    # shared_preferences_windows speichert als JSON-Datei
+    json_candidates = [
+        home / "AppData" / "Roaming" / "com.example.zeiterfassung" / "shared_preferences.json",
+        home / "AppData" / "Local"   / "com.example.zeiterfassung" / "shared_preferences.json",
+        home / "AppData" / "Roaming" / "Zeiterfassung" / "shared_preferences.json",
+    ]
+    for p in json_candidates:
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                wl = data.get("activity_whitelist")
+                if isinstance(wl, list) and wl:
+                    return [str(k) for k in wl]
+            except Exception:
+                pass
+
+    # Fallback: Windows Registry
+    try:
+        reg_paths = [
+            r"SOFTWARE\com.example.zeiterfassung",
+            r"SOFTWARE\Zeiterfassung",
+        ]
+        for rp in reg_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, rp)
+                val, _ = winreg.QueryValueEx(key, "activity_whitelist")
+                winreg.CloseKey(key)
+                parsed = json.loads(val) if isinstance(val, str) else val
+                if isinstance(parsed, list) and parsed:
+                    return [str(k) for k in parsed]
+            except FileNotFoundError:
+                pass
+    except ImportError:
+        pass   # kein winreg (nicht Windows)
+    except Exception:
+        pass
+
+    return None
+
+
+def resolve_keywords(cli_keywords: list[str] | None) -> list[str]:
+    """
+    Bestimmt die endgültige Keyword-Liste:
+    1. --keywords CLI-Argument (überschreibt alles)
+    2. App-SharedPreferences (nur Gurktaler-Begriffe, App-Namen gefiltert)
+    3. DEFAULT_KEYWORDS
+    """
+    if cli_keywords:
+        return [k.strip().lower() for k in cli_keywords if k.strip()]
+
+    app_wl = load_whitelist_from_app()
+    if app_wl:
+        # App-Namen und generische Begriffe herausfiltern
+        app_noise = {
+            "chrome", "firefox", "edge", "opera", "brave",
+            "word", "excel", "powerpoint", "libreoffice", "writer", "calc", "impress",
+            "acrobat", "foxit", "sumatra", "outlook", "thunderbird",
+            "teams", "zoom", "slack",
+            "termin",   # zu generisch für E-Mail-Filter
+        }
+        filtered = [k for k in app_wl if k.lower() not in app_noise]
+        if filtered:
+            print(f"  Whitelist aus App geladen ({len(filtered)} Begriffe, "
+                  f"{len(app_wl) - len(filtered)} App-Namen entfernt)")
+            return [k.lower() for k in filtered]
+
+    print(f"  Standard-Keywords verwendet ({len(DEFAULT_KEYWORDS)} Begriffe)")
+    return DEFAULT_KEYWORDS
 
 
 # ── Thunderbird-Dateierkennung ────────────────────────────────────────────────
 
 def find_thunderbird_profiles() -> list[Path]:
-    """Sucht Thunderbird-Profilordner auf Windows, Linux und macOS."""
-    candidates = []
     home = Path.home()
-    # Windows
-    candidates += [
+    candidates = [
         home / "AppData" / "Roaming" / "Thunderbird" / "Profiles",
-        home / "AppData" / "Local" / "Thunderbird" / "Profiles",
+        home / "AppData" / "Local"   / "Thunderbird" / "Profiles",
+        home / ".thunderbird",
+        home / "Library" / "Thunderbird" / "Profiles",
     ]
-    # Linux
-    candidates += [home / ".thunderbird"]
-    # macOS
-    candidates += [home / "Library" / "Thunderbird" / "Profiles"]
-
-    profiles = []
-    for base in candidates:
-        if base.exists():
-            profiles.append(base)
-    return profiles
+    return [p for p in candidates if p.exists()]
 
 
 def find_mbox_files(roots: list[Path]) -> list[Path]:
-    """Findet alle MBOX-Dateien rekursiv unterhalb der übergebenen Pfade."""
-    mbox_files = []
+    result = []
     for root in roots:
         for path in root.rglob("*"):
-            if path.is_file() and not path.suffix in (".msf", ".dat", ".index"):
-                try:
-                    size = path.stat().st_size
-                    if size < 1024:
-                        continue
-                    # MBOX beginnt mit "From " (with trailing space)
-                    with open(path, "rb") as fh:
-                        header = fh.read(5)
-                    if header == b"From ":
-                        mbox_files.append(path)
-                except (OSError, PermissionError):
-                    pass
-    return mbox_files
+            if not path.is_file():
+                continue
+            if path.suffix in (".msf", ".dat", ".index", ".sqlite", ".log"):
+                continue
+            try:
+                if path.stat().st_size < 1024:
+                    continue
+                with open(path, "rb") as fh:
+                    if fh.read(5) == b"From ":
+                        result.append(path)
+            except (OSError, PermissionError):
+                pass
+    return result
 
 
 # ── Analyse ───────────────────────────────────────────────────────────────────
 
-def analyse_mbox(path: Path, keyword: str,
+def analyse_mbox(path: Path, keywords: list[str],
                  from_month: str | None, to_month: str | None) -> dict[str, list[str]]:
-    """
-    Liest eine MBOX-Datei und gibt ein Dict {monat: [betreff, ...]} zurück.
-    """
     results: dict[str, list[str]] = defaultdict(list)
     try:
         mbox = mailbox.mbox(str(path))
@@ -179,7 +264,7 @@ def analyse_mbox(path: Path, keyword: str,
     count = total_relevant = 0
     for msg in mbox:
         count += 1
-        if not is_relevant(msg, keyword):
+        if not is_relevant(msg, keywords):
             continue
         dt = get_msg_date(msg)
         if dt is None:
@@ -197,26 +282,19 @@ def analyse_mbox(path: Path, keyword: str,
     return results
 
 
-# ── DB-Abfrage ────────────────────────────────────────────────────────────────
+# ── DB-Zugriff ────────────────────────────────────────────────────────────────
 
 def find_db_path() -> Path | None:
-    """Versucht die Zeiterfassung-SQLite-DB auf dem lokalen PC zu finden."""
     home = Path.home()
     candidates = [
-        # Windows (Flutter / sqflite)
         home / "AppData" / "Roaming" / "com.example.zeiterfassung" / "databases" / "zeiterfassung.db",
-        home / "AppData" / "Local" / "com.example.zeiterfassung" / "databases" / "zeiterfassung.db",
-        # Linux
+        home / "AppData" / "Local"   / "com.example.zeiterfassung" / "databases" / "zeiterfassung.db",
         home / ".local" / "share" / "com.example.zeiterfassung" / "databases" / "zeiterfassung.db",
     ]
-    for p in candidates:
-        if p.exists():
-            return p
-    return None
+    return next((p for p in candidates if p.exists()), None)
 
 
 def get_employers_from_db(db_path: Path) -> list[dict]:
-    """Liest Arbeitgeber aus der Zeiterfassung-DB."""
     try:
         conn = sqlite3.connect(str(db_path))
         cur = conn.execute("SELECT id, name FROM employers ORDER BY name")
@@ -231,56 +309,39 @@ def get_employers_from_db(db_path: Path) -> list[dict]:
 # ── SQL-Generierung ───────────────────────────────────────────────────────────
 
 def build_sql(monthly: dict[str, int], employer_id: str) -> list[str]:
-    """Erstellt idempotente INSERT OR REPLACE-Statements."""
     now = datetime.now().isoformat(timespec="milliseconds")
     statements = []
-
     for mk in sorted(monthly):
         year, month = int(mk[:4]), int(mk[5:])
-        n_mails = monthly[mk]
-        minutes = n_mails * MINUTES_PER_MAIL
-
-        wd = first_workday(year, month)
+        n_mails  = monthly[mk]
+        minutes  = n_mails * MINUTES_PER_MAIL
+        wd       = first_workday(year, month)
         start_dt = wd.replace(hour=DEFAULT_START_HOUR, minute=0, second=0, microsecond=0)
         end_dt   = start_dt + timedelta(minutes=minutes)
-
         entry_id = deterministic_uuid(employer_id, mk)
-        date_str  = wd.strftime("%Y-%m-%d")
-        start_str = start_dt.isoformat(timespec="milliseconds")
-        end_str   = end_dt.isoformat(timespec="milliseconds")
-        note      = NOTE_TEMPLATE.format(n=n_mails)
+        note     = NOTE_TEMPLATE.format(n=n_mails)
 
-        sql = (
+        statements.append(
             f"INSERT OR REPLACE INTO time_entries "
             f"(id, date, start_time, end_time, break_minutes, work_type, day_type, "
-            f"note, travel_minutes, employer_id, is_special_hours, is_synced, created_at) "
-            f"VALUES ("
+            f"note, travel_minutes, employer_id, is_special_hours, is_synced, created_at) VALUES ("
             f"'{entry_id}', "
-            f"'{date_str}', "
-            f"'{start_str}', "
-            f"'{end_str}', "
-            f"0, "
-            f"'{WORK_TYPE}', "
-            f"'workday', "
-            f"'{note}', "
-            f"0, "
-            f"'{employer_id}', "
-            f"0, 0, "
-            f"'{now}'"
-            f");"
+            f"'{wd.strftime('%Y-%m-%d')}', "
+            f"'{start_dt.isoformat(timespec='milliseconds')}', "
+            f"'{end_dt.isoformat(timespec='milliseconds')}', "
+            f"0, '{WORK_TYPE}', 'workday', '{note}', "
+            f"0, '{employer_id}', 0, 0, '{now}');"
         )
-        statements.append(sql)
-
     return statements
 
 
 # ── Ausgabe ───────────────────────────────────────────────────────────────────
 
-def print_summary(monthly: dict[str, int], keyword: str) -> None:
+def print_summary(monthly: dict[str, int], keywords: list[str]) -> None:
     print()
-    print("=" * 55)
-    print(f"  ERGEBNIS  ·  Keyword: '{keyword}'  ·  {MINUTES_PER_MAIL} Min/Mail")
-    print("=" * 55)
+    print("=" * 58)
+    print(f"  ERGEBNIS  ·  {MINUTES_PER_MAIL} Min/Mail  ·  {len(keywords)} Keywords")
+    print("=" * 58)
     print(f"  {'Monat':<12} {'Mails':>6}  {'Minuten':>8}  {'Stunden':>8}")
     print("  " + "-" * 40)
     total_mails = total_min = 0
@@ -308,17 +369,14 @@ def save_csv(monthly: dict[str, int], outfile: Path) -> None:
     print(f"CSV gespeichert:  {outfile}")
 
 
-def save_sql(statements: list[str], outfile: Path, monthly: dict[str, int],
-             employer_name: str) -> None:
+def save_sql(statements: list[str], monthly: dict[str, int],
+             employer_name: str, outfile: Path) -> None:
     with open(outfile, "w", encoding="utf-8") as f:
         f.write("-- Gurktaler Mailbearbeitung — Zeiterfassung Import\n")
         f.write(f"-- Erstellt: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
         f.write(f"-- Arbeitgeber: {employer_name}\n")
         f.write(f"-- {MINUTES_PER_MAIL} Minuten pro E-Mail\n")
-        f.write("--\n")
-        f.write("-- Einspielung: sqlite3 zeiterfassung.db < diese_datei.sql\n")
-        f.write("-- ODER: DB Browser for SQLite → SQL ausführen\n")
-        f.write("\n")
+        f.write("--\n-- Einspielung: sqlite3 zeiterfassung.db < diese_datei.sql\n\n")
         for mk in sorted(monthly):
             n = monthly[mk]
             m = n * MINUTES_PER_MAIL
@@ -329,26 +387,27 @@ def save_sql(statements: list[str], outfile: Path, monthly: dict[str, int],
     print(f"SQL gespeichert:  {outfile}")
 
 
-def save_txt(monthly: dict[str, int], employer_name: str, outfile: Path) -> None:
-    """Lesbare Zusammenfassung als Textdatei (für Unterlagen)."""
+def save_txt(monthly: dict[str, int], employer_name: str,
+             keywords: list[str], outfile: Path) -> None:
     with open(outfile, "w", encoding="utf-8") as f:
         f.write("MAILBEARBEITUNG GURKTALER — ZEITERFASSUNG\n")
         f.write(f"Erstellt: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
         f.write(f"Arbeitgeber: {employer_name}\n")
-        f.write(f"Minuten pro E-Mail: {MINUTES_PER_MAIL}\n\n")
+        f.write(f"Minuten pro E-Mail: {MINUTES_PER_MAIL}\n")
+        f.write(f"Keywords ({len(keywords)}): {', '.join(keywords)}\n\n")
         f.write(f"{'Monat':<14} {'Mails':>6}  {'Minuten':>9}  {'Stunden':>9}  Notiz\n")
-        f.write("-" * 70 + "\n")
+        f.write("-" * 72 + "\n")
         total_mails = total_min = 0
         for mk in sorted(monthly):
             year, month_num = int(mk[:4]), int(mk[5:])
             month_name = datetime(year, month_num, 1).strftime("%B %Y")
             n = monthly[mk]
             m = n * MINUTES_PER_MAIL
-            note = NOTE_TEMPLATE.format(n=n)
-            f.write(f"{month_name:<14} {n:>6}  {m:>9}  {m/60:>8.2f}h  {note}\n")
+            f.write(f"{month_name:<14} {n:>6}  {m:>9}  {m/60:>8.2f}h  "
+                    f"{NOTE_TEMPLATE.format(n=n)}\n")
             total_mails += n
             total_min += m
-        f.write("-" * 70 + "\n")
+        f.write("-" * 72 + "\n")
         f.write(f"{'GESAMT':<14} {total_mails:>6}  {total_min:>9}  {total_min/60:>8.2f}h\n")
     print(f"Protokoll:        {outfile}")
 
@@ -357,70 +416,57 @@ def save_txt(monthly: dict[str, int], employer_name: str, outfile: Path) -> None
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Gurktaler E-Mail-Analyse → Zeiterfassung SQL-Import"
+        description="Gurktaler E-Mail-Analyse → Zeiterfassung SQL-Import",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--mbox", nargs="+", metavar="PFAD",
-        help="Pfad(e) zu MBOX-Datei(en) oder Thunderbird-Profilordner. "
-             "Ohne Angabe: automatische Suche."
-    )
-    parser.add_argument(
-        "--keyword", default="gurktaler",
-        help="Suchbegriff in Von/An/CC/Betreff (Standard: gurktaler)"
-    )
-    parser.add_argument(
-        "--from", dest="from_month", metavar="YYYY-MM",
-        help="Nur Mails ab diesem Monat (z.B. 2024-04)"
-    )
-    parser.add_argument(
-        "--to", dest="to_month", metavar="YYYY-MM",
-        help="Nur Mails bis einschließlich diesem Monat (z.B. 2025-03)"
-    )
-    parser.add_argument(
-        "--employer-id", metavar="UUID",
-        help="Arbeitgeber-UUID aus der Zeiterfassung-DB (wird sonst abgefragt)"
-    )
-    parser.add_argument(
-        "--db", metavar="PFAD",
-        help="Pfad zur zeiterfassung.db (wird sonst automatisch gesucht)"
-    )
-    parser.add_argument(
-        "--minutes", type=int, default=MINUTES_PER_MAIL,
-        help=f"Minuten pro E-Mail (Standard: {MINUTES_PER_MAIL})"
-    )
+    parser.add_argument("--mbox", nargs="+", metavar="PFAD",
+        help="MBOX-Datei(en) oder Thunderbird-Profilordner (Standard: auto)")
+    parser.add_argument("--keywords", nargs="+", metavar="WORT",
+        help="Suchbegriffe (Standard: Gurktaler-Whitelist aus der App)")
+    parser.add_argument("--from", dest="from_month", metavar="YYYY-MM",
+        help="Nur Mails ab diesem Monat")
+    parser.add_argument("--to", dest="to_month", metavar="YYYY-MM",
+        help="Nur Mails bis einschließlich diesem Monat")
+    parser.add_argument("--employer-id", metavar="UUID",
+        help="Arbeitgeber-UUID (wird sonst aus der DB gelesen)")
+    parser.add_argument("--db", metavar="PFAD",
+        help="Pfad zur zeiterfassung.db (Standard: auto)")
+    parser.add_argument("--minutes", type=int, default=MINUTES_PER_MAIL,
+        help=f"Minuten pro E-Mail (Standard: {MINUTES_PER_MAIL})")
     args = parser.parse_args()
 
     global MINUTES_PER_MAIL
     MINUTES_PER_MAIL = args.minutes
 
-    print("=" * 55)
+    print("=" * 58)
     print("  Gurktaler E-Mail-Analyse für Zeiterfassung")
-    print("=" * 55)
+    print("=" * 58)
 
-    # ── MBOX-Dateien finden ──────────────────────────────────────────────────
+    # ── Keywords ──────────────────────────────────────────────────────────────
+    print("\nKeywords:")
+    keywords = resolve_keywords(args.keywords)
+    print(f"  Aktiv: {', '.join(keywords[:8])}{'…' if len(keywords) > 8 else ''}")
+
+    # ── MBOX-Dateien ──────────────────────────────────────────────────────────
     mbox_paths: list[Path] = []
     if args.mbox:
         for p in args.mbox:
             fp = Path(p)
             if fp.is_dir():
-                print(f"\nDurchsuche Verzeichnis: {fp}")
                 found = find_mbox_files([fp])
-                print(f"  {len(found)} MBOX-Dateien gefunden")
+                print(f"\n{fp}: {len(found)} MBOX-Dateien")
                 mbox_paths.extend(found)
             elif fp.is_file():
                 mbox_paths.append(fp)
             else:
-                print(f"[Warnung] Pfad nicht gefunden: {fp}", file=sys.stderr)
+                print(f"[Warnung] Nicht gefunden: {fp}", file=sys.stderr)
     else:
         profiles = find_thunderbird_profiles()
         if not profiles:
             print("\n[Fehler] Kein Thunderbird-Profil gefunden.")
-            print("  Bitte Pfad angeben: --mbox <Pfad>")
+            print("  Bitte angeben: --mbox <Pfad>")
             sys.exit(1)
-        print(f"\nThunderbird-Profile gefunden:")
-        for p in profiles:
-            print(f"  {p}")
-        print("\nDurchsuche MBOX-Dateien...")
+        print(f"\nThunderbird-Profile: {[str(p) for p in profiles]}")
         mbox_paths = find_mbox_files(profiles)
         print(f"  {len(mbox_paths)} MBOX-Dateien gefunden")
 
@@ -428,110 +474,88 @@ def main():
         print("[Fehler] Keine MBOX-Dateien gefunden.")
         sys.exit(1)
 
-    # ── Analyse ──────────────────────────────────────────────────────────────
-    print(f"\nAnalysiere  (Keyword: '{args.keyword}'):")
+    # ── Analyse ───────────────────────────────────────────────────────────────
+    print(f"\nAnalysiere{f'  (ab {args.from_month})' if args.from_month else ''}"
+          f"{f'  (bis {args.to_month})' if args.to_month else ''}:")
     all_monthly: dict[str, list[str]] = defaultdict(list)
     for path in mbox_paths:
-        monthly = analyse_mbox(path, args.keyword, args.from_month, args.to_month)
-        for mk, subjects in monthly.items():
+        for mk, subjects in analyse_mbox(path, keywords, args.from_month, args.to_month).items():
             all_monthly[mk].extend(subjects)
 
     if not all_monthly:
-        print(f"\nKeine E-Mails mit '{args.keyword}' gefunden.")
-        if args.from_month or args.to_month:
-            print(f"  Zeitraum: {args.from_month or 'Beginn'} – {args.to_month or 'Ende'}")
+        print("\nKeine passenden E-Mails gefunden.")
+        print("  Tipp: --keywords mit eigenen Begriffen oder --mbox prüfen.")
         sys.exit(0)
 
-    # Monatliche Summen
     monthly_counts: dict[str, int] = {mk: len(v) for mk, v in all_monthly.items()}
-    print_summary(monthly_counts, args.keyword)
+    print_summary(monthly_counts, keywords)
 
-    # ── Arbeitgeber-ID ermitteln ──────────────────────────────────────────────
+    # ── Arbeitgeber-ID ────────────────────────────────────────────────────────
     employer_id = args.employer_id
-    employer_name = "Gurktaler (unbekannt)"
-
+    employer_name = "Gurktaler"
     db_path: Path | None = Path(args.db) if args.db else find_db_path()
 
     if db_path and db_path.exists():
         print(f"Zeiterfassung-DB: {db_path}")
         employers = get_employers_from_db(db_path)
         if employers:
-            # Gurktaler-Treffer automatisch vorschlagen
-            gurk_matches = [e for e in employers
-                            if "gurktaler" in e["name"].lower()]
-            if len(gurk_matches) == 1 and not employer_id:
-                employer_id = gurk_matches[0]["id"]
-                employer_name = gurk_matches[0]["name"]
-                print(f"Arbeitgeber auto-erkannt: {employer_name}")
+            gurk = [e for e in employers if "gurktaler" in e["name"].lower()]
+            if len(gurk) == 1 and not employer_id:
+                employer_id   = gurk[0]["id"]
+                employer_name = gurk[0]["name"]
+                print(f"Arbeitgeber:      {employer_name}")
             elif not employer_id:
-                print("\nArbeitgeber in der DB:")
+                print("\nArbeitgeber:")
                 for i, e in enumerate(employers):
                     print(f"  [{i}] {e['name']}")
-                    print(f"       ID: {e['id']}")
-                choice = input("\nNummer des Arbeitgebers eingeben: ").strip()
+                idx = input("Nummer: ").strip()
                 try:
-                    idx = int(choice)
-                    employer_id = employers[idx]["id"]
-                    employer_name = employers[idx]["name"]
+                    employer_id   = employers[int(idx)]["id"]
+                    employer_name = employers[int(idx)]["name"]
                 except (ValueError, IndexError):
-                    print("[Warnung] Ungültige Eingabe — SQL wird ohne employer_id erstellt")
                     employer_id = ""
-            else:
-                for e in employers:
-                    if e["id"] == employer_id:
-                        employer_name = e["name"]
-                        break
     else:
         if not employer_id:
-            print("\n[Hinweis] Zeiterfassung-DB nicht gefunden.")
-            print("  SQL kann trotzdem erstellt werden, aber ohne Arbeitgeber-Zuordnung.")
-            print("  Alternativ: --db <Pfad> oder --employer-id <UUID> angeben.\n")
-            employer_id = employer_id or ""
+            print("\n[Hinweis] DB nicht gefunden — SQL ohne employer_id.")
+            print("  Alternativ: --db <Pfad> oder --employer-id <UUID>\n")
+            employer_id = ""
 
     # ── Dateien speichern ─────────────────────────────────────────────────────
     today = datetime.now().strftime("%Y-%m-%d")
-    out_dir = Path(".")
-
-    csv_path = out_dir / f"gurktaler_mails_{today}.csv"
-    sql_path = out_dir / f"gurktaler_insert_{today}.sql"
-    txt_path = out_dir / f"gurktaler_bericht_{today}.txt"
-
-    save_csv(monthly_counts, csv_path)
+    save_csv(monthly_counts, Path(f"gurktaler_mails_{today}.csv"))
+    save_txt(monthly_counts, employer_name, keywords, Path(f"gurktaler_bericht_{today}.txt"))
 
     if employer_id:
         statements = build_sql(monthly_counts, employer_id)
-        save_sql(statements, sql_path, monthly_counts, employer_name)
+        save_sql(statements, monthly_counts, employer_name,
+                 Path(f"gurktaler_insert_{today}.sql"))
     else:
-        print("[Info] Kein Arbeitgeber — SQL nicht erstellt. "
-              "Bitte --employer-id <UUID> angeben.")
+        print("[Info] Kein Arbeitgeber → SQL übersprungen")
 
-    save_txt(monthly_counts, employer_name, txt_path)
-
-    # ── Details auf Wunsch ────────────────────────────────────────────────────
-    show = input("\nBetreffzeilen der gefundenen Mails anzeigen? [j/N] ").strip().lower()
+    # ── Details ───────────────────────────────────────────────────────────────
+    show = input("\nBetreffzeilen anzeigen? [j/N] ").strip().lower()
     if show == "j":
         for mk in sorted(all_monthly):
             print(f"\n  {mk}  ({len(all_monthly[mk])} Mails):")
-            for subj in all_monthly[mk]:
+            for subj in sorted(set(all_monthly[mk])):
                 print(f"    · {subj}")
 
-    # ── Direkter DB-Import auf Wunsch ──────────────────────────────────────────
+    # ── Direkter DB-Import ────────────────────────────────────────────────────
     if employer_id and db_path and db_path.exists():
         do_import = input(
-            f"\nSQL direkt in die Zeiterfassung-DB einspiele? [{db_path.name}] [j/N] "
+            f"\nSQL direkt in DB einspiele? [{db_path.name}] [j/N] "
         ).strip().lower()
         if do_import == "j":
             try:
                 conn = sqlite3.connect(str(db_path))
-                statements = build_sql(monthly_counts, employer_id)
-                for stmt in statements:
+                for stmt in build_sql(monthly_counts, employer_id):
                     conn.execute(stmt)
                 conn.commit()
                 conn.close()
-                print(f"  {len(statements)} Einträge erfolgreich in die DB geschrieben.")
-                print("  Zeiterfassung-App neu starten, damit die Änderungen sichtbar sind.")
+                print(f"  {len(monthly_counts)} Einträge geschrieben.")
+                print("  Zeiterfassung-App neu starten.")
             except Exception as exc:
-                print(f"[Fehler] DB-Import: {exc}", file=sys.stderr)
+                print(f"[Fehler] {exc}", file=sys.stderr)
 
     print("\nFertig.")
 
