@@ -102,6 +102,7 @@ Future<void> configureGeofencingBackground() async {
 
 const _kAutoEntryKey         = 'geofence_auto_entry_id';
 const _kAutoEntryEmployerKey = 'geofence_auto_entry_employer_id';
+const _kInsideZonesKey       = 'geofence_inside_zones'; // persisted CSV of zone IDs
 const kTripTrackingKey       = 'trip_tracking_active';
 const _kOpenTripKey          = 'trip_open_id';
 const _kSpeedStartMs         = 4.2;  // 15 km/h – trip begins
@@ -122,6 +123,13 @@ Future<void> _onStart(ServiceInstance service) async {
   );
 
   final Set<String> inside = {};
+  // Restore inside-set from the previous service run so that a MIUI-induced
+  // restart does not re-fire zone-entry events for zones the user was already in.
+  {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_kInsideZonesKey) ?? '';
+    if (saved.isNotEmpty) inside.addAll(saved.split(','));
+  }
   var locations = <Map<String, dynamic>>[];
   final timers = <String, Timer>{}; // locationId → pending clock-out timer
   DateTime? outsideZonesSince = DateTime.now();
@@ -144,10 +152,21 @@ Future<void> _onStart(ServiceInstance service) async {
 
   void _restartGps(LocationAccuracy acc) {
     _posSub?.cancel();
+    final bool highPrecision = acc == LocationAccuracy.high;
     _posSub = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
+      locationSettings: AndroidSettings(
         accuracy: acc,
-        distanceFilter: acc == LocationAccuracy.high ? 10 : 30,
+        // During trip: 10 m / 5 s – tight tracking.
+        // Idle (geofence-only): 50 m / 20 s – saves ~60 % battery vs continuous.
+        distanceFilter: highPrecision ? 10 : 50,
+        intervalDuration: highPrecision
+            ? const Duration(seconds: 5)
+            : const Duration(seconds: 20),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationText: 'Standorterfassung aktiv',
+          notificationTitle: 'Zeiterfassung',
+          enableWakeLock: true,
+        ),
       ),
     ).listen(_posHandler);
   }
@@ -287,6 +306,8 @@ Future<void> _onStart(ServiceInstance service) async {
 
       if (!wasInside && nowInside) {
         inside.add(id);
+        (await SharedPreferences.getInstance())
+            .setString(_kInsideZonesKey, inside.join(','));
         timers[id]?.cancel();
         timers.remove(id);
         await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
@@ -299,6 +320,8 @@ Future<void> _onStart(ServiceInstance service) async {
         });
       } else if (wasInside && !nowInside) {
         inside.remove(id);
+        (await SharedPreferences.getInstance())
+            .setString(_kInsideZonesKey, inside.join(','));
         await _log('EXIT', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  Karenz 5 min');
         timers[id]?.cancel();
         timers[id] = Timer(const Duration(minutes: 5), () async {

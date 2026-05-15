@@ -191,7 +191,8 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+              16, 16, 16, 16 + MediaQuery.of(context).viewPadding.bottom),
           children: [
             // Date
             ListTile(
