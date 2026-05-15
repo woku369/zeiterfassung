@@ -90,6 +90,7 @@ class _MonthTab extends StatefulWidget {
 
 class _MonthTabState extends State<_MonthTab> {
   bool _exporting = false;
+  bool _exportingRange = false;
   bool _importing = false;
 
   Future<void> _exportXlsx() async {
@@ -185,6 +186,58 @@ class _MonthTabState extends State<_MonthTab> {
       if (mounted) _showError('Import fehlgeschlagen: $e');
     } finally {
       if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<void> _exportRange() async {
+    final now = DateTime.now();
+    // Pick "from" month
+    final from = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year, now.month - 1),
+      firstDate: DateTime(2020),
+      lastDate: now,
+      helpText: 'Zeitraum: Von Monat',
+      fieldLabelText: 'Von',
+      initialDatePickerMode: DatePickerMode.year,
+    );
+    if (from == null || !mounted) return;
+
+    final to = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: from,
+      lastDate: now,
+      helpText: 'Zeitraum: Bis Monat',
+      fieldLabelText: 'Bis',
+      initialDatePickerMode: DatePickerMode.year,
+    );
+    if (to == null || !mounted) return;
+
+    final rangeStart = DateTime(from.year, from.month);
+    final rangeEnd   = DateTime(to.year, to.month + 1).subtract(const Duration(seconds: 1));
+
+    setState(() => _exportingRange = true);
+    try {
+      final employer = context.read<EmployerProvider>().active;
+      final entries = await DatabaseHelper.instance.getEntriesForDateRange(
+        rangeStart, rangeEnd,
+        employerId: employer?.id,
+      );
+      if (!mounted) return;
+      final file = await ExportService.instance.exportRange(
+        entries: entries,
+        from: rangeStart,
+        to: rangeEnd,
+        employerName: employer?.name ?? '',
+        weeklyHours: employer?.weeklyHours ?? 40,
+      );
+      if (!mounted) return;
+      await Share.shareXFiles([XFile(file.path)], text: 'Zeiterfassung Export');
+    } catch (e) {
+      if (mounted) _showError('Export fehlgeschlagen: $e');
+    } finally {
+      if (mounted) setState(() => _exportingRange = false);
     }
   }
 
@@ -329,6 +382,13 @@ class _MonthTabState extends State<_MonthTab> {
           subtitle: 'Monatsansicht als Excel-Datei',
           loading: _exporting,
           onTap: _exportXlsx,
+        ),
+        _ActionTile(
+          icon: Icons.date_range_outlined,
+          title: 'Zeitraum exportieren',
+          subtitle: 'Beliebigen Zeitraum als Excel-Datei',
+          loading: _exportingRange,
+          onTap: _exportRange,
         ),
         _ActionTile(
           icon: Icons.upload_outlined,
@@ -537,6 +597,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   // Pivot year = year in which the fiscal year starts.
   late int _pivotYear;
   bool _loading = false;
+  bool _exportingYear = false;
   // Month index 0..11 → actual hours for that month.
   final List<double> _monthHours = List.filled(12, 0.0);
   // Month index → Vertragsäquivalent (Ist × Zuschlagsfaktor).
@@ -612,6 +673,36 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   void _nextYear() {
     setState(() => _pivotYear++);
     _loadFiscalYear();
+  }
+
+  Future<void> _exportYearXlsx() async {
+    setState(() => _exportingYear = true);
+    try {
+      final employer = _employer;
+      final from = _fyStart;
+      final to = DateTime(_fyEnd.year, _fyEnd.month, 0);
+      final entries = await DatabaseHelper.instance.getEntriesForDateRange(
+        from, to,
+        employerId: employer?.id,
+      );
+      final file = await ExportService.instance.exportYear(
+        allEntries: entries,
+        fyStart: _fyStart,
+        employerName: employer?.name ?? '',
+        weeklyHours: employer?.weeklyHours ?? 40,
+        isSurchargeEmployer: SurchargeService.isSurchargeEmployer(employer),
+      );
+      if (!mounted) return;
+      await Share.shareXFiles([XFile(file.path)], text: 'Jahresbericht Export');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Export fehlgeschlagen: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error));
+      }
+    } finally {
+      if (mounted) setState(() => _exportingYear = false);
+    }
   }
 
   @override
@@ -725,6 +816,16 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
               const SizedBox(height: 12),
               // ── Legende ──────────────────────────────────────────────
               _Legend(),
+              const SizedBox(height: 20),
+              Text('Aktionen', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              _ActionTile(
+                icon: Icons.download_outlined,
+                title: 'Jahresbericht exportieren',
+                subtitle: '$_fyLabel als Excel-Datei',
+                loading: _exportingYear,
+                onTap: _exportYearXlsx,
+              ),
             ],
           );
   }
