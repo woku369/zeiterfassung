@@ -63,6 +63,22 @@ if (-not $NoPull) {
 
 Set-Location $appDir
 
+# -- versionCode auto-increment ------------------------------------------------
+# Liest "version: X.Y.Z+BUILD" aus pubspec.yaml, inkrementiert BUILD,
+# schreibt zurueck. Jeder Build erhaelt einen hoeheren versionCode ->
+# Android erkennt den neuen Build als Upgrade, kein Deinstallieren noetig.
+$pubspec     = Join-Path $appDir "pubspec.yaml"
+$pubspecText = Get-Content $pubspec -Raw
+if ($pubspecText -match 'version:\s*(\d+\.\d+\.\d+)\+(\d+)') {
+    $semver    = $Matches[1]
+    $buildNum  = [int]$Matches[2] + 1
+    $pubspecText = $pubspecText -replace 'version:\s*\d+\.\d+\.\d+\+\d+', "version: $semver+$buildNum"
+    Set-Content $pubspec $pubspecText -NoNewline
+    Write-Step "versionCode -> $buildNum  ($semver+$buildNum)"
+} else {
+    Write-Warn "versionCode konnte nicht geparst werden - pubspec.yaml unveraendert"
+}
+
 if ($Clean) {
     Write-Step "flutter clean"
     flutter clean
@@ -78,10 +94,10 @@ if ($buildApk) {
 
     $apkSrc = Join-Path $appDir "build\app\outputs\flutter-apk\app-release.apk"
     if (Test-Path $apkSrc) {
-        $apkDst = Join-Path $buildsDir "zeiterfassung-$date.apk"
+        $apkDst = Join-Path $buildsDir "zeiterfassung-$date-b$buildNum.apk"
         Copy-Item $apkSrc $apkDst -Force
         $size = [math]::Round((Get-Item $apkDst).Length / 1MB, 1)
-        Write-Ok "APK -> builds\zeiterfassung-$date.apk  ($size MB)"
+        Write-Ok "APK -> builds\zeiterfassung-$date-b$buildNum.apk  ($size MB)"
     } else {
         Write-Fail "APK nicht gefunden: $apkSrc"
     }
