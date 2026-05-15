@@ -32,7 +32,11 @@ class TimeEntryProvider extends ChangeNotifier {
     _selectedMonth = month;
     _entries = await DatabaseHelper.instance
         .getEntriesForMonth(year, month, employerId: _employerId);
-    _activeEntry = _entries.where((e) => e.isActive).firstOrNull;
+    // Active entry may belong to a different employer (e.g. user switched AG
+    // while clocked in). Always find the globally open entry so the timer
+    // never disappears and clock-out stays reachable.
+    _activeEntry = _entries.where((e) => e.isActive).firstOrNull
+        ?? await DatabaseHelper.instance.getAnyActiveEntry();
     notifyListeners();
   }
 

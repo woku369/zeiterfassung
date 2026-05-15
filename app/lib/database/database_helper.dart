@@ -277,6 +277,16 @@ class DatabaseHelper {
     return rows.map(TimeEntry.fromMap).toList();
   }
 
+  /// Returns the one open entry (end_time IS NULL) regardless of employer.
+  Future<TimeEntry?> getAnyActiveEntry() async {
+    final db = await database;
+    final rows = await db.query('time_entries',
+        where: "end_time IS NULL AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        orderBy: 'start_time DESC',
+        limit: 1);
+    return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
+  }
+
   Future<List<TimeEntry>> getEntriesForDateRange(DateTime from, DateTime to,
       {String? employerId}) async {
     final db = await database;
