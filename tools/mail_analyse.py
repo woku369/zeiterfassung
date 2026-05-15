@@ -125,10 +125,12 @@ def month_key(dt: datetime) -> str:
     return dt.strftime("%Y-%m")
 
 
-def first_workday(year: int, month: int) -> datetime:
-    d = datetime(year, month, 1)
+def last_workday(year: int, month: int) -> datetime:
+    # letzter Tag des Monats, dann rückwärts bis Werktag
+    d = datetime(year, month + 1, 1) - timedelta(days=1) if month < 12 \
+        else datetime(year, 12, 31)
     while d.weekday() >= 5:
-        d += timedelta(days=1)
+        d -= timedelta(days=1)
     return d
 
 
@@ -315,7 +317,7 @@ def build_sql(monthly: dict[str, int], employer_id: str) -> list[str]:
         year, month = int(mk[:4]), int(mk[5:])
         n_mails  = monthly[mk]
         minutes  = n_mails * MINUTES_PER_MAIL
-        wd       = first_workday(year, month)
+        wd       = last_workday(year, month)
         start_dt = wd.replace(hour=DEFAULT_START_HOUR, minute=0, second=0, microsecond=0)
         end_dt   = start_dt + timedelta(minutes=minutes)
         entry_id = deterministic_uuid(employer_id, mk)
