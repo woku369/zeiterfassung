@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../database/database_helper.dart';
 import '../models/trip_record.dart';
@@ -31,6 +32,9 @@ class TripProvider extends ChangeNotifier {
     _trackingEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(kTripTrackingKey, v);
+    // SharedPreferences cache in the background isolate is stale after writing
+    // here, so push the new value directly via the service message channel.
+    FlutterBackgroundService().invoke('setTripTracking', {'enabled': v});
     notifyListeners();
   }
 

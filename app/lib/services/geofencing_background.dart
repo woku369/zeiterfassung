@@ -141,9 +141,17 @@ Future<void> _onStart(ServiceInstance service) async {
   double?   _tripLastLat,  _tripLastLng;
   double    _tripDistKm = 0;
   Timer?    _tripStopTimer;       // fires when speed drops for >2 min
-  bool      _tripActive = false;   // currently in a "moving" phase
+  bool      _tripActive = false;  // currently in a "moving" phase
   bool      _btTripActive = false; // trip was started by BT connect
   DateTime? _lastMovementTime;    // last GPS tick with speed >= stop threshold
+  // Live flag updated via 'setTripTracking' message. SharedPreferences cache in
+  // the background isolate is stale after the main isolate writes to it, so we
+  // maintain this local copy and update it on service start + on message.
+  bool _tripTrackingEnabled = false;
+  {
+    final prefs = await SharedPreferences.getInstance();
+    _tripTrackingEnabled = prefs.getBool(kTripTrackingKey) ?? false;
+  }
 
   // Dynamic GPS accuracy: medium (balanced power) normally, high during trip.
   StreamSubscription<Position>? _posSub;
@@ -182,6 +190,11 @@ Future<void> _onStart(ServiceInstance service) async {
     inside.removeWhere((id) => !newIds.contains(id));
     locations = incoming;
     _log('INIT', 'Zonen geladen: ${incoming.map((l) => l['name']).join(', ')}');
+  });
+
+  service.on('setTripTracking').listen((data) {
+    if (data == null) return;
+    _tripTrackingEnabled = (data['enabled'] as bool?) ?? false;
   });
 
   // ── Watchdog: warn if auto-clocked-in but outside all zones for a while ───
@@ -355,7 +368,7 @@ Future<void> _onStart(ServiceInstance service) async {
 
     // ── Bluetooth trigger (written by BluetoothTripReceiver.kt) ───────────
     final btEvent = prefs.getString(_kBtEventKey);
-    if (btEvent != null && (prefs.getBool(kTripTrackingKey) ?? false)) {
+    if (btEvent != null && _tripTrackingEnabled) {
       await prefs.remove(_kBtEventKey); // consume only when tracking enabled
       if (btEvent.startsWith('connect:') && !_tripActive) {
         final mac = btEvent.substring(8);
@@ -393,7 +406,7 @@ Future<void> _onStart(ServiceInstance service) async {
       }
     }
 
-    if (prefs.getBool(kTripTrackingKey) ?? false) {
+    if (_tripTrackingEnabled) {
 
       if (!_tripActive && effectiveSpeed >= _kSpeedStartMs) {
         // Start a new trip
