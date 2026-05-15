@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-14 – v1.19 Urlaubstage/Krankenstand implementiert
+> Letztes Update: 2026-05-15 – v1.20 TerminMeister-Kopplung + Geofencing Trip-End-Fix
 
 ---
 
@@ -26,6 +26,28 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Erledigt
 
+### v1.20 – TerminMeister-Kopplung (Monatsbericht)
+- [x] **`TerminMeisterService`** (`services/terminmeister_service.dart`):
+  - HTTP-Client: `GET {tmUrl}/api/appointments?month=YYYY-MM`
+  - Filtert serverseitig auf `status == 'abgeschlossen'`
+  - Parst `TmAppointment` (id, title, type, status, startDate, participantCount, group)
+  - Timeout 8 s, returns `[]` bei jedem Netzwerk-/Parsing-Fehler (TM ist optional, keine Pflicht)
+- [x] **`SyncProvider` erweitert:**
+  - Neue Felder `_tmUrl`, `_tmApiKey` (SharedPreferences: `tm_url`, `tm_api_key`)
+  - Getters `tmUrl`, `tmApiKey`, `hasTmConfig`
+  - Neue Methode `saveTmConfig(url, apiKey)`
+- [x] **Einstellungen – neuer Abschnitt „TerminMeister-Kopplung":**
+  - `_TmCard`-Widget (nach NAS-Verbindung) mit URL + API-Key-Dialog
+  - Zeigt konfigurierte URL oder „Nicht konfiguriert"
+- [x] **Monatsbericht – `_TmFuehrungenCard`:**
+  - `StatefulWidget` lädt TM-Daten automatisch bei Monatswechsel (`didUpdateWidget`)
+  - Gruppiert abgeschlossene Führungen nach Datum, zeigt Titel · Gruppe · Teilnehmerzahl
+  - Fußzeile: „N Führungen · X Teilnehmer gesamt"
+  - Karte unsichtbar wenn TM nicht konfiguriert oder keine Daten für den Monat
+- [x] **NAS-Endpunkt in TM `server.js` (manuell deployen):**
+  - `GET /api/appointments?month=YYYY-MM` filtert `appointments.json` nach Monat
+  - Snippet liegt vor; muss in TM's `server.js` nach `/api/completed-today` eingefügt werden
+
 ### v1.19 – Urlaubstage, Krankenstand & Jahressaldo
 - [x] **`vacation_days_per_year` pro Arbeitgeber (DB v12):**
   - Neues Feld auf `Employer`-Modell (int, Default 25) – `toMap`, `fromMap`, `copyWith`, `toJson` vollständig
@@ -45,6 +67,11 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] **Bugfixes v1.19:**
   - `server.js` fehlte `vacation_days_per_year` in Schema + Upsert → Wert wurde bei jedem NAS-Sync verworfen (auf Default 25 zurückgesetzt)
   - `entry_form_screen.dart`: fehlender `mounted`-Check nach `await addEntry()` vor `context.read<EmployerProvider>()` → potenzieller Zugriff auf deaktivierten Context
+  - **Geofencing Trip-End-Time (MIUI):** HyperOS suspendiert das Background-Isolate wenn das Gerät steht; der 2-Min-Stop-Timer feuert Stunden zu spät, `DateTime.now()` liefert dann eine falsch späte Endzeit
+    - Fix: `_lastMovementTime` speichert den letzten GPS-Tick mit Geschwindigkeit ≥5 km/h
+    - `_finalizeTrip` akzeptiert neuen optionalen Parameter `DateTime? endTime`
+    - Stop-Timer: wenn `DateTime.now() - lastMovement > 15 Min` → `endTime = lastMovement + 2 Min`
+    - Ergebnis: Fahrtenende stimmt auf ±2 Minuten auch nach MIUI-Suspension
 
 ### v1.18 – Bugfixes: Activity-Timeline + Geofencing + UX
 - [x] **Adopted-State in Activity-Timeline (Issue #1):**
@@ -426,6 +453,9 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [ ] E-Mail-Zeitstempel als automatische Aktivitätshinweise im Dashboard anzeigen
 - [ ] IFTTT/Zapier-Webhook als alternativer Auslöser
 - [ ] Mehrsprachigkeit (DE/EN)
+- [x] **TerminMeister-Kopplung Szenario A:** Führungen im Monatsbericht *(implementiert v1.20)*
+- [ ] **TerminMeister-Kopplung Szenario B:** NAS `shared/planned_entries.json` – keine Doppelerfassung, TM schreibt Vorschläge direkt in Zeiterfassung
+- [ ] **TerminMeister-Kopplung Szenario C:** Flutter-Port – TerminMeister als Modul in Zeiterfassung
 
 ---
 
@@ -444,10 +474,12 @@ app/
                      holiday_service, geofencing_service (mit Boot-Flag),
                      geofencing_background (autoStart:false, Channels im Hauptisolate;
                        schreibt Auto-Clock-in/out direkt in SQLite,
-                       Watchdog-Notification alle 15 Min für vergessene Clock-outs),
+                       Watchdog-Notification alle 15 Min für vergessene Clock-outs;
+                       _lastMovementTime für MIUI-korrektes Trip-Ende),
                      imap_service, tray_service (tray_manager + window_manager),
                      backup_service (lokal + NAS), activity_tracking_service,
-                     activity_tracking_win32, fusion_engine
+                     activity_tracking_win32, fusion_engine,
+                     terminmeister_service (TmAppointment, fetchMonth – optional)
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
     database/        database_helper (SQLite v12)
@@ -500,7 +532,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.19)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.20)
 
 ---
 
