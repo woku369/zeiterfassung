@@ -14,6 +14,10 @@ class TimeEntry {
   final double? startLng;
   final double? endLat;
   final double? endLng;
+  final int travelMinutes;
+  final String? employerId;
+  final String? projectId;
+  final bool isSpecialHours;
   final bool isSynced;
   final DateTime createdAt;
 
@@ -31,20 +35,25 @@ class TimeEntry {
     this.startLng,
     this.endLat,
     this.endLng,
+    this.travelMinutes = 0,
+    this.employerId,
+    this.projectId,
+    this.isSpecialHours = false,
     this.isSynced = false,
     required this.createdAt,
   });
 
   Duration get totalDuration {
+    if (workType.isAbsence) return Duration.zero;
     if (endTime == null) return Duration.zero;
     final raw = endTime!.difference(startTime);
-    final net = raw - Duration(minutes: breakMinutes);
+    final net = raw - Duration(minutes: breakMinutes) + Duration(minutes: travelMinutes);
     return net.isNegative ? Duration.zero : net;
   }
 
   double get totalHours => totalDuration.inMinutes / 60.0;
 
-  bool get isActive => endTime == null;
+  bool get isActive => !workType.isAbsence && endTime == null;
 
   TimeEntry copyWith({
     String? id,
@@ -60,6 +69,10 @@ class TimeEntry {
     double? startLng,
     double? endLat,
     double? endLng,
+    int? travelMinutes,
+    String? employerId,
+    String? projectId,
+    bool? isSpecialHours,
     bool? isSynced,
     DateTime? createdAt,
   }) {
@@ -77,6 +90,10 @@ class TimeEntry {
       startLng: startLng ?? this.startLng,
       endLat: endLat ?? this.endLat,
       endLng: endLng ?? this.endLng,
+      travelMinutes: travelMinutes ?? this.travelMinutes,
+      employerId: employerId ?? this.employerId,
+      projectId: projectId ?? this.projectId,
+      isSpecialHours: isSpecialHours ?? this.isSpecialHours,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -96,6 +113,10 @@ class TimeEntry {
     'start_lng': startLng,
     'end_lat': endLat,
     'end_lng': endLng,
+    'travel_minutes': travelMinutes,
+    'employer_id': employerId,
+    'project_id': projectId,
+    'is_special_hours': isSpecialHours ? 1 : 0,
     'is_synced': isSynced ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
   };
@@ -114,17 +135,25 @@ class TimeEntry {
     startLng: (m['start_lng'] as num?)?.toDouble(),
     endLat: (m['end_lat'] as num?)?.toDouble(),
     endLng: (m['end_lng'] as num?)?.toDouble(),
+    travelMinutes: m['travel_minutes'] as int? ?? 0,
+    employerId: m['employer_id'] as String?,
+    projectId: m['project_id'] as String?,
+    isSpecialHours: (m['is_special_hours'] as int? ?? 0) == 1,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
   );
 
   Map<String, dynamic> toJson() => toMap()
     ..update('is_synced', (_) => isSynced)
+    ..update('is_special_hours', (_) => isSpecialHours)
     ..update('end_time', (_) => endTime?.toIso8601String());
 
   factory TimeEntry.fromJson(Map<String, dynamic> json) {
     final m = Map<String, dynamic>.from(json);
     if (m['is_synced'] is bool) m['is_synced'] = (m['is_synced'] as bool) ? 1 : 0;
+    if (m['is_special_hours'] is bool) {
+      m['is_special_hours'] = (m['is_special_hours'] as bool) ? 1 : 0;
+    }
     return TimeEntry.fromMap(m);
   }
 }

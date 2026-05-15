@@ -1,17 +1,44 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Internet für NAS-Sync -->
+    <!-- Internet für NAS-Sync und IMAP -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- GPS / Standort -->
+    <!-- GPS / Standort (Vordergrund) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- GPS im Hintergrund (Geofencing) – Android 10+ zeigt extra Dialog -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Benachrichtigungen für Geofencing-Events (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Foreground Service für dauerhaftes Geofencing -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Geofencing nach Geräteneustart automatisch starten -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Datei-Zugriff für Export (Android 9 und älter) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+
+    <!-- Aktivitäts-Tracking: App-Nutzungsstatistiken (muss manuell erteilt werden) -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Anruf-Tracking: Anruf-Log lesen + Kontaktnamen live nachschlagen -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Bluetooth-Fahrtenbuch: gekoppelte Geräte lesen + Verbindungsstatus -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
     <application
         android:label="Zeiterfassung"
@@ -39,5 +66,54 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Dauerhafter Geofencing Foreground Service -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location"
+            android:exported="true"
+            tools:replace="android:exported" />
+
+        <!-- Built-in BootReceiver deaktiviert: unser eigener Receiver erstellt
+             zuerst die Notification-Channels, dann startet er den Service.
+             Ohne diesen Schritt crasht startForeground() auf Android 8+. -->
+        <receiver
+            android:name="id.flutter.flutter_background_service.BootReceiver"
+            android:enabled="false"
+            android:exported="false"
+            tools:replace="android:enabled,android:exported" />
+
+        <!-- Eigener BootReceiver: Channels anlegen → Service starten -->
+        <receiver
+            android:name=".ZeiterfassungBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Xiaomi/MIUI Schnellstart -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Bluetooth-Fahrtenbuch: ACL connect/disconnect Events empfangen -->
+        <receiver
+            android:name=".BluetoothTripReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Quick Settings Tile für Aktivitäts-Tracking (Android 7+) -->
+        <service
+            android:name=".ActivityTrackingTileService"
+            android:label="Aktivitäts-Timeline"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

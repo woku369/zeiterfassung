@@ -1,0 +1,5 @@
+# Build-Ausgaben (APK, Windows-ZIP)
+builds/
+
+# Lokale Entwicklungskonfiguration (Zugangsdaten – nie committen)
+app/lib/dev_config.dart
