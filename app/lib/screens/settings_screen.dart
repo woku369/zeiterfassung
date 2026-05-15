@@ -47,6 +47,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _NasCard(),
           const SizedBox(height: 20),
 
+          // ── TerminMeister-Kopplung ─────────────────────────────────────
+          Text('TerminMeister-Kopplung', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _TmCard(),
+          const SizedBox(height: 20),
+
           // ── Arbeitgeber ────────────────────────────────────────────────
           Text('Arbeitgeber', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -586,6 +592,81 @@ class _NasCardState extends State<_NasCard> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ── TerminMeister-Kopplung ────────────────────────────────────────────────────
+
+class _TmCard extends StatefulWidget {
+  @override
+  State<_TmCard> createState() => _TmCardState();
+}
+
+class _TmCardState extends State<_TmCard> {
+  Future<void> _edit() async {
+    final sp = context.read<SyncProvider>();
+    final urlCtrl = TextEditingController(text: sp.tmUrl);
+    final keyCtrl = TextEditingController(text: sp.tmApiKey);
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('TerminMeister-Kopplung'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: urlCtrl,
+              decoration: const InputDecoration(
+                labelText: 'URL (z.B. http://100.x.x.x:3005)',
+                helperText: 'Tailscale-IP des NAS · Port 3005',
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: keyCtrl,
+              decoration: const InputDecoration(
+                labelText: 'API-Key (optional)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context,
+                  {'url': urlCtrl.text.trim(), 'key': keyCtrl.text.trim()}),
+              child: const Text('Speichern')),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      await context.read<SyncProvider>().saveTmConfig(result['url']!, result['key']!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SyncProvider>();
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.calendar_month_outlined),
+        title: Text(
+          sp.tmUrl.isEmpty ? 'Nicht konfiguriert' : sp.tmUrl,
+          style: TextStyle(
+            color: sp.tmUrl.isEmpty ? Colors.grey : null,
+            fontSize: sp.tmUrl.isEmpty ? null : 13,
+          ),
+        ),
+        subtitle: sp.tmUrl.isEmpty
+            ? null
+            : const Text('TerminMeister NAS · Port 3005'),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _edit,
       ),
     );
   }

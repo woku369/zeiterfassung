@@ -8,6 +8,8 @@ class SyncProvider extends ChangeNotifier {
   static const _prefInterval = 'sync_interval_minutes';
   static const _prefNasUrl   = 'global_nas_url';
   static const _prefNasKey   = 'global_nas_api_key';
+  static const _prefTmUrl    = 'tm_url';
+  static const _prefTmKey    = 'tm_api_key';
   static const _defaultInterval = 30;
 
   bool _isSyncing = false;
@@ -16,6 +18,8 @@ class SyncProvider extends ChangeNotifier {
   int _intervalMinutes = _defaultInterval;
   String _nasUrl = '';
   String _nasApiKey = '';
+  String _tmUrl = '';
+  String _tmApiKey = '';
   Timer? _periodicTimer;
   Timer? _debounceTimer;
   ActivityProvider? _activityProvider;
@@ -28,12 +32,17 @@ class SyncProvider extends ChangeNotifier {
   String get nasUrl => _nasUrl;
   String get nasApiKey => _nasApiKey;
   bool get hasNasConfig => _nasUrl.isNotEmpty;
+  String get tmUrl => _tmUrl;
+  String get tmApiKey => _tmApiKey;
+  bool get hasTmConfig => _tmUrl.isNotEmpty;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _intervalMinutes = prefs.getInt(_prefInterval) ?? _defaultInterval;
     _nasUrl  = prefs.getString(_prefNasUrl)  ?? '';
     _nasApiKey = prefs.getString(_prefNasKey) ?? '';
+    _tmUrl   = prefs.getString(_prefTmUrl)   ?? '';
+    _tmApiKey  = prefs.getString(_prefTmKey)   ?? '';
   }
 
   void setActivityProvider(ActivityProvider ap) {
@@ -50,6 +59,15 @@ class SyncProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefNasUrl, _nasUrl);
     await prefs.setString(_prefNasKey, _nasApiKey);
+    notifyListeners();
+  }
+
+  Future<void> saveTmConfig(String url, String apiKey) async {
+    _tmUrl    = url.trim();
+    _tmApiKey = apiKey.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefTmUrl, _tmUrl);
+    await prefs.setString(_prefTmKey, _tmApiKey);
     notifyListeners();
   }
 

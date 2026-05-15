@@ -5,8 +5,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/export_service.dart';
 import '../services/import_service.dart';
+import '../services/terminmeister_service.dart';
 import '../database/database_helper.dart';
 import '../models/time_entry.dart';
 import '../models/employer.dart';
@@ -293,6 +295,7 @@ class _MonthTabState extends State<_MonthTab> {
           ),
         const SizedBox(height: 12),
         _ProjectBreakdownCard(entries: entries, employer: employer),
+        _TmFuehrungenCard(year: tp.selectedYear, month: tp.selectedMonth),
         const SizedBox(height: 12),
         if (entries.any((e) => e.dayType != DayType.workday))
           Card(
@@ -336,6 +339,138 @@ class _MonthTabState extends State<_MonthTab> {
         ),
       ],
     );
+  }
+}
+
+// ── TerminMeister-Führungen ────────────────────────────────────────────────────
+
+class _TmFuehrungenCard extends StatefulWidget {
+  final int year;
+  final int month;
+  const _TmFuehrungenCard({required this.year, required this.month});
+
+  @override
+  State<_TmFuehrungenCard> createState() => _TmFuehrungenCardState();
+}
+
+class _TmFuehrungenCardState extends State<_TmFuehrungenCard> {
+  List<TmAppointment>? _appointments;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_TmFuehrungenCard old) {
+    super.didUpdateWidget(old);
+    if (old.year != widget.year || old.month != widget.month) _load();
+  }
+
+  Future<void> _load() async {
+    final sp = context.read<SyncProvider>();
+    if (!sp.hasTmConfig) {
+      if (mounted) setState(() => _appointments = []);
+      return;
+    }
+    final month = '${widget.year}-${widget.month.toString().padLeft(2, '0')}';
+    final result = await TerminMeisterService.instance.fetchMonth(
+      sp.tmUrl,
+      month,
+      apiKey: sp.tmApiKey.isEmpty ? null : sp.tmApiKey,
+    );
+    if (mounted) setState(() => _appointments = result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SyncProvider>();
+    if (!sp.hasTmConfig) return const SizedBox.shrink();
+
+    final apps = _appointments;
+    if (apps == null) return const SizedBox.shrink(); // loading
+
+    // Group by date
+    final byDate = <String, List<TmAppointment>>{};
+    for (final a in apps) {
+      if (a.startDate == null) continue;
+      final key = DateFormat('d. MMMM', 'de_AT').format(a.startDate!);
+      (byDate[key] ??= []).add(a);
+    }
+    if (byDate.isEmpty) return const SizedBox.shrink();
+
+    final totalParticipants =
+        apps.fold<int>(0, (s, a) => s + a.participantCount);
+
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.groups_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Führungen & Events',
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ],
+                ),
+                const Divider(),
+                ...byDate.entries.map((e) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(e.key,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500)),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: e.value
+                                  .map((a) => Text(
+                                        _fmtAppointment(a),
+                                        style: const TextStyle(fontSize: 13),
+                                      ))
+                                  .toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                const Divider(),
+                Text(
+                  '${apps.length} ${apps.length == 1 ? 'Führung' : 'Führungen'}'
+                  '${totalParticipants > 0 ? ' · $totalParticipants Teilnehmer gesamt' : ''}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _fmtAppointment(TmAppointment a) {
+    final parts = <String>[a.title];
+    if (a.group != null && a.group!.isNotEmpty) parts.add(a.group!);
+    if (a.participantCount > 0) parts.add('${a.participantCount} Pers.');
+    return parts.join(' · ');
   }
 }
 
