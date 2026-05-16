@@ -417,6 +417,7 @@ def save_txt(monthly: dict[str, int], employer_name: str,
 # ── Hauptprogramm ─────────────────────────────────────────────────────────────
 
 def main():
+    global MINUTES_PER_MAIL
     parser = argparse.ArgumentParser(
         description="Gurktaler E-Mail-Analyse → Zeiterfassung SQL-Import",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -436,8 +437,6 @@ def main():
     parser.add_argument("--minutes", type=int, default=MINUTES_PER_MAIL,
         help=f"Minuten pro E-Mail (Standard: {MINUTES_PER_MAIL})")
     args = parser.parse_args()
-
-    global MINUTES_PER_MAIL
     MINUTES_PER_MAIL = args.minutes
 
     print("=" * 58)
