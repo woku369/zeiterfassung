@@ -411,14 +411,32 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
 
   List<Widget> _gurktalerExtras() {
     final isWeekendOrHoliday = _dayType != DayType.workday;
+
+    // Samstag: Zuschlag nur ab 13:00 Uhr
+    final endHour = _endTime?.hour ?? 0;
+    final startHour = _startTime.hour;
+    final satAfterCutoff = _dayType == DayType.saturday && endHour >= 13;
+    final satStraddlesCutoff = satAfterCutoff && startHour < 13;
+
     final factor = (_isSpecialHours && _workType != WorkType.homeoffice)
         ? switch (_dayType) {
-            DayType.saturday => 1.5,
+            DayType.saturday => satAfterCutoff ? 1.5 : 1.0,
             DayType.sunday   => 2.0,
             DayType.holiday  => 2.0,
             DayType.workday  => 1.0,
           }
         : 1.0;
+
+    String surchargeLabel() {
+      if (_workType == WorkType.homeoffice) return 'Homeoffice ist immer zuschlagsfrei.';
+      if (!isWeekendOrHoliday) return 'Werktag → kein Zuschlag, gilt als Mehrarbeit.';
+      if (_dayType == DayType.saturday) {
+        if (!satAfterCutoff) return 'Samstag vor 13:00 – kein Zuschlag.';
+        if (satStraddlesCutoff) return 'Samstag: vor 13:00 × 1.0 / ab 13:00 × 1.5';
+        return 'Samstag ab 13:00 – Zuschlag × 1.5';
+      }
+      return 'Zuschlag laut Tagesart × ${factor.toStringAsFixed(1)}';
+    }
     final projects = context.read<ProjectProvider>().forEmployer(_employerId);
     return [
       Container(
@@ -469,11 +487,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               title: const Text('Sonderarbeitszeit (Führung u. ä.)',
                   style: TextStyle(fontSize: 14, color: Colors.black87)),
               subtitle: Text(
-                _workType == WorkType.homeoffice
-                    ? 'Homeoffice ist immer zuschlagsfrei.'
-                    : isWeekendOrHoliday
-                        ? 'Zuschlag laut Tagesart × ${factor.toStringAsFixed(1)}'
-                        : 'Werktag → kein Zuschlag, gilt als Mehrarbeit.',
+                surchargeLabel(),
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
               ),
               value: _isSpecialHours,
