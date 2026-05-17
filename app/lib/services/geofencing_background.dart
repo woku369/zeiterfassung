@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sqlite_api.dart';
 import 'package:uuid/uuid.dart';
+import 'holiday_service.dart';
 
 // ── Geofence-Log ─────────────────────────────────────────────────────────────
 
@@ -519,6 +520,14 @@ Future<void> _autoClockIn(
       return;
     }
 
+    final dayType = HolidayService.instance.isHoliday(now)
+        ? 'holiday'
+        : now.weekday == 6
+            ? 'saturday'
+            : now.weekday == 7
+                ? 'sunday'
+                : 'workday';
+
     await db.insert('time_entries', {
       'id':            id,
       'employer_id':   employerId,
@@ -526,7 +535,7 @@ Future<void> _autoClockIn(
       'start_time':    now.toIso8601String(),
       'end_time':      null,
       'work_type':     workType,
-      'day_type':      'workday',
+      'day_type':      dayType,
       'note':          'Auto · $name',
       'break_minutes': 0,
       'distance_km':   null,
