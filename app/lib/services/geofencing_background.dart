@@ -111,12 +111,15 @@ const _kSpeedStopMs          = 1.4;  // 5 km/h  – stop candidate
 const _kMinDistKm            = 0.3;  // ignore micro-trips
 const kBtTripDevicesKey      = 'bt_trip_devices';   // JSON list of MAC addresses
 const _kBtEventKey           = 'bt_trip_event';     // written by BluetoothTripReceiver
-// Hysterese: Zone gilt erst als verlassen wenn dist > radius + _kExitBuffer.
-// Verhindert schnelles Ein-/Ausstempeln an der Zonengrenze bei GPS-Jitter.
-const _kExitBufferM          = 60.0;
-// GPS-Fixes mit schlechterer Genauigkeit als dieser Wert werden für den
-// Zonen-Check ignoriert (gültig für Geofencing, nicht für Fahrtenerkennung).
-const _kMaxAccuracyM         = 120.0;
+// Exit-Bestätigung: Zone erst als verlassen werten nach N aufeinanderfolgenden
+// Messungen außerhalb. Ein einzelner schlechter GPS-Fix löst keinen Exit aus.
+const _kExitConfirmRequired  = 4;    // × 20 s Intervall = ~80 s Mindest-Exitzeit
+// Hysterese zusätzlich zum Radius: erst ab dieser Distanz zählt eine Messung
+// als "außen" für den Bestätigungs-Zähler.
+const _kExitBufferM          = 80.0;
+// GPS-Fixes mit schlechterer Genauigkeit werden für den Zonen-Check ignoriert.
+// Adaptive Grenze: max(radius × 0.5, 80m) – wird im Code berechnet.
+const _kMaxAccuracyM         = 80.0;
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -130,6 +133,9 @@ Future<void> _onStart(ServiceInstance service) async {
   );
 
   final Set<String> inside = {};
+  // Zählt aufeinanderfolgende "außen"-Messungen pro Zone.
+  // Exit wird erst ausgelöst wenn der Zähler _kExitConfirmRequired erreicht.
+  final Map<String, int> exitConfirm = {};
   // Restore inside-set from the previous service run so that a MIUI-induced
   // restart does not re-fire zone-entry events for zones the user was already in.
   {
@@ -314,9 +320,11 @@ Future<void> _onStart(ServiceInstance service) async {
     }
 
     // Skip poor-accuracy fixes for zone checks only (trip tracking still uses them).
+    // Adaptive threshold: max(radius × 0.5, _kMaxAccuracyM) per zone, checked below.
     final accuracyOk = pos.accuracy <= _kMaxAccuracyM;
     if (!accuracyOk) {
-      await _log('GPS-SKIP', 'Accuracy ${pos.accuracy.toStringAsFixed(0)}m > ${_kMaxAccuracyM.toStringAsFixed(0)}m – Zonen-Check übersprungen');
+      await _log('GPS-SKIP',
+          'Accuracy ${pos.accuracy.toStringAsFixed(0)}m > ${_kMaxAccuracyM.toStringAsFixed(0)}m – Zonen-Check übersprungen');
     }
 
     for (final loc in List<Map<String, dynamic>>.from(locations)) {
@@ -328,13 +336,18 @@ Future<void> _onStart(ServiceInstance service) async {
       );
       final radius = (loc['radiusMeters'] as num).toDouble();
       final wasInside = inside.contains(id);
-      // Hysterese: einmal drin, erst bei radius + _kExitBufferM als draußen werten.
-      // Verhindert Oszillation bei GPS-Jitter an der Zonengrenze.
-      final nowInside = accuracyOk
-          ? (wasInside ? dist <= radius + _kExitBufferM : dist <= radius)
-          : wasInside; // schlechte Accuracy → Status beibehalten
 
-      if (!wasInside && nowInside) {
+      // Bei schlechter Accuracy: Status einfrieren, Zähler nicht verändern.
+      if (!accuracyOk) continue;
+
+      // "Außen" erst wenn dist > radius + Puffer (Hysterese).
+      final outsideThreshold = radius + _kExitBufferM;
+      final measuredOutside = dist > outsideThreshold;
+      final measuredInside  = dist <= radius;
+
+      // Eintritt: sofort bei erster gültigen "innen"-Messung.
+      if (!wasInside && measuredInside) {
+        exitConfirm.remove(id);
         inside.add(id);
         (await SharedPreferences.getInstance())
             .setString(_kInsideZonesKey, inside.join(','));
@@ -348,7 +361,30 @@ Future<void> _onStart(ServiceInstance service) async {
           'employerId': loc['employerId'],
           'entered': true,
         });
-      } else if (wasInside && !nowInside) {
+        continue;
+      }
+
+      // Austritt: erst nach _kExitConfirmRequired aufeinanderfolgenden "außen"-Messungen.
+      if (wasInside) {
+        if (measuredOutside) {
+          exitConfirm[id] = (exitConfirm[id] ?? 0) + 1;
+          await _log('EXIT-CANDIDATE',
+              '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  confirm=${exitConfirm[id]}/$_kExitConfirmRequired');
+          if (exitConfirm[id]! >= _kExitConfirmRequired) {
+            exitConfirm.remove(id);
+            // jetzt echtes Exit durchführen (unten)
+          } else {
+            continue; // noch nicht genug Bestätigungen
+          }
+        } else {
+          // Noch innerhalb (oder zwischen radius und outsideThreshold) → Zähler zurücksetzen
+          exitConfirm.remove(id);
+          continue;
+        }
+      }
+
+      // Ab hier: bestätigter Exit (wasInside=true, Zähler erreicht)
+      {
         inside.remove(id);
         (await SharedPreferences.getInstance())
             .setString(_kInsideZonesKey, inside.join(','));
