@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../models/employer.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
 import '../services/holiday_service.dart';
@@ -18,7 +19,9 @@ class _EntriesScreenState extends State<EntriesScreen> {
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TimeEntryProvider>();
-    final employer = context.watch<EmployerProvider>().active;
+    final ep = context.watch<EmployerProvider>();
+    final employer = ep.active;
+    final others = ep.employers.where((e) => e.id != employer?.id).toList();
     final weeklyTarget = employer?.weeklyHours ?? 40.0;
     final byWeek = tp.entriesByWeek;
     final sortedWeeks = byWeek.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -36,6 +39,22 @@ class _EntriesScreenState extends State<EntriesScreen> {
           ],
         ),
         actions: [
+          if (others.isNotEmpty)
+            PopupMenuButton<Employer>(
+              tooltip: 'Arbeitgeber wechseln',
+              icon: const Icon(Icons.swap_horiz),
+              onSelected: (e) => ep.setActive(e),
+              itemBuilder: (_) => others
+                  .map((e) => PopupMenuItem(
+                        value: e,
+                        child: Row(children: [
+                          const Icon(Icons.business_outlined, size: 18),
+                          const SizedBox(width: 10),
+                          Text(e.name),
+                        ]),
+                      ))
+                  .toList(),
+            ),
           IconButton(
             icon: const Icon(Icons.chevron_left),
             onPressed: () {
