@@ -37,6 +37,14 @@ class HotspotAccessibilityService : AccessibilityService() {
                         AppLog.add(this@HotspotAccessibilityService, "→ Bereits aktiv, nichts zu tun")
                         return
                     }
+                    // Try direct reflection first (works on some HyperOS versions)
+                    if (startTetheringViaReflection(true)) {
+                        val prefs = getSharedPreferences("autohotspot", MODE_PRIVATE)
+                        prefs.edit().putBoolean(PREF_WE_ENABLED_IT, true).apply()
+                        AppLog.add(this@HotspotAccessibilityService, "✓ Reflection erfolgreich")
+                        return
+                    }
+                    AppLog.add(this@HotspotAccessibilityService, "Reflection nicht verfügbar, nutze QS-Tile")
                     pendingAction = PendingAction.ENABLE
                     retryCount = 0
                     openQuickSettings()
@@ -51,6 +59,12 @@ class HotspotAccessibilityService : AccessibilityService() {
                     if (!isHotspotEnabled()) {
                         AppLog.add(this@HotspotAccessibilityService, "→ Hotspot bereits aus")
                         prefs.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
+                        return
+                    }
+                    if (startTetheringViaReflection(false)) {
+                        val prefs2 = getSharedPreferences("autohotspot", MODE_PRIVATE)
+                        prefs2.edit().putBoolean(PREF_WE_ENABLED_IT, false).apply()
+                        AppLog.add(this@HotspotAccessibilityService, "✓ Reflection stop erfolgreich")
                         return
                     }
                     pendingAction = PendingAction.DISABLE
@@ -139,26 +153,26 @@ class HotspotAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun findAndClickHotspot(node: AccessibilityNodeInfo): Boolean {
-        val text = node.text?.toString()?.lowercase()?.trim() ?: ""
-        val desc = node.contentDescription?.toString()?.lowercase()?.trim() ?: ""
-
-        if (text == "hotspot" || desc == "hotspot" ||
-            text.contains("hotspot") || desc.contains("hotspot")
-        ) {
-            var target: AccessibilityNodeInfo? = node
-            while (target != null && !target.isClickable) {
-                target = target.parent
+    private fun findAndClickHotspot(root: AccessibilityNodeInfo): Boolean {
+        // Use findAccessibilityNodeInfosByText() — same approach as the original Auto Hotspot app.
+        // It searches all nodes including content descriptions, much faster than manual traversal.
+        val searchTerms = listOf("Hotspot", "hotspot", "Tethering", "tethering")
+        for (term in searchTerms) {
+            val nodes = root.findAccessibilityNodeInfosByText(term)
+            if (!nodes.isNullOrEmpty()) {
+                for (node in nodes) {
+                    val text = node.text?.toString() ?: ""
+                    val desc = node.contentDescription?.toString() ?: ""
+                    var target: AccessibilityNodeInfo? = node
+                    while (target != null && !target.isClickable) {
+                        target = target.parent
+                    }
+                    if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                        AppLog.add(this, "Tile geklickt via '$term' (text='$text' desc='$desc')")
+                        return true
+                    }
+                }
             }
-            if (target?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
-                AppLog.add(this, "Tile geklickt (text='$text' desc='$desc')")
-                return true
-            }
-        }
-
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            if (findAndClickHotspot(child)) return true
         }
         return false
     }
@@ -185,6 +199,31 @@ class HotspotAccessibilityService : AccessibilityService() {
             method.invoke(wifiManager) as Boolean
         } catch (e: Exception) {
             AppLog.add(this, "isHotspotEnabled Fehler: ${e.message}")
+            false
+        }
+    }
+
+    private fun startTetheringViaReflection(enable: Boolean): Boolean {
+        return try {
+            val cm = applicationContext.getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            if (enable) {
+                val method = cm.javaClass.getDeclaredMethod(
+                    "startTethering", Int::class.java, Boolean::class.java,
+                    Class.forName("android.net.ConnectivityManager\$OnStartTetheringCallback"),
+                    android.os.Handler::class.java
+                )
+                method.isAccessible = true
+                method.invoke(cm, 0 /* TETHERING_WIFI */, false, null, null)
+                AppLog.add(this, "startTethering via reflection aufgerufen")
+            } else {
+                val method = cm.javaClass.getDeclaredMethod("stopTethering", Int::class.java)
+                method.isAccessible = true
+                method.invoke(cm, 0 /* TETHERING_WIFI */)
+                AppLog.add(this, "stopTethering via reflection aufgerufen")
+            }
+            true
+        } catch (e: Exception) {
+            AppLog.add(this, "Reflection fehlgeschlagen: ${e.javaClass.simpleName}: ${e.message?.take(80)}")
             false
         }
     }
