@@ -111,6 +111,12 @@ const _kSpeedStopMs          = 1.4;  // 5 km/h  – stop candidate
 const _kMinDistKm            = 0.3;  // ignore micro-trips
 const kBtTripDevicesKey      = 'bt_trip_devices';   // JSON list of MAC addresses
 const _kBtEventKey           = 'bt_trip_event';     // written by BluetoothTripReceiver
+// Hysterese: Zone gilt erst als verlassen wenn dist > radius + _kExitBuffer.
+// Verhindert schnelles Ein-/Ausstempeln an der Zonengrenze bei GPS-Jitter.
+const _kExitBufferM          = 60.0;
+// GPS-Fixes mit schlechterer Genauigkeit als dieser Wert werden für den
+// Zonen-Check ignoriert (gültig für Geofencing, nicht für Fahrtenerkennung).
+const _kMaxAccuracyM         = 120.0;
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -307,6 +313,12 @@ Future<void> _onStart(ServiceInstance service) async {
           '${nearbyParts.join('  ')}');
     }
 
+    // Skip poor-accuracy fixes for zone checks only (trip tracking still uses them).
+    final accuracyOk = pos.accuracy <= _kMaxAccuracyM;
+    if (!accuracyOk) {
+      await _log('GPS-SKIP', 'Accuracy ${pos.accuracy.toStringAsFixed(0)}m > ${_kMaxAccuracyM.toStringAsFixed(0)}m – Zonen-Check übersprungen');
+    }
+
     for (final loc in List<Map<String, dynamic>>.from(locations)) {
       final id = loc['id'] as String;
       final dist = _haversine(
@@ -316,7 +328,11 @@ Future<void> _onStart(ServiceInstance service) async {
       );
       final radius = (loc['radiusMeters'] as num).toDouble();
       final wasInside = inside.contains(id);
-      final nowInside = dist <= radius;
+      // Hysterese: einmal drin, erst bei radius + _kExitBufferM als draußen werten.
+      // Verhindert Oszillation bei GPS-Jitter an der Zonengrenze.
+      final nowInside = accuracyOk
+          ? (wasInside ? dist <= radius + _kExitBufferM : dist <= radius)
+          : wasInside; // schlechte Accuracy → Status beibehalten
 
       if (!wasInside && nowInside) {
         inside.add(id);
