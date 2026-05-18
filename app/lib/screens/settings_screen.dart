@@ -17,6 +17,9 @@ import '../providers/sync_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/activity_tracking_service.dart';
 import '../providers/trip_provider.dart';
+import '../providers/time_entry_provider.dart';
+import '../database/database_helper.dart';
+import '../models/time_entry.dart';
 import 'locations_screen.dart';
 import 'imap_screen.dart';
 import 'trip_log_screen.dart';
@@ -228,6 +231,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             _BackupCard(),
           ],
+
+          // ── Datenpflege ───────────────────────────────────────────────
+          const SizedBox(height: 20),
+          Text('Datenpflege', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          const _DedupCard(),
 
           // ── Info ──────────────────────────────────────────────────────
           const SizedBox(height: 20),
@@ -1336,6 +1345,148 @@ class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Schließen'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Datenpflege: Duplikate bereinigen ─────────────────────────────────────────
+
+class _DedupCard extends StatefulWidget {
+  const _DedupCard();
+  @override
+  State<_DedupCard> createState() => _DedupCardState();
+}
+
+class _DedupCardState extends State<_DedupCard> {
+  bool _scanning = false;
+
+  Future<void> _scan() async {
+    setState(() => _scanning = true);
+    try {
+      final groups = await DatabaseHelper.instance.findDuplicates();
+      if (!mounted) return;
+      if (groups.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Keine Mehrfacheinträge gefunden.')),
+        );
+        return;
+      }
+      await showDialog(
+        context: context,
+        builder: (_) => _DedupDialog(groups: groups),
+      );
+      // Reload entries after potential deletion
+      if (mounted) {
+        context.read<TimeEntryProvider>().refresh();
+      }
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: _scanning
+            ? const SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.content_copy_outlined),
+        title: const Text('Mehrfacheinträge suchen'),
+        subtitle: const Text('Findet und entfernt doppelt erfasste Einträge'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _scanning ? null : _scan,
+      ),
+    );
+  }
+}
+
+class _DedupDialog extends StatefulWidget {
+  final List<List<TimeEntry>> groups;
+  const _DedupDialog({required this.groups});
+  @override
+  State<_DedupDialog> createState() => _DedupDialogState();
+}
+
+class _DedupDialogState extends State<_DedupDialog> {
+  bool _deleting = false;
+
+  String _fmtEntry(TimeEntry e) {
+    final d = '${e.date.day.toString().padLeft(2,'0')}.${e.date.month.toString().padLeft(2,'0')}.${e.date.year}';
+    final start = '${e.startTime.hour.toString().padLeft(2,'0')}:${e.startTime.minute.toString().padLeft(2,'0')}';
+    final end = e.endTime != null
+        ? '–${e.endTime!.hour.toString().padLeft(2,'0')}:${e.endTime!.minute.toString().padLeft(2,'0')}'
+        : '';
+    final note = (e.note?.isNotEmpty == true) ? '  ${e.note}' : '';
+    return '$d  $start$end$note';
+  }
+
+  Future<void> _delete() async {
+    setState(() => _deleting = true);
+    final deleted = await DatabaseHelper.instance.deleteDuplicates(widget.groups);
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$deleted Mehrfacheinträge entfernt.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.groups.fold(0, (s, g) => s + g.length - 1);
+    return AlertDialog(
+      title: Text('${widget.groups.length} Gruppe${widget.groups.length == 1 ? '' : 'n'} gefunden'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: widget.groups.length,
+          separatorBuilder: (_, __) => const Divider(),
+          itemBuilder: (_, i) {
+            final group = widget.groups[i];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: group.asMap().entries.map((e) {
+                final isFirst = e.key == 0;
+                return Row(children: [
+                  Icon(
+                    isFirst ? Icons.check_circle_outline : Icons.delete_outline,
+                    size: 16,
+                    color: isFirst ? Colors.green : Colors.red.shade300,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _fmtEntry(e.value),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isFirst ? null : Colors.grey,
+                        decoration: isFirst ? null : TextDecoration.lineThrough,
+                      ),
+                    ),
+                  ),
+                ]);
+              }).toList(),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _deleting ? null : () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton.icon(
+          onPressed: _deleting ? null : _delete,
+          icon: _deleting
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.delete_sweep_outlined, size: 18),
+          label: Text('$total Duplikat${total == 1 ? '' : 'e'} löschen'),
+          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
         ),
       ],
     );

@@ -341,6 +341,70 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  /// Findet Einträge, die am selben Tag beim selben Arbeitgeber innerhalb
+  /// von 5 Minuten starten — wahrscheinliche Mehrfacheinträge.
+  /// Gibt Gruppen zurück; jede Gruppe enthält ≥ 2 Einträge.
+  Future<List<List<TimeEntry>>> findDuplicates() async {
+    final db = await database;
+    final rows = await db.query('time_entries',
+        orderBy: 'employer_id, date, start_time ASC');
+    final all = rows.map(TimeEntry.fromMap).toList();
+
+    final groups = <List<TimeEntry>>[];
+    var i = 0;
+    while (i < all.length) {
+      final group = [all[i]];
+      var j = i + 1;
+      while (j < all.length) {
+        final a = group.first;
+        final b = all[j];
+        if (a.date.year != b.date.year ||
+            a.date.month != b.date.month ||
+            a.date.day != b.date.day ||
+            a.employerId != b.employerId) break;
+        final diffMin = b.startTime.difference(a.startTime).inMinutes.abs();
+        if (diffMin <= 5) {
+          group.add(b);
+          j++;
+        } else {
+          break;
+        }
+      }
+      if (group.length >= 2) groups.add(group);
+      i = j;
+    }
+    return groups;
+  }
+
+  /// Löscht Duplikate: behält pro Gruppe den "besten" Eintrag
+  /// (Ende gesetzt > längste Notiz > ältestes created_at).
+  Future<int> deleteDuplicates(List<List<TimeEntry>> groups) async {
+    final db = await database;
+    var deleted = 0;
+    for (final group in groups) {
+      final keep = group.reduce((a, b) {
+        // Prefer entry with end_time
+        final aHasEnd = a.endTime != null;
+        final bHasEnd = b.endTime != null;
+        if (aHasEnd && !bHasEnd) return a;
+        if (bHasEnd && !aHasEnd) return b;
+        // Prefer longer note
+        if ((a.note?.length ?? 0) != (b.note?.length ?? 0)) {
+          return (a.note?.length ?? 0) > (b.note?.length ?? 0) ? a : b;
+        }
+        // Prefer earliest created_at
+        return a.createdAt.isBefore(b.createdAt) ? a : b;
+      });
+      for (final e in group) {
+        if (e.id != keep.id) {
+          await db.delete('time_entries', where: 'id = ?', whereArgs: [e.id]);
+          deleted++;
+        }
+      }
+    }
+    return deleted;
+  }
+
   // ── employers ─────────────────────────────────────────────────────────────
 
   Future<void> insertEmployer(Employer e) async {
