@@ -19,7 +19,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -73,6 +73,7 @@ class DatabaseHelper {
     await _createV7Tables(db);
     await _createV10Tables(db);
     await _createV11Tables(db);
+    await _createV13Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -134,6 +135,9 @@ class DatabaseHelper {
         await db.execute(
             'ALTER TABLE employers ADD COLUMN vacation_days_per_year INTEGER NOT NULL DEFAULT 25');
       } catch (_) {}
+    }
+    if (oldVersion < 13) {
+      await _createV13Tables(db);
     }
   }
 
@@ -211,6 +215,61 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<void> _createV13Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS deletion_log (
+        id TEXT PRIMARY KEY,
+        deleted_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ── deletion_log ──────────────────────────────────────────────────────────
+
+  Future<void> logDeletion(String id) async {
+    final db = await database;
+    await db.insert('deletion_log', {
+      'id': id,
+      'deleted_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> logDeletions(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final id in ids) {
+      batch.insert('deletion_log', {'id': id, 'deleted_at': now},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Alle lokal protokollierten Löschungen seit [since] (für Sync-Push).
+  Future<List<String>> getDeletionsSince(String since) async {
+    final db = await database;
+    final rows = await db.query('deletion_log',
+        columns: ['id'],
+        where: 'deleted_at > ?',
+        whereArgs: [since]);
+    return rows.map((r) => r['id'] as String).toList();
+  }
+
+  /// Wendet vom Server empfangene Löschungen lokal an.
+  Future<void> applyRemoteDeletions(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final id in ids) {
+      batch.delete('time_entries', where: 'id = ?', whereArgs: [id]);
+      batch.insert('deletion_log', {'id': id, 'deleted_at': now},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+    await batch.commit(noResult: true);
   }
 
   // ── trips ─────────────────────────────────────────────────────────────────
@@ -381,27 +440,28 @@ class DatabaseHelper {
   Future<int> deleteDuplicates(List<List<TimeEntry>> groups) async {
     final db = await database;
     var deleted = 0;
+    final deletedIds = <String>[];
     for (final group in groups) {
       final keep = group.reduce((a, b) {
-        // Prefer entry with end_time
         final aHasEnd = a.endTime != null;
         final bHasEnd = b.endTime != null;
         if (aHasEnd && !bHasEnd) return a;
         if (bHasEnd && !aHasEnd) return b;
-        // Prefer longer note
         if ((a.note?.length ?? 0) != (b.note?.length ?? 0)) {
           return (a.note?.length ?? 0) > (b.note?.length ?? 0) ? a : b;
         }
-        // Prefer earliest created_at
         return a.createdAt.isBefore(b.createdAt) ? a : b;
       });
       for (final e in group) {
         if (e.id != keep.id) {
           await db.delete('time_entries', where: 'id = ?', whereArgs: [e.id]);
+          deletedIds.add(e.id);
           deleted++;
         }
       }
     }
+    // Löschungen protokollieren → werden beim nächsten Sync an NAS + andere Geräte übertragen
+    await logDeletions(deletedIds);
     return deleted;
   }
 

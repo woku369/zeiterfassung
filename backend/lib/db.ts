@@ -34,10 +34,56 @@ function initSchema(db: Database.Database) {
       start_lng REAL,
       end_lat REAL,
       end_lng REAL,
+      travel_minutes INTEGER NOT NULL DEFAULT 0,
+      employer_id TEXT,
+      project_id TEXT,
       is_synced INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_entries_date ON time_entries(date);
+
+    CREATE TABLE IF NOT EXISTS employers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      weekly_hours REAL NOT NULL DEFAULT 40.0,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tracked_locations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      radius_meters REAL NOT NULL DEFAULT 200.0,
+      employer_id TEXT,
+      auto_clock_in INTEGER NOT NULL DEFAULT 0,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      employer_id TEXT,
+      color INTEGER,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS deletion_log (
+      id TEXT PRIMARY KEY,
+      deleted_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 }

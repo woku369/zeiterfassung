@@ -89,6 +89,8 @@ class SyncService {
       }
     }
 
+    final deletedIds = await db.getDeletionsSince(lastSync);
+
     try {
       final body = jsonEncode({
         'last_sync': lastSync,
@@ -96,6 +98,7 @@ class SyncService {
         'employers': employers.map((e) => e.toJson()).toList(),
         'locations': locations.map((l) => l.toJson()).toList(),
         'projects':  projects.map((p) => p.toJson()).toList(),
+        if (deletedIds.isNotEmpty) 'deleted_ids': deletedIds,
         if (localSettings != null && localSettings.isNotEmpty)
           'settings': localSettings,
       });
@@ -143,6 +146,13 @@ class SyncService {
       }
       if (serverProjects.isNotEmpty) {
         await db.upsertProjectsFromServer(serverProjects);
+      }
+
+      // Apply deletions from other devices
+      final serverDeletedIds = (data['deleted_ids'] as List<dynamic>? ?? [])
+          .map((e) => e as String).toList();
+      if (serverDeletedIds.isNotEmpty) {
+        await db.applyRemoteDeletions(serverDeletedIds);
       }
 
       // Mark local entries as synced, save sync timestamp
