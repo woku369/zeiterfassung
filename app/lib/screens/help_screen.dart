@@ -326,6 +326,7 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Arbeitgeber', value: 'Inkl. Löschungen (Soft-Delete)'),
               _KeyValue(label: 'Standorte', value: 'Inkl. Löschungen (Soft-Delete)'),
               _KeyValue(label: 'Projekte', value: 'Inkl. Löschungen (Soft-Delete)'),
+              _KeyValue(label: 'Löschungen (Zeiteinträge)', value: 'Deletion-Log – jede Löschung propagiert beim nächsten Sync auf alle Geräte'),
               _KeyValue(label: 'Whitelist + Activity-Settings', value: 'LWW per Key – Gerät mit jüngster Änderung gewinnt'),
               _KeyValue(label: 'IMAP-Config', value: 'Bidirektional'),
               _SubHeading('Einstellungen'),
@@ -349,6 +350,27 @@ class HelpScreen extends StatelessWidget {
                 'Synchronisiert ein anderes Gerät später mit alten Werten, '
                 'verlierst du deine Änderungen NICHT – das Gerät mit der '
                 'jüngsten User-Änderung gewinnt.',
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.cleaning_services_outlined,
+            title: 'Datenpflege',
+            children: const [
+              _Para(
+                'Einstellungen → Datenpflege: Werkzeuge um doppelte Einträge '
+                'zu finden und zu bereinigen.',
+              ),
+              _SubHeading('Mehrfacheinträge bereinigen'),
+              _KeyValue(label: 'Öffnen', value: 'Einstellungen → Datenpflege → „Mehrfacheinträge suchen"'),
+              _KeyValue(label: 'Erkennung', value: 'Gleicher Tag + gleicher Arbeitgeber + Startzeit-Differenz ≤ 5 Minuten'),
+              _KeyValue(label: 'Anzeige', value: 'Grün = behalten, Rot durchgestrichen = wird gelöscht'),
+              _KeyValue(label: 'Löschen', value: '„N Duplikate löschen" – unwiderruflich'),
+              _Hint(
+                'Gelöschte Einträge werden im Deletion-Log gespeichert und '
+                'beim nächsten Sync auf alle verbundenen Geräte propagiert – '
+                'Datenpflege muss also nur auf einem Gerät durchgeführt werden.',
               ),
             ],
           ),
@@ -572,12 +594,19 @@ class HelpScreen extends StatelessWidget {
             title: 'Monatsberichte & Export',
             children: [
               _Para('Berichte → Monat wählen → XLSX exportieren.'),
+              _SubHeading('Monats-Export'),
               _KeyValue(label: 'Format', value: 'Excel (.xlsx) mit KW-Summen und Monatssumme'),
               _KeyValue(label: 'Import', value: 'Kompatibel mit Stempeluhr 2.1'),
               _KeyValue(label: 'Teilen', value: 'Direkt aus der App per Share-Dialog'),
+              _SubHeading('Zeitraum-Export'),
+              _KeyValue(label: 'Öffnen', value: 'Berichte → Tab „Monat" → „Zeitraum exportieren"'),
+              _KeyValue(label: 'Auswahl', value: 'Von-Monat und Bis-Monat wählen – alle dazwischenliegenden Monate in einer Datei'),
+              _SubHeading('Jahresbericht'),
+              _KeyValue(label: 'Öffnen', value: 'Berichte → Tab „Wirtschaftsjahr" → „Jahresbericht exportieren"'),
+              _KeyValue(label: 'Inhalt', value: 'Alle Einträge des Wirtschaftsjahres als XLSX inkl. Jahressumme'),
               _Hint(
-                'Für die Jahresauswertung jeden Monat exportieren oder '
-                'alle Daten einmal jährlich vom NAS-Backend abfragen.',
+                'Arbeitgeberwechsel direkt in der AppBar des Berichte-Screens (auch '
+                'auf der Einträge-Seite): Symbol ⇄ erscheint wenn ≥ 2 Arbeitgeber vorhanden.',
               ),
             ],
           ),

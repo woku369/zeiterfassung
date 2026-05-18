@@ -37,6 +37,7 @@ function initSchema(db: Database.Database) {
       travel_minutes INTEGER NOT NULL DEFAULT 0,
       employer_id TEXT,
       project_id TEXT,
+      is_special_hours INTEGER NOT NULL DEFAULT 0,
       is_synced INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))

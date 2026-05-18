@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-15 – v1.20 TerminMeister-Kopplung + Geofencing Trip-End-Fix
+> Letztes Update: 2026-05-18 – v1.21 Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
 
 ---
 
@@ -25,6 +25,55 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.21 – Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
+
+- [x] **Deletion-Sync via NAS (DB v13):**
+  - Neue Tabelle `deletion_log (id, deleted_at)` auf Client und NAS
+  - Jede Löschung (manuell oder per Datenpflege) schreibt einen Eintrag in `deletion_log`
+  - Sync-Payload enthält `deleted_ids` (Löschungen seit letztem Sync) → NAS löscht + logt
+  - Server-Response enthält `deleted_ids` anderer Geräte → Client löscht lokal per `applyRemoteDeletions()`
+  - Neues NAS-Endpoint `/api/sync.ts` ersetzt das veraltete `/api/entries/sync` (vollständig: Einträge, Arbeitgeber, Standorte, Projekte, Settings, Deletion-Log)
+  - `backend/lib/db.ts` erweitert: Tabellen `employers`, `tracked_locations`, `projects`, `deletion_log`, `sync_state`
+
+- [x] **Datenpflege – Mehrfacheinträge (Einstellungen → Datenpflege):**
+  - `findDuplicates()`: gruppiert Einträge nach Tag + Arbeitgeber + Startzeit-Differenz ≤ 5 Min.
+  - `_DedupCard` + `_DedupDialog`: zeigt Gruppen mit Behalten (grün) / Löschen (rot durchgestrichen)
+  - `deleteDuplicates()` ruft `logDeletions()` auf → Löschungen propagieren via NAS auf alle Geräte
+
+- [x] **Geofencing-Stabilität (Oszillation):**
+  - Exit-Bestätigung: 4 aufeinanderfolgende „außerhalb"-Messungen nötig (≈ 80 s Mindestzeit)
+  - Hysterese-Band: Exit erst wenn Distanz > Radius + 80 m (verhindert Grenzpendeln)
+  - Accuracy-Filter: GPS-Fixes schlechter als 80 m Genauigkeit werden ignoriert (Cell-Tower-Jitter)
+  - Ergebnis: kein permanentes Auto-Ein/Aus-Stempeln mehr bei Cell-Tower-Wechsel
+
+- [x] **Bugfix: Auto-Einstempeln day_type** – Geofencing-Auto-Clock-in klassifizierte immer als Werktag; jetzt korrekte Erkennung von Samstag, Sonntag, Feiertag per `HolidayService`
+
+- [x] **Bugfix: Fahrtenbuch-Toggle** – Background-Service sah SharedPreferences-Updates aus dem Haupt-Isolate nicht (Dart-Isolate-Cache); Fix: `service.invoke('setTripTracking')` Nachrichtenkanal + lokale `_tripTrackingEnabled`-Variable im Hintergrunds-Isolate
+
+- [x] **Zuschlagsberechnung Samstag (zeitbezogen):**
+  - Vor 13:00 Uhr: kein Zuschlag (×1.0)
+  - Ab 13:00 Uhr: ×1.5
+  - Eintrag der beide Seiten umfasst: proportionale Berechnung (anteilig vor/nach 13:00)
+  - Anzeige im Eintrag-Formular zeigt passenden Hinweistext
+
+- [x] **AG-Wechsel auf Einträge-Screen** – `PopupMenuButton` mit `Icons.swap_horiz` in AppBar (identisch mit Berichte-Screen)
+
+- [x] **Export-Erweiterungen:**
+  - Monatsbericht-Header mit Stundensumme, Soll, Saldo
+  - „Zeitraum exportieren": Von-/Bis-Monat wählen, alle Einträge in einer XLSX-Datei
+  - „Jahresbericht exportieren" im Wirtschaftsjahr-Tab
+
+- [x] **E-Mail-Analyse-Tool (`tools/mail_analyse.py`):**
+  - Parst Thunderbird MBOX-Dateien, filtert nach Gurktaler-Whitelist
+  - 2 Min/Mail, Eintrag am letzten Werktag des Monats
+  - Ausgabe: CSV + SQL-INSERT + Protokoll-TXT; interaktiver SQLite-Import
+
+- [x] **Bugfixes v1.21:**
+  - `geofencing_background.dart`: `db.close()` nicht in allen Pfaden garantiert → `try/finally` in allen 5 DB-Funktionen nachgezogen
+  - `settings_screen.dart`: `employer.nasUrl!` Null-Check fehlte → Guard + Hinweis-SnackBar
+  - `backend/lib/db.ts`: `is_special_hours` fehlte in NAS time_entries-Schema → ergänzt
+  - `backend/pages/api/sync.ts`: `is_special_hours` fehlte in INSERT/UPDATE → ergänzt; top-level try/catch für saubere 500-Antworten
 
 ### v1.20 – TerminMeister-Kopplung (Monatsbericht)
 - [x] **`TerminMeisterService`** (`services/terminmeister_service.dart`):
@@ -482,7 +531,7 @@ app/
                      terminmeister_service (TmAppointment, fetchMonth – optional)
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v12)
+    database/        database_helper (SQLite v13)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -527,12 +576,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v10: + `projects` (Tabelle), + `project_id` (time_entries) – Projektzuordnung
 - v11: + `trips` (Tabelle) – Fahrtenbuch mit GPS-Tracking und Adressauflösung
 - v12: + `vacation_days_per_year` (employers) – Urlaubskontingent pro Arbeitgeber
+- v13: + `deletion_log (id, deleted_at)` – Deletion-Log für geräteübergreifende Lösch-Propagation
 
-**Server-DB:** zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync; `projects` (Tabelle) für bidirektionalen Projekt-Sync.
+**Server-DB:** `employers`, `tracked_locations`, `projects`, `deletion_log`, `sync_state` – vollständig via `/api/sync.ts`; zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync (legacy `server.js`).
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.20)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.21)
 
 ---
 

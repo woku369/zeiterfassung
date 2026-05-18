@@ -473,8 +473,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _testConnection(
       BuildContext context, Employer employer) async {
+    final nasUrl = employer.nasUrl;
+    if (nasUrl == null || nasUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte zuerst NAS-URL konfigurieren')));
+      return;
+    }
     final ok = await SyncService.instance.testConnection(
-      baseUrl: employer.nasUrl!,
+      baseUrl: nasUrl,
       apiKey: employer.nasApiKey,
     );
     if (!context.mounted) return;

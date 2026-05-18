@@ -222,10 +222,14 @@ Future<void> _onStart(ServiceInstance service) async {
 
     try {
       final db = await _openDb();
-      final rows = await db.query('time_entries',
-          where: 'id = ? AND end_time IS NULL',
-          whereArgs: [entryId], limit: 1);
-      await db.close();
+      late final List<Map<String, Object?>> rows;
+      try {
+        rows = await db.query('time_entries',
+            where: 'id = ? AND end_time IS NULL',
+            whereArgs: [entryId], limit: 1);
+      } finally {
+        await db.close();
+      }
       if (rows.isEmpty) {
         // Already clocked out manually – clear stale flag.
         await prefs.remove(_kAutoEntryKey);
@@ -560,40 +564,42 @@ Future<void> _autoClockIn(
 
   try {
     final db = await _openDb();
-    // Skip if already clocked in (manually or via geofencing) – the user
-    // explicitly does not want overlapping entries.
-    final active = await db.query('time_entries',
-        where: 'end_time IS NULL', limit: 1);
-    if (active.isNotEmpty) {
+    try {
+      // Skip if already clocked in (manually or via geofencing) – the user
+      // explicitly does not want overlapping entries.
+      final active = await db.query('time_entries',
+          where: 'end_time IS NULL', limit: 1);
+      if (active.isNotEmpty) {
+        await _log('SKIP', 'Bereits eingestempelt – $name übersprungen');
+        _notify(n, 995, 'Bei $name angekommen',
+            'Bereits eingestempelt – Geofencing übersprungen.');
+        return;
+      }
+
+      final dayType = HolidayService.instance.isHoliday(now)
+          ? 'holiday'
+          : now.weekday == 6
+              ? 'saturday'
+              : now.weekday == 7
+                  ? 'sunday'
+                  : 'workday';
+
+      await db.insert('time_entries', {
+        'id':            id,
+        'employer_id':   employerId,
+        'date':          DateTime(now.year, now.month, now.day).toIso8601String(),
+        'start_time':    now.toIso8601String(),
+        'end_time':      null,
+        'work_type':     workType,
+        'day_type':      dayType,
+        'note':          'Auto · $name',
+        'break_minutes': 0,
+        'distance_km':   null,
+        'created_at':    now.toIso8601String(),
+      });
+    } finally {
       await db.close();
-      await _log('SKIP', 'Bereits eingestempelt – $name übersprungen');
-      _notify(n, 995, 'Bei $name angekommen',
-          'Bereits eingestempelt – Geofencing übersprungen.');
-      return;
     }
-
-    final dayType = HolidayService.instance.isHoliday(now)
-        ? 'holiday'
-        : now.weekday == 6
-            ? 'saturday'
-            : now.weekday == 7
-                ? 'sunday'
-                : 'workday';
-
-    await db.insert('time_entries', {
-      'id':            id,
-      'employer_id':   employerId,
-      'date':          DateTime(now.year, now.month, now.day).toIso8601String(),
-      'start_time':    now.toIso8601String(),
-      'end_time':      null,
-      'work_type':     workType,
-      'day_type':      dayType,
-      'note':          'Auto · $name',
-      'break_minutes': 0,
-      'distance_km':   null,
-      'created_at':    now.toIso8601String(),
-    });
-    await db.close();
 
     await prefs.setString(_kAutoEntryKey, id);
     if (employerId != null) {
@@ -616,30 +622,33 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
   final now = DateTime.now();
   try {
     final db = await _openDb();
-    // Gesetzliche Pause: ab 5h automatisch 30 Min., außer Homeoffice.
-    final rows = await db.query('time_entries',
-        columns: ['start_time', 'work_type', 'break_minutes'],
-        where: 'id = ? AND end_time IS NULL',
-        whereArgs: [entryId], limit: 1);
-    int breakMinutes = 0;
-    if (rows.isNotEmpty) {
-      final existing = rows.first;
-      final start = DateTime.parse(existing['start_time'] as String);
-      final durationMinutes = now.difference(start).inMinutes;
-      final workType = existing['work_type'] as String;
-      final alreadySet = (existing['break_minutes'] as int?) ?? 0;
-      if (alreadySet == 0 && durationMinutes >= 300 && workType != 'homeoffice') {
-        breakMinutes = 30;
-        await _log('PAUSE', 'Auto 30 Min. eingetragen (${durationMinutes}min Arbeitszeit)');
+    try {
+      // Gesetzliche Pause: ab 5h automatisch 30 Min., außer Homeoffice.
+      final rows = await db.query('time_entries',
+          columns: ['start_time', 'work_type', 'break_minutes'],
+          where: 'id = ? AND end_time IS NULL',
+          whereArgs: [entryId], limit: 1);
+      int breakMinutes = 0;
+      if (rows.isNotEmpty) {
+        final existing = rows.first;
+        final start = DateTime.parse(existing['start_time'] as String);
+        final durationMinutes = now.difference(start).inMinutes;
+        final workType = existing['work_type'] as String;
+        final alreadySet = (existing['break_minutes'] as int?) ?? 0;
+        if (alreadySet == 0 && durationMinutes >= 300 && workType != 'homeoffice') {
+          breakMinutes = 30;
+          await _log('PAUSE', 'Auto 30 Min. eingetragen (${durationMinutes}min Arbeitszeit)');
+        }
       }
+      await db.update(
+        'time_entries',
+        {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes},
+        where: 'id = ? AND end_time IS NULL',
+        whereArgs: [entryId],
+      );
+    } finally {
+      await db.close();
     }
-    await db.update(
-      'time_entries',
-      {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes},
-      where: 'id = ? AND end_time IS NULL',
-      whereArgs: [entryId],
-    );
-    await db.close();
     final breakNote = breakMinutes > 0 ? ' · 30 Min. Pause eingetragen' : '';
     _notify(n, 996, 'Ausgestempelt',
         'Geofencing hat automatisch gestoppt.$breakNote Zum Bearbeiten App öffnen.');
@@ -662,16 +671,19 @@ Future<void> _insertOpenTrip(
     String id, DateTime start, double lat, double lng) async {
   try {
     final db = await _openDb();
-    await db.insert('trips', {
-      'id':         id,
-      'start_time': start.toIso8601String(),
-      'end_time':   null,
-      'start_lat':  lat,
-      'start_lng':  lng,
-      'distance_km': 0.0,
-      'created_at': start.toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-    await db.close();
+    try {
+      await db.insert('trips', {
+        'id':         id,
+        'start_time': start.toIso8601String(),
+        'end_time':   null,
+        'start_lat':  lat,
+        'start_lng':  lng,
+        'distance_km': 0.0,
+        'created_at': start.toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } finally {
+      await db.close();
+    }
   } catch (e) {
     await _log('TRIP-ERROR', 'insertOpenTrip: $e');
   }
@@ -689,8 +701,11 @@ Future<void> _finalizeTrip({
     // Too short – delete skeleton
     try {
       final db = await _openDb();
-      await db.delete('trips', where: 'id = ?', whereArgs: [id]);
-      await db.close();
+      try {
+        await db.delete('trips', where: 'id = ?', whereArgs: [id]);
+      } finally {
+        await db.close();
+      }
     } catch (_) {}
     await _log('TRIP-SKIP', 'Zu kurz: ${distKm.toStringAsFixed(2)} km');
     return;
@@ -698,13 +713,16 @@ Future<void> _finalizeTrip({
   final end = endTime ?? DateTime.now();
   try {
     final db = await _openDb();
-    await db.update('trips', {
-      'end_time':   end.toIso8601String(),
-      'end_lat':    endLat,
-      'end_lng':    endLng,
-      'distance_km': distKm,
-    }, where: 'id = ?', whereArgs: [id]);
-    await db.close();
+    try {
+      await db.update('trips', {
+        'end_time':   end.toIso8601String(),
+        'end_lat':    endLat,
+        'end_lng':    endLng,
+        'distance_km': distKm,
+      }, where: 'id = ?', whereArgs: [id]);
+    } finally {
+      await db.close();
+    }
     await _log('TRIP-END', 'id=$id  dist=${distKm.toStringAsFixed(2)}km');
     _notify(notifications, 991,
         'Fahrt beendet: ${distKm.toStringAsFixed(1)} km',
