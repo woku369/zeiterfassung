@@ -626,6 +626,7 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
   if (entryId == null) return;
 
   final now = DateTime.now();
+  var breakMinutes = 0;
   try {
     final db = await _openDb();
     try {
