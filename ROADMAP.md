@@ -513,6 +513,31 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
 - [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
+
+### Mittelfristig – Zuschläge-Reporting (Verhandlungsunterlage Gurktaler AG)
+
+> **Datenbasis-Hinweis:** Vorjahreswerte zu lückenhaft für belastbare Aussagen.
+> Aufnahme nach ~10–12 Wochen ordentlicher Datenerfassung (ab ca. August 2026).
+
+- [ ] **Wochendurchschnitt im Zuschläge-Sheet:**
+  - Effektiv-Äquivalent-Stunden / tatsächlich erfasste Wochen (nicht pauschal 52)
+  - Macht „ich arbeite faktisch X h/Woche" direkt ablesbar
+
+- [ ] **Hochrechnung Überstundenpauschale:**
+  - Monatsdurchschnitt der zuschlagspflichtigen Stunden × Stundensatz → geschätzter Monatsbetrag
+  - Jahresprojektion (× 12) sowie Gegenüberstellung mit 360 €/Monat-Grenze (§ 68 EStG)
+  - Für DN und DG getrennt ausweisen (beide Seiten steuerfrei)
+
+- [ ] **Aufschlüsselung nach Tätigkeitstyp im Zuschläge-Sheet:**
+  - Führungen / allgemeine Gartenarbeit / Homeoffice als eigene Untergruppen
+  - Zeigt welcher Anteil überhaupt zuschlagspflichtig ist
+
+- [ ] **Ziel-Szenario-Vergleich:**
+  - Aktuelle Situation (8 h/Woche, kein Zuschlag) vs.
+  - Szenario A: 10 h/Woche-Vertrag
+  - Szenario B: 8 h + Überstundenpauschale
+  - Szenario C: 10 h + reduzierte Pauschale
+  - Netto-Auswirkung für DN und DG jeweils beziffern
 - [x] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe in der Activity-Timeline anzeigen und direkt als Eintrag übernehmen *(v1.17)*
 - [ ] **Anruf-Overlay:** Schwebender Button über der Phone-App bei aktivem Anruf (SYSTEM_ALERT_WINDOW) – sofortige Arbeitszeiterfassung ohne App-Wechsel
 
