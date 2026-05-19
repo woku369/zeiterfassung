@@ -357,6 +357,15 @@ Future<void> _onStart(ServiceInstance service) async {
             .setString(_kInsideZonesKey, inside.join(','));
         timers[id]?.cancel();
         timers.remove(id);
+        // Wenn Karenz-Timer anderer Zonen laufen, ist der Nutzer eindeutig
+        // weitergezogen → alte Timer abbrechen und alten Auto-Eintrag sofort
+        // schließen, damit _autoClockIn nicht durch "Bereits eingestempelt" blockiert.
+        if (timers.isNotEmpty) {
+          for (final t in timers.values) t.cancel();
+          timers.clear();
+          await _log('KARENZ-CANCEL', 'Neue Zone ${loc['name']} – laufende Karenz-Timer beendet');
+          await _autoClockOut(notifications);
+        }
         await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
         await _autoClockIn(loc, notifications);
         service.invoke('zoneChange', {
