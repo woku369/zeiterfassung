@@ -82,6 +82,16 @@ function initSchema(db: Database.Database) {
       deleted_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS entry_project_splits (
+      id TEXT PRIMARY KEY,
+      entry_id TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      minutes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_splits_entry ON entry_project_splits(entry_id);
+
     CREATE TABLE IF NOT EXISTS sync_state (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

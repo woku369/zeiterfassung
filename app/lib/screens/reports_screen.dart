@@ -16,6 +16,7 @@ import '../models/work_type.dart';
 import '../services/holiday_service.dart';
 import '../services/surcharge_service.dart';
 import '../providers/project_provider.dart';
+import '../models/entry_project_split.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -549,38 +550,57 @@ class _ProjectBreakdownCard extends StatelessWidget {
     final projects = context.watch<ProjectProvider>().forEmployer(employer!.id);
     if (projects.isEmpty) return const SizedBox.shrink();
 
-    // Build map project_id → hours, also collect unassigned hours
-    final byProject = <String, double>{};
-    double unassigned = 0;
-    for (final e in entries) {
-      if (e.workType.isAbsence) continue;
-      if (e.projectId != null &&
-          projects.any((p) => p.id == e.projectId)) {
-        byProject[e.projectId!] = (byProject[e.projectId!] ?? 0) + e.totalHours;
-      } else {
-        unassigned += e.totalHours;
-      }
-    }
+    final entryIds = entries.where((e) => !e.workType.isAbsence).map((e) => e.id).toList();
+    if (entryIds.isEmpty) return const SizedBox.shrink();
 
-    final hasData = byProject.isNotEmpty || unassigned > 0;
-    if (!hasData) return const SizedBox.shrink();
+    return FutureBuilder<Map<String, List<EntryProjectSplit>>>(
+      future: DatabaseHelper.instance.getSplitsForEntries(entryIds),
+      builder: (context, snap) {
+        final allSplits = snap.data ?? {};
+        final byProject = <String, double>{};
+        double unassigned = 0;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text('Nach Projekt', style: Theme.of(context).textTheme.titleMedium),
-            const Divider(),
-            ...projects
-                .where((p) => byProject.containsKey(p.id))
-                .map((p) => _SummaryRow(p.name, _fmtH(byProject[p.id]!))),
-            if (unassigned > 0)
-              _SummaryRow('Kein Projekt', _fmtH(unassigned),
-                  color: Colors.grey.shade500),
-          ],
-        ),
-      ),
+        for (final e in entries) {
+          if (e.workType.isAbsence) continue;
+          final splits = allSplits[e.id];
+          if (splits != null && splits.isNotEmpty) {
+            for (final s in splits) {
+              final pid = s.projectId;
+              final min = s.minutes;
+              if (projects.any((p) => p.id == pid)) {
+                byProject[pid] = (byProject[pid] ?? 0) + min / 60.0;
+              }
+            }
+          } else if (e.projectId != null &&
+              projects.any((p) => p.id == e.projectId)) {
+            byProject[e.projectId!] =
+                (byProject[e.projectId!] ?? 0) + e.totalHours;
+          } else {
+            unassigned += e.totalHours;
+          }
+        }
+
+        final hasData = byProject.isNotEmpty || unassigned > 0;
+        if (!hasData) return const SizedBox.shrink();
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text('Nach Projekt', style: Theme.of(context).textTheme.titleMedium),
+                const Divider(),
+                ...projects
+                    .where((p) => byProject.containsKey(p.id))
+                    .map((p) => _SummaryRow(p.name, _fmtH(byProject[p.id]!))),
+                if (unassigned > 0)
+                  _SummaryRow('Kein Projekt', _fmtH(unassigned),
+                      color: Colors.grey.shade500),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -4,6 +4,7 @@ import '../models/time_entry.dart';
 import '../models/employer.dart';
 import '../models/tracked_location.dart';
 import '../models/project.dart';
+import '../models/entry_project_split.dart';
 import '../database/database_helper.dart';
 
 class SyncResult {
@@ -90,6 +91,7 @@ class SyncService {
     }
 
     final deletedIds = await db.getDeletionsSince(lastSync);
+    final allSplits = await db.getAllSplitsForSync();
 
     try {
       final body = jsonEncode({
@@ -98,6 +100,7 @@ class SyncService {
         'employers': employers.map((e) => e.toJson()).toList(),
         'locations': locations.map((l) => l.toJson()).toList(),
         'projects':  projects.map((p) => p.toJson()).toList(),
+        if (allSplits.isNotEmpty) 'splits': allSplits.map((s) => s.toJson()).toList(),
         if (deletedIds.isNotEmpty) 'deleted_ids': deletedIds,
         if (localSettings != null && localSettings.isNotEmpty)
           'settings': localSettings,
@@ -146,6 +149,13 @@ class SyncService {
       }
       if (serverProjects.isNotEmpty) {
         await db.upsertProjectsFromServer(serverProjects);
+      }
+
+      final serverSplits = (data['splits'] as List<dynamic>? ?? [])
+          .map((e) => EntryProjectSplit.fromJson(e as Map<String, dynamic>))
+          .toList();
+      if (serverSplits.isNotEmpty) {
+        await db.upsertSplitsFromServer(serverSplits);
       }
 
       // Apply deletions from other devices

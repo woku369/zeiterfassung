@@ -22,6 +22,7 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     employers?: Record<string, unknown>[];
     locations?: Record<string, unknown>[];
     projects?: Record<string, unknown>[];
+    splits?: Record<string, unknown>[];
     deleted_ids?: string[];
     settings?: Record<string, unknown>;
   };
@@ -160,6 +161,28 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     upsertProjects(projects);
   }
 
+  // ── Upsert project splits ─────────────────────────────────────────────────
+  const splits: Record<string, unknown>[] = body.splits ?? [];
+  if (splits.length > 0) {
+    const upsertSplit = db.prepare(`
+      INSERT INTO entry_project_splits (id,entry_id,project_id,minutes,created_at,updated_at)
+      VALUES (@id,@entry_id,@project_id,@minutes,@created_at,@updated_at)
+      ON CONFLICT(id) DO UPDATE SET
+        entry_id=excluded.entry_id, project_id=excluded.project_id,
+        minutes=excluded.minutes, updated_at=excluded.updated_at
+    `);
+    const upsertSplits = db.transaction((items: Record<string, unknown>[]) => {
+      for (const s of items) {
+        upsertSplit.run({
+          id: s['id'], entry_id: s['entry_id'], project_id: s['project_id'],
+          minutes: s['minutes'] ?? 0,
+          created_at: s['created_at'] ?? now, updated_at: now,
+        });
+      }
+    });
+    upsertSplits(splits);
+  }
+
   // ── Settings (LWW: last-write wins, NAS is authoritative store) ───────────
   if (body.settings && Object.keys(body.settings).length > 0) {
     const upsertSetting = db.prepare(
@@ -191,6 +214,11 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     `SELECT * FROM projects WHERE updated_at > ? ORDER BY updated_at`
   ).all(lastSync) as Record<string, unknown>[];
 
+  // Splits for entries that changed since last_sync
+  const pulledSplits = db.prepare(
+    `SELECT * FROM entry_project_splits WHERE updated_at > ? ORDER BY updated_at`
+  ).all(lastSync) as Record<string, unknown>[];
+
   // Deletions accumulated on NAS since last_sync (from other devices)
   const serverDeletedIds = (db.prepare(
     `SELECT id FROM deletion_log WHERE deleted_at > ?`
@@ -214,6 +242,7 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     employers: pulledEmployers,
     locations: pulledLocations,
     projects: pulledProjects,
+    splits: pulledSplits,
     deleted_ids: serverDeletedIds,
     settings: Object.keys(savedSettings).length > 0 ? savedSettings : undefined,
   });

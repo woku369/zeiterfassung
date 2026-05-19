@@ -7,6 +7,7 @@ import '../models/imap_config.dart';
 import '../models/activity_log.dart';
 import '../models/project.dart';
 import '../models/trip_record.dart';
+import '../models/entry_project_split.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -19,7 +20,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 13,
+      version: 14,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -74,6 +75,7 @@ class DatabaseHelper {
     await _createV10Tables(db);
     await _createV11Tables(db);
     await _createV13Tables(db);
+    await _createV14Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -138,6 +140,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 13) {
       await _createV13Tables(db);
+    }
+    if (oldVersion < 14) {
+      await _createV14Tables(db);
     }
   }
 
@@ -224,6 +229,87 @@ class DatabaseHelper {
         deleted_at TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<void> _createV14Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS entry_project_splits (
+        id TEXT PRIMARY KEY,
+        entry_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        minutes INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_splits_entry ON entry_project_splits(entry_id)');
+  }
+
+  // ── entry_project_splits ──────────────────────────────────────────────────
+
+  Future<List<EntryProjectSplit>> getSplitsForEntry(String entryId) async {
+    final db = await database;
+    final rows = await db.query('entry_project_splits',
+        where: 'entry_id = ?', whereArgs: [entryId], orderBy: 'created_at ASC');
+    return rows.map(EntryProjectSplit.fromMap).toList();
+  }
+
+  /// Loads splits for multiple entries at once; returns a map entry_id → splits.
+  Future<Map<String, List<EntryProjectSplit>>> getSplitsForEntries(
+      List<String> entryIds) async {
+    if (entryIds.isEmpty) return {};
+    final db = await database;
+    final placeholders = entryIds.map((_) => '?').join(',');
+    final rows = await db.rawQuery(
+        'SELECT * FROM entry_project_splits WHERE entry_id IN ($placeholders) ORDER BY created_at ASC',
+        entryIds);
+    final result = <String, List<EntryProjectSplit>>{};
+    for (final row in rows) {
+      final split = EntryProjectSplit.fromMap(row);
+      result.putIfAbsent(split.entryId, () => []).add(split);
+    }
+    return result;
+  }
+
+  /// Replaces all splits for [entryId] with [splits].
+  Future<void> saveSplitsForEntry(
+      String entryId, List<EntryProjectSplit> splits) async {
+    final db = await database;
+    final batch = db.batch();
+    batch.delete('entry_project_splits',
+        where: 'entry_id = ?', whereArgs: [entryId]);
+    for (final s in splits) {
+      batch.insert('entry_project_splits', s.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> deleteSplitsForEntry(String entryId) async {
+    final db = await database;
+    await db.delete('entry_project_splits',
+        where: 'entry_id = ?', whereArgs: [entryId]);
+  }
+
+  /// All splits for sync push (no soft-delete, just the full table).
+  Future<List<EntryProjectSplit>> getAllSplitsForSync() async {
+    final db = await database;
+    final rows = await db.query('entry_project_splits');
+    return rows.map(EntryProjectSplit.fromMap).toList();
+  }
+
+  /// Upsert splits received from server.
+  Future<void> upsertSplitsFromServer(
+      List<EntryProjectSplit> splits) async {
+    if (splits.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final s in splits) {
+      batch.insert('entry_project_splits', s.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 
   // ── deletion_log ──────────────────────────────────────────────────────────
@@ -317,7 +403,10 @@ class DatabaseHelper {
 
   Future<void> deleteEntry(String id) async {
     final db = await database;
-    await db.delete('time_entries', where: 'id = ?', whereArgs: [id]);
+    final batch = db.batch();
+    batch.delete('entry_project_splits', where: 'entry_id = ?', whereArgs: [id]);
+    batch.delete('time_entries', where: 'id = ?', whereArgs: [id]);
+    await batch.commit(noResult: true);
   }
 
   Future<List<TimeEntry>> getEntriesForMonth(int year, int month,

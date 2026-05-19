@@ -5,11 +5,13 @@ import 'package:uuid/uuid.dart';
 import '../models/employer.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
+import '../models/entry_project_split.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
 import '../providers/project_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/surcharge_service.dart';
+import '../database/database_helper.dart';
 
 class EntryFormScreen extends StatefulWidget {
   final TimeEntry? entry;
@@ -36,8 +38,25 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   bool _isSpecialHours = false;
   int _travelMinutes = 0;
 
+  // Project splits: list of (projectId, minutesController) pairs
+  final List<_SplitDraft> _splits = [];
+
   bool get _isNew => widget.entry == null || widget.forceNew;
   bool get _isAbsence => _workType.isAbsence;
+
+  // Total entry minutes (null if end not set)
+  int? get _entryMinutes {
+    if (_endTime == null) return null;
+    final start = _toDateTime(_startTime);
+    var end = _toDateTime(_endTime!);
+    if (end.isBefore(start)) end = end.add(const Duration(days: 1));
+    final gross = end.difference(start).inMinutes;
+    final bm = int.tryParse(_breakCtrl.text) ?? 0;
+    return (gross - bm).clamp(0, 99999);
+  }
+
+  int get _allocatedMinutes =>
+      _splits.fold(0, (s, d) => s + (int.tryParse(d.ctrl.text) ?? 0));
 
   @override
   void initState() {
@@ -58,6 +77,33 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     _isSpecialHours = e?.isSpecialHours ?? false;
     _travelMinutes = e?.travelMinutes ?? 0;
     _projectId = e?.projectId;
+    if (e != null && !widget.forceNew) {
+      _loadSplits(e.id, fallbackProjectId: e.projectId);
+    }
+  }
+
+  Future<void> _loadSplits(String entryId, {String? fallbackProjectId}) async {
+    final saved = await DatabaseHelper.instance.getSplitsForEntry(entryId);
+    if (!mounted) return;
+    setState(() {
+      if (saved.isNotEmpty) {
+        _splits.addAll(saved.map((s) => _SplitDraft(
+            projectId: s.projectId,
+            minutes: s.minutes)));
+      } else if (fallbackProjectId != null) {
+        // Migrate single project_id → split with 0 min (user fills in)
+        _splits.add(_SplitDraft(projectId: fallbackProjectId, minutes: 0));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    _kmCtrl.dispose();
+    _breakCtrl.dispose();
+    for (final d in _splits) d.ctrl.dispose();
+    super.dispose();
   }
 
   Employer? get _selectedEmployer {
@@ -75,14 +121,6 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     if (d.weekday == 6) return DayType.saturday;
     if (d.weekday == 7) return DayType.sunday;
     return DayType.workday;
-  }
-
-  @override
-  void dispose() {
-    _noteCtrl.dispose();
-    _kmCtrl.dispose();
-    _breakCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _pickDate() async {
@@ -120,8 +158,19 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     }
     final tp = context.read<TimeEntryProvider>();
+    // For the legacy project_id field: keep single-project compat.
+    final validSplits = _isSurchargeEmployer
+        ? _splits.where((d) => d.projectId != null && (int.tryParse(d.ctrl.text) ?? 0) > 0).toList()
+        : <_SplitDraft>[];
+    final legacyProjectId = !_isSurchargeEmployer
+        ? null
+        : validSplits.length == 1
+            ? validSplits.first.projectId
+            : null;
+
+    final entryId = _isNew ? const Uuid().v4() : widget.entry!.id;
     final entry = TimeEntry(
-      id: _isNew ? const Uuid().v4() : widget.entry!.id,
+      id: entryId,
       date: _date,
       startTime: start,
       endTime: end,
@@ -132,14 +181,13 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       distanceKm: km,
       travelMinutes: _travelMinutes,
       employerId: _employerId,
-      projectId: _isSurchargeEmployer ? _projectId : null,
+      projectId: legacyProjectId,
       isSpecialHours: _isSurchargeEmployer && _isSpecialHours,
       isSynced: false,
       createdAt: widget.entry?.createdAt ?? DateTime.now(),
     );
     if (_isNew) {
       await tp.addEntry(entry);
-      // Sick days are duplicated for all employers automatically.
       if (_workType == WorkType.sick && mounted) {
         final allEmployers = context.read<EmployerProvider>().employers;
         for (final emp in allEmployers) {
@@ -153,6 +201,19 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     } else {
       await tp.updateEntry(entry);
     }
+
+    // Save project splits
+    if (_isSurchargeEmployer) {
+      final splitModels = validSplits
+          .map((d) => EntryProjectSplit.create(
+                entryId: entryId,
+                projectId: d.projectId!,
+                minutes: int.parse(d.ctrl.text),
+              ))
+          .toList();
+      await DatabaseHelper.instance.saveSplitsForEntry(entryId, splitModels);
+    }
+
     if (mounted) Navigator.pop(context);
   }
 
@@ -438,6 +499,10 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       return 'Zuschlag laut Tagesart × ${factor.toStringAsFixed(1)}';
     }
     final projects = context.read<ProjectProvider>().forEmployer(_employerId);
+    final totalMin = _entryMinutes;
+    final allocMin = _allocatedMinutes;
+    final restMin = totalMin != null ? (totalMin - allocMin) : null;
+
     return [
       Container(
         padding: const EdgeInsets.all(12),
@@ -459,26 +524,104 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
             ]),
             if (projects.isNotEmpty) ...[
               const SizedBox(height: 10),
-              DropdownButtonFormField<String?>(
-                value: projects.any((p) => p.id == _projectId) ? _projectId : null,
-                decoration: InputDecoration(
-                  labelText: 'Projekt',
-                  prefixIcon: const Icon(Icons.folder_outlined),
-                  border: const OutlineInputBorder(),
-                  fillColor: Colors.white,
-                  filled: true,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              Row(children: [
+                Icon(Icons.folder_outlined, size: 16, color: Colors.orange.shade800),
+                const SizedBox(width: 6),
+                Text('Projekt-Aufschlüsselung',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade900)),
+              ]),
+              const SizedBox(height: 6),
+              ..._splits.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final draft = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: projects.any((p) => p.id == draft.projectId)
+                            ? draft.projectId
+                            : null,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Projekt',
+                          border: const OutlineInputBorder(),
+                          fillColor: Colors.white,
+                          filled: true,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8, horizontal: 10),
+                        ),
+                        items: projects
+                            .map((p) => DropdownMenuItem<String?>(
+                                  value: p.id,
+                                  child: Text(p.name,
+                                      overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
+                        onChanged: (v) => setState(() => draft.projectId = v),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 70,
+                      child: TextFormField(
+                        controller: draft.ctrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          labelText: 'Min.',
+                          border: OutlineInputBorder(),
+                          fillColor: Colors.white,
+                          filled: true,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                              vertical: 8, horizontal: 8),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      color: Colors.orange.shade700,
+                      onPressed: () => setState(() {
+                        _splits[idx].ctrl.dispose();
+                        _splits.removeAt(idx);
+                      }),
+                    ),
+                  ]),
+                );
+              }),
+              // Budget bar
+              if (totalMin != null) ...[
+                const SizedBox(height: 4),
+                _SplitBudgetBar(
+                    allocated: allocMin,
+                    total: totalMin,
+                    rest: restMin!),
+              ] else if (allocMin > 0) ...[
+                const SizedBox(height: 4),
+                Text('Zugeordnet: ${_fmtMin(allocMin)}',
+                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
+              ],
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                onPressed: projects.isEmpty
+                    ? null
+                    : () => setState(() => _splits.add(_SplitDraft())),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Projekt hinzufügen'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade800,
+                  side: BorderSide(color: Colors.orange.shade400),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                items: [
-                  const DropdownMenuItem<String?>(value: null, child: Text('Kein Projekt')),
-                  ...projects.map((p) => DropdownMenuItem<String?>(
-                        value: p.id,
-                        child: Text(p.name),
-                      )),
-                ],
-                onChanged: (v) => setState(() => _projectId = v),
               ),
+              const SizedBox(height: 4),
             ],
             const SizedBox(height: 8),
             SwitchListTile.adaptive(
@@ -592,6 +735,77 @@ class _TimeTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Project split helpers ─────────────────────────────────────────────────────
+
+String _fmtMin(int min) {
+  final h = min ~/ 60;
+  final m = min % 60;
+  return h > 0 ? '${h}h ${m.toString().padLeft(2, '0')}m' : '${m}m';
+}
+
+class _SplitDraft {
+  String? projectId;
+  final TextEditingController ctrl;
+
+  _SplitDraft({String? projectId, int minutes = 0})
+      : projectId = projectId,
+        ctrl = TextEditingController(
+            text: minutes > 0 ? minutes.toString() : '');
+
+  void dispose() => ctrl.dispose();
+}
+
+class _SplitBudgetBar extends StatelessWidget {
+  final int allocated;
+  final int total;
+  final int rest;
+  const _SplitBudgetBar(
+      {required this.allocated, required this.total, required this.rest});
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = total > 0 ? (allocated / total).clamp(0.0, 1.0) : 0.0;
+    final over = allocated > total;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: frac,
+            minHeight: 6,
+            backgroundColor: Colors.orange.shade100,
+            valueColor: AlwaysStoppedAnimation(
+                over ? Colors.red.shade400 : Colors.orange.shade600),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Row(children: [
+          Text('Zugeordnet: ${_fmtMin(allocated)} / ${_fmtMin(total)}',
+              style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
+          const Spacer(),
+          Text(
+            over
+                ? 'Überzogen: ${_fmtMin(allocated - total)}'
+                : rest > 0
+                    ? 'Rest: ${_fmtMin(rest)}'
+                    : 'Vollständig',
+            style: TextStyle(
+                fontSize: 11,
+                color: over
+                    ? Colors.red.shade700
+                    : rest > 0
+                        ? Colors.grey.shade600
+                        : Colors.green.shade700,
+                fontWeight:
+                    over ? FontWeight.w600 : FontWeight.normal),
+          ),
+        ]),
+      ],
     );
   }
 }
