@@ -747,8 +747,10 @@ class DatabaseHelper {
     final db = await database;
     final batch = db.batch();
     for (final log in logs) {
+      // ignore: Android IDs are deterministic (session_${startMs}_$pkg); replacing
+      // would reset is_synced=0 on every loadSessions() call since toMap() omits that field.
       batch.insert('activity_log', log.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
     await batch.commit(noResult: true);
   }

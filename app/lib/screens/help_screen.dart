@@ -473,8 +473,9 @@ class HelpScreen extends StatelessWidget {
               _Step(number: '4', text: 'Zurück in die App → Timeline lädt und Vorschläge erscheinen oben'),
               _Para(
                 'Android zeigt App-Namen und Nutzungszeiträume für den '
-                'gewählten Tag. Daten kommen direkt vom System '
-                '(UsageStatsManager) – nichts wird separat gespeichert.',
+                'gewählten Tag. Daten kommen vom System (UsageStatsManager) '
+                'und werden lokal gespeichert, damit sie beim nächsten Sync '
+                'auf anderen Geräten sichtbar werden.',
               ),
               _SubHeading('Android – Quick-Settings-Tile'),
               _Step(number: '1', text: 'Schnelleinstellungen von oben nach unten wischen'),
@@ -488,6 +489,18 @@ class HelpScreen extends StatelessWidget {
                 text: 'Nach 5 Min. ohne Eingabe (Idle) pausiert die Aufzeichnung',
               ),
               _Step(number: '4', text: '"Stopp" → alle Blöcke erscheinen, Vorschläge werden generiert'),
+              _SubHeading('Geräte-Pooling'),
+              _Para(
+                'Aktivitäten von PC und Tablet erscheinen gemeinsam in der Timeline – '
+                'jede Session zeigt woher sie stammt.',
+              ),
+              _KeyValue(label: 'Gerätename', value: 'Einstellungen → Aktivitäts-Tracking → Gerätename'),
+              _KeyValue(label: 'Chip', value: 'Blauer „Geräte"-Chip neben dem Titel = Session kommt von einem anderen Gerät'),
+              _KeyValue(label: 'Sync', value: 'Sessions werden beim nächsten NAS-Sync auf alle Geräte verteilt'),
+              _Hint(
+                'Standard-Gerätename ist der Hostname des Geräts. '
+                'Für eindeutige Zuordnung „Büro-PC", „Tablet" o.ä. verwenden.',
+              ),
               _SubHeading('Whitelist'),
               _Para('Nur Titel/Apps die einen Whitelist-Begriff enthalten werden aufgezeichnet.'),
               _KeyValue(label: 'Browser', value: 'Chrome, Firefox, Edge, Opera, Brave'),
@@ -528,10 +541,19 @@ class HelpScreen extends StatelessWidget {
                 'Die Projektzuordnung ist aktuell für Gurktaler AG verfügbar '
                 'und erscheint im Formular sowie im Berichte-Screen.',
               ),
-              _SubHeading('Projekte im Eintrag'),
+              _SubHeading('Projekte im Eintrag (Aufschlüsselung)'),
+              _Para(
+                'Jeder Eintrag kann auf mehrere Projekte aufgeteilt werden – '
+                'nützlich wenn in einer Arbeitszeit an mehreren Projekten gearbeitet wurde.',
+              ),
               _Step(number: '1', text: 'Eintrag anlegen oder bearbeiten → Gurktaler-Sonderoptionen aufklappen'),
-              _Step(number: '2', text: 'Projekt aus der Dropdown-Liste wählen (leer = kein Projekt)'),
-              _Step(number: '3', text: 'Speichern – Projektzuordnung wird mit dem Eintrag synchronisiert'),
+              _Step(number: '2', text: '„Projekt hinzufügen" antippen → Projekt wählen, Minuten eingeben'),
+              _Step(number: '3', text: 'Weitere Projekte bei Bedarf hinzufügen – Fortschrittsbalken zeigt Restminuten'),
+              _Step(number: '4', text: 'Speichern – Aufschlüsselung wird mit dem Eintrag synchronisiert'),
+              _Hint(
+                'Nicht alle Minuten müssen vergeben werden. '
+                'Im Berichte-Screen erscheint die Summe pro Projekt über alle Einträge des Monats.',
+              ),
               _SubHeading('Projekte verwalten'),
               _Step(number: '1', text: 'Einstellungen → Arbeitgeber Gurktaler AG → Projekte'),
               _Step(number: '2', text: '„Projekt hinzufügen" – Name eingeben, bestätigen'),

@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-18 – v1.21 Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
+> Letztes Update: 2026-05-19 – v1.22 Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
 
 ---
 
@@ -25,6 +25,30 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.22 – Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
+
+- [x] **Projekt-Aufschlüsselung innerhalb eines Zeiteintrags (DB v14):**
+  - Neue Tabelle `entry_project_splits (id, entry_id, project_id, minutes, created_at, updated_at)`
+  - Eintrag-Formular: mehrere Projekt-Zeilen + Minutenfeld + Fortschrittsbalken (Budget-Bar)
+  - Berichte-Screen: Projekt-Aufschlüsselung liest Splits; Fallback auf `project_id` für Altdaten
+  - Sync: `getAllSplitsForSync()` → Payload + `upsertSplitsFromServer()` auf beiden Seiten
+  - Backend: `entry_project_splits`-Tabelle in `db.ts` + Upsert-Logik in `sync.ts`
+
+- [x] **Activity-Pooling über alle Geräte (DB v15):**
+  - `ActivityLog`-Modell: neues Feld `device_id` (nullable), `copyWith()`, `toJson()`/`fromJson()`
+  - DB v15: `ALTER TABLE activity_log ADD COLUMN device_id TEXT` + `is_synced INTEGER NOT NULL DEFAULT 0`
+  - `ActivityTrackingService`: `_deviceName`-Feld + `setDeviceName()` – alle erzeugten Logs tragen Gerätenamen
+  - `ActivityProvider`: Gerätename aus SharedPreferences laden (`Platform.localHostname` als Default); Android `loadSessions()` persistiert UsageStats in DB → Pool-Sicht aller Geräte
+  - `ActivityTimelineScreen`: blauer `_DeviceChip` auf Session-Karten anderer Geräte
+  - `SyncService`: `activity_logs` im Sync-Payload (Push unsynced, Pull von anderen Geräten, Mark synced)
+  - Backend `db.ts`: `activity_log`-Tabelle mit `device_id`; `sync.ts`: Upsert + Pull-Filter (kein Echo an Absender)
+  - Einstellungen: neues Feld „Gerätename" unter Aktivitäts-Tracking
+
+- [x] **Bugfixes v1.22:**
+  - `database_helper.dart`: `insertActivityLogs()` verwendete `ConflictAlgorithm.replace` → resettet `is_synced=0` bei jedem `loadSessions()`-Aufruf (Android-IDs deterministisch). Fix: `ConflictAlgorithm.ignore`
+  - `help_screen.dart`: „nichts wird separat gespeichert" war nach Pooling-Feature falsch → korrigiert
+  - `help_screen.dart`: Projektzuordnung-Sektion beschrieb alten Single-Dropdown → auf Multi-Split aktualisiert
 
 ### v1.21 – Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
 
@@ -531,7 +555,7 @@ app/
                      terminmeister_service (TmAppointment, fetchMonth – optional)
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v13)
+    database/        database_helper (SQLite v15)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -577,12 +601,14 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v11: + `trips` (Tabelle) – Fahrtenbuch mit GPS-Tracking und Adressauflösung
 - v12: + `vacation_days_per_year` (employers) – Urlaubskontingent pro Arbeitgeber
 - v13: + `deletion_log (id, deleted_at)` – Deletion-Log für geräteübergreifende Lösch-Propagation
+- v14: + `entry_project_splits (id, entry_id, project_id, minutes, ...)` – Projekt-Aufschlüsselung pro Zeiteintrag
+- v15: + `device_id TEXT` + `is_synced INTEGER` auf `activity_log` – Geräte-Pooling + Sync-Flag
 
-**Server-DB:** `employers`, `tracked_locations`, `projects`, `deletion_log`, `sync_state` – vollständig via `/api/sync.ts`; zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync (legacy `server.js`).
+**Server-DB:** `employers`, `tracked_locations`, `projects`, `deletion_log`, `entry_project_splits`, `activity_log`, `sync_state` – vollständig via `/api/sync.ts`; zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync (legacy `server.js`).
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.21)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.22)
 
 ---
 
