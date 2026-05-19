@@ -45,6 +45,14 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Backend `db.ts`: `activity_log`-Tabelle mit `device_id`; `sync.ts`: Upsert + Pull-Filter (kein Echo an Absender)
   - Einstellungen: neues Feld „Gerätename" unter Aktivitäts-Tracking
 
+- [x] **Zuschläge-Tab im Jahresbericht XLSX (nur Gurktaler AG):**
+  - Neues Sheet „Zuschläge" wird automatisch in `exportYear()` eingefügt wenn `isSurchargeEmployer=true`
+  - Aufteilung jedes Eintrags in Normal-/+50%/+100%-Stunden: Sa vor 13h = normal, Sa 13–20h = ×1.5, Sa/Sa nach 20h = ×2.0, So/Feiertag gesamt = ×2.0, Werktag nach 20h = ×2.0
+  - Farbkodierung: hellgelb (+50%), hellrosa (+100%), weiß (normal)
+  - Monatssummen + Jahressumme für alle Spalten
+  - Argumentation-Sektion (lila): Soll vs. effektiv-gewichtet, Wochen-Äquivalent, Differenz zum 10h-Ziel, km/Fahrzeit-Summen, Hinweis auf § 68 EStG (360 €/Monat steuerfrei DN+DG)
+  - Homeoffice-Einträge werden als „normal" geführt (kein Zuschlag per Vereinbarung)
+
 - [x] **Bugfixes v1.22:**
   - `database_helper.dart`: `insertActivityLogs()` verwendete `ConflictAlgorithm.replace` → resettet `is_synced=0` bei jedem `loadSessions()`-Aufruf (Android-IDs deterministisch). Fix: `ConflictAlgorithm.ignore`
   - `help_screen.dart`: „nichts wird separat gespeichert" war nach Pooling-Feature falsch → korrigiert

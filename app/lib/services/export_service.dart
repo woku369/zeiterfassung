@@ -18,7 +18,11 @@ class ExportService {
   static final _orange   = ExcelColor.fromHexString('#FFF3E0');
   static final _green    = ExcelColor.fromHexString('#E8F5E9');
   static final _red      = ExcelColor.fromHexString('#FFEBEE');
-  static final _title    = ExcelColor.fromHexString('#0D47A1');
+  static final _title      = ExcelColor.fromHexString('#0D47A1');
+  static final _surcharge50  = ExcelColor.fromHexString('#FFF8E1'); // amber-50
+  static final _surcharge100 = ExcelColor.fromHexString('#FCE4EC'); // pink-50
+  static final _argBg        = ExcelColor.fromHexString('#EDE7F6'); // deep-purple-50
+  static final _argHeader    = ExcelColor.fromHexString('#4527A0'); // deep-purple-900
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -174,6 +178,10 @@ class ExportService {
     dRow = 3; // reset to after headers
     _writeDetailRows(detail, dRow, workEntries, weeklyHours);
     _setDetailColumnWidths(detail);
+
+    if (isSurchargeEmployer) {
+      _buildSurchargeSheet(excel, fyLabel, employerName, allEntries, weeklyHours);
+    }
 
     return _save(excel, employerName, fyLabel.replaceAll('/', '-'));
   }
@@ -364,6 +372,275 @@ class ExportService {
     sheet.setColumnWidth(7, 12); // Tagtyp
     sheet.setColumnWidth(8, 35); // Notiz
     sheet.setColumnWidth(9,  8); // km
+  }
+
+  // ── Zuschläge helpers ────────────────────────────────────────────────────────
+
+  /// Splits a single [entry]'s hours into normal / +50% / +100% buckets.
+  /// Saturday: before 13:00 = normal, 13–20h = +50%, after 20:00 = +100%.
+  /// Sunday / holiday: all hours = +100%.
+  /// Workday: before 20:00 = normal, after 20:00 = +100%.
+  ({double normalH, double surcharge50H, double surcharge100H,
+    double effectiveH, String typeLabel})
+  _surchargeBreakdown(TimeEntry entry) {
+    final end = entry.endTime;
+    if (entry.workType.isAbsence || end == null) {
+      return (normalH: 0, surcharge50H: 0, surcharge100H: 0,
+              effectiveH: 0, typeLabel: '');
+    }
+    if (entry.workType == WorkType.homeoffice) {
+      return (normalH: entry.totalHours, surcharge50H: 0, surcharge100H: 0,
+              effectiveH: entry.totalHours, typeLabel: 'Homeoffice');
+    }
+    final start   = entry.startTime;
+    final date    = entry.date;
+    final rawMin  = end.difference(start).inMinutes.toDouble();
+    if (rawMin <= 0) {
+      return (normalH: 0, surcharge50H: 0, surcharge100H: 0,
+              effectiveH: 0, typeLabel: 'Normal');
+    }
+    // Scale: paid hours / raw clock hours (accounts for break deduction & travel addition)
+    final scale = entry.totalHours / (rawMin / 60.0);
+
+    // Returns the overlap of [start,end] with the window [wS,wE] in scaled hours.
+    double seg(DateTime wS, DateTime wE) {
+      final s = start.isAfter(wS) ? start : wS;
+      final e = end.isBefore(wE)  ? end   : wE;
+      if (!s.isBefore(e)) return 0;
+      return e.difference(s).inMinutes / 60.0 * scale;
+    }
+
+    final d0       = DateTime(date.year, date.month, date.day);
+    final c13      = DateTime(date.year, date.month, date.day, 13);
+    final c20      = DateTime(date.year, date.month, date.day, 20);
+    final nextDay  = d0.add(const Duration(days: 1));
+
+    double normalH, s50H, s100H;
+    String typeLabel;
+
+    switch (entry.dayType) {
+      case DayType.saturday:
+        normalH   = seg(d0, c13);
+        s50H      = seg(c13, c20);
+        s100H     = seg(c20, nextDay);
+        typeLabel = s100H > 0.001
+            ? 'Sa ×1.5/×2.0'
+            : s50H > 0.001 ? 'Sa ×1.5 (ab 13h)' : 'Sa normal';
+      case DayType.sunday:
+        normalH = 0; s50H = 0; s100H = entry.totalHours;
+        typeLabel = 'Sonntag ×2.0';
+      case DayType.holiday:
+        normalH = 0; s50H = 0; s100H = entry.totalHours;
+        typeLabel = 'Feiertag ×2.0';
+      case DayType.workday:
+        normalH = seg(d0, c20); s50H = 0; s100H = seg(c20, nextDay);
+        typeLabel = s100H > 0.001 ? 'Nacht ×2.0' : 'Normal';
+    }
+    final effectiveH = normalH + s50H * 1.5 + s100H * 2.0;
+    return (normalH: normalH, surcharge50H: s50H, surcharge100H: s100H,
+            effectiveH: effectiveH, typeLabel: typeLabel);
+  }
+
+  void _writeSurchargeSubtotal(
+    Sheet sheet, int row, {
+    required String label,
+    required double normalH,
+    required double s50H,
+    required double s100H,
+    required double effH,
+    required double km,
+    required double travelH,
+    bool bold = false,
+    bool grandTotal = false,
+  }) {
+    final bg = grandTotal ? _blueLight : _grey;
+    for (var c = 0; c < 12; c++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = switch (c) {
+        0  => TextCellValue(label),
+        5  => TextCellValue(_fmtH(normalH)),
+        7  => TextCellValue(_fmtH(s50H)),
+        8  => TextCellValue(_fmtH(s100H)),
+        9  => TextCellValue(_fmtH(effH)),
+        10 => km     > 0.01 ? DoubleCellValue(km)          : TextCellValue(''),
+        11 => travelH > 0.01 ? TextCellValue(_fmtH(travelH)) : TextCellValue(''),
+        _  => TextCellValue(''),
+      };
+      cell.cellStyle = CellStyle(bold: bold, backgroundColorHex: bg);
+    }
+  }
+
+  void _buildSurchargeSheet(
+    Excel excel,
+    String fyLabel,
+    String employerName,
+    List<TimeEntry> allEntries,
+    double weeklyHours,
+  ) {
+    final sheet = excel['Zuschläge'];
+    final df  = DateFormat('dd.MM.yyyy');
+    final tf  = DateFormat('HH:mm');
+    final wdf = DateFormat('EEEE', 'de_AT');
+
+    final workEntries = allEntries
+        .where((e) => !e.workType.isAbsence && e.endTime != null)
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    var row = 0;
+    _writeTitleRow(sheet, row++,
+        'ZUSCHLÄGE $fyLabel  –  ${employerName.toUpperCase()}');
+    row++; // blank
+
+    // ── Column headers ──────────────────────────────────────────────────────
+    const headers = [
+      'Datum', 'Wochentag', 'Tätigkeitsart', 'Beginn', 'Ende',
+      'Normal (h)', 'Zuschlagstyp', '+50% (h)', '+100% (h)', 'Effektiv (h)',
+      'km', 'Fahrzeit (h)',
+    ];
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = TextCellValue(headers[c]);
+      cell.cellStyle = CellStyle(bold: true, backgroundColorHex: _blue, fontColorHex: _white);
+    }
+    row++;
+
+    // ── Data rows grouped by month ──────────────────────────────────────────
+    double totNH = 0, totS50 = 0, totS100 = 0, totEff = 0, totKm = 0, totTH = 0;
+    double mNH   = 0, mS50  = 0, mS100  = 0, mEff  = 0, mKm  = 0, mTH  = 0;
+    int? curYM; // year*12+month to handle fiscal year spanning two calendar years
+
+    for (final entry in workEntries) {
+      final ym = entry.date.year * 12 + entry.date.month;
+
+      if (ym != curYM) {
+        // Monthly subtotal for the outgoing month
+        if (curYM != null) {
+          _writeSurchargeSubtotal(sheet, row++,
+              label: 'Monatssumme', normalH: mNH, s50H: mS50, s100H: mS100,
+              effH: mEff, km: mKm, travelH: mTH, bold: true);
+          mNH = mS50 = mS100 = mEff = mKm = mTH = 0;
+        }
+        // Month header row
+        final mLabel = DateFormat('MMMM yyyy', 'de_AT').format(entry.date);
+        for (var c = 0; c < 12; c++) {
+          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+          if (c == 0) cell.value = TextCellValue(mLabel);
+          cell.cellStyle = CellStyle(bold: true, backgroundColorHex: _blueLight);
+        }
+        row++;
+        curYM = ym;
+      }
+
+      final bd      = _surchargeBreakdown(entry);
+      final km      = entry.distanceKm ?? 0;
+      final travelH = entry.travelMinutes / 60.0;
+
+      mNH   += bd.normalH;      mS50  += bd.surcharge50H;
+      mS100 += bd.surcharge100H; mEff  += bd.effectiveH;
+      mKm   += km;               mTH   += travelH;
+      totNH  += bd.normalH;     totS50 += bd.surcharge50H;
+      totS100 += bd.surcharge100H; totEff += bd.effectiveH;
+      totKm  += km;             totTH  += travelH;
+
+      final ExcelColor? bg = bd.surcharge100H > 0.001
+          ? _surcharge100
+          : bd.surcharge50H > 0.001 ? _surcharge50 : null;
+
+      final cellValues = <CellValue>[
+        TextCellValue(df.format(entry.date)),
+        TextCellValue(wdf.format(entry.date)),
+        TextCellValue(entry.workType.label),
+        TextCellValue(tf.format(entry.startTime)),
+        TextCellValue(tf.format(entry.endTime!)),
+        DoubleCellValue(double.parse(bd.normalH.toStringAsFixed(2))),
+        TextCellValue(bd.typeLabel),
+        DoubleCellValue(double.parse(bd.surcharge50H.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(bd.surcharge100H.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(bd.effectiveH.toStringAsFixed(2))),
+        km      > 0 ? DoubleCellValue(km)      : TextCellValue(''),
+        travelH > 0 ? DoubleCellValue(double.parse(travelH.toStringAsFixed(2)))
+                    : TextCellValue(''),
+      ];
+      for (var c = 0; c < cellValues.length; c++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        cell.value = cellValues[c];
+        if (bg != null) cell.cellStyle = CellStyle(backgroundColorHex: bg);
+      }
+      row++;
+    }
+
+    // Last month subtotal
+    if (curYM != null) {
+      _writeSurchargeSubtotal(sheet, row++,
+          label: 'Monatssumme', normalH: mNH, s50H: mS50, s100H: mS100,
+          effH: mEff, km: mKm, travelH: mTH, bold: true);
+    }
+    row++; // blank
+
+    // Grand total
+    _writeSurchargeSubtotal(sheet, row++,
+        label: 'JAHRESSUMME', normalH: totNH, s50H: totS50, s100H: totS100,
+        effH: totEff, km: totKm, travelH: totTH, bold: true, grandTotal: true);
+
+    row += 2; // spacer
+
+    // ── Argumentation section ───────────────────────────────────────────────
+    void argRow(String label, String value, {bool isHeader = false}) {
+      final labelBg = isHeader ? _argHeader : _argBg;
+      final fontCol = isHeader ? _white      : null;
+      for (var c = 0; c < 12; c++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        if (c == 0) cell.value = TextCellValue(label);
+        if (c == 1) cell.value = TextCellValue(value);
+        cell.cellStyle = CellStyle(
+          bold: isHeader || c == 0,
+          backgroundColorHex: labelBg,
+          fontColorHex: fontCol,
+        );
+      }
+      row++;
+    }
+
+    argRow('ARGUMENTATION FÜR STUNDENANHEBUNG', '', isHeader: true);
+    argRow('Wochensoll (vertraglich)',             _fmtH(weeklyHours));
+    argRow('Jahres-Soll (52 Wochen)',              _fmtH(weeklyHours * 52));
+    argRow('Jahres-Ist (Netto-Stunden)',
+        _fmtH(totNH + totS50 + totS100));
+    argRow('Effektiv-Äquivalent gesamt (gewichtet)', _fmtH(totEff));
+    row++; // blank within section
+
+    final weeklyEff   = totEff / 52.0;
+    final diffTo10h   = weeklyEff - 10.0;
+    final yearDiff10h = totEff - 10.0 * 52;
+    argRow('Wochen-Äquivalent (effektiv)', _fmtH(weeklyEff));
+    argRow('Differenz zum 10h-Wochenziel',
+        '${diffTo10h >= 0 ? '+' : ''}${_fmtH(diffTo10h)}');
+    argRow('Jahres-Differenz (effektiv vs. 10h-Ziel)',
+        '${yearDiff10h >= 0 ? '+' : ''}${_fmtH(yearDiff10h)}');
+    row++;
+
+    argRow('+50%-Zuschlag (Std gesamt)', _fmtH(totS50));
+    argRow('+100%-Zuschlag (Std gesamt)', _fmtH(totS100));
+    argRow('km gesamt', '${totKm.toStringAsFixed(1)} km');
+    argRow('Fahrzeit gesamt', _fmtH(totTH));
+    row++;
+    argRow('Überstundenpauschale steuerfrei (DN+DG)',
+        'bis ~360 €/Monat gem. § 68 EStG');
+
+    // ── Column widths ───────────────────────────────────────────────────────
+    sheet.setColumnWidth(0,  14); // Datum
+    sheet.setColumnWidth(1,  14); // Wochentag
+    sheet.setColumnWidth(2,  16); // Tätigkeitsart
+    sheet.setColumnWidth(3,   8); // Beginn
+    sheet.setColumnWidth(4,   8); // Ende
+    sheet.setColumnWidth(5,  11); // Normal (h)
+    sheet.setColumnWidth(6,  18); // Zuschlagstyp
+    sheet.setColumnWidth(7,  11); // +50%
+    sheet.setColumnWidth(8,  11); // +100%
+    sheet.setColumnWidth(9,  12); // Effektiv
+    sheet.setColumnWidth(10,  8); // km
+    sheet.setColumnWidth(11, 12); // Fahrzeit
   }
 
   String _fmtH(double h) {
