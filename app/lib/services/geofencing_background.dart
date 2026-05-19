@@ -374,21 +374,17 @@ Future<void> _onStart(ServiceInstance service) async {
           exitConfirm[id] = (exitConfirm[id] ?? 0) + 1;
           await _log('EXIT-CANDIDATE',
               '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  confirm=${exitConfirm[id]}/$_kExitConfirmRequired');
-          if (exitConfirm[id]! >= _kExitConfirmRequired) {
-            exitConfirm.remove(id);
-            // jetzt echtes Exit durchführen (unten)
-          } else {
+          if (exitConfirm[id]! < _kExitConfirmRequired) {
             continue; // noch nicht genug Bestätigungen
           }
+          exitConfirm.remove(id);
         } else {
           // Noch innerhalb (oder zwischen radius und outsideThreshold) → Zähler zurücksetzen
           exitConfirm.remove(id);
           continue;
         }
-      }
 
-      // Ab hier: bestätigter Exit (wasInside=true, Zähler erreicht)
-      {
+        // Bestätigter Exit – nur erreichbar wenn wasInside=true und Zähler voll.
         inside.remove(id);
         (await SharedPreferences.getInstance())
             .setString(_kInsideZonesKey, inside.join(','));
@@ -413,6 +409,7 @@ Future<void> _onStart(ServiceInstance service) async {
             'Zone verlassen: ${loc['name'] as String}',
             'Ausstempeln in 5 Minuten sofern du nicht zurückkehrst.');
       }
+      // wasInside=false, !measuredInside → nichts tun (außen bleibt außen)
     }
     if (inside.isNotEmpty) {
       outsideZonesSince = null;
