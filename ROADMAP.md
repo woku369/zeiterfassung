@@ -516,28 +516,44 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ### Mittelfristig – Zuschläge-Reporting (Verhandlungsunterlage Gurktaler AG)
 
-> **Datenbasis-Hinweis:** Vorjahreswerte zu lückenhaft für belastbare Aussagen.
-> Aufnahme nach ~10–12 Wochen ordentlicher Datenerfassung (ab ca. August 2026).
+> **Strategisches Ziel:** Vollzeitbeschäftigung (100 %) in zwei Stufen:
+> 1. Nachweis, dass die aktuell erbrachte Leistung bereits ~50 % Vollzeit entspricht
+>    → Formalisierung auf 50 % als erster Schritt
+> 2. Zwischenstufe ~1 Jahr bei 75 % mit allen gesetzlichen Zuschlägen
+>    → danach 100 % All-in
+>
+> Der Hauptjob lässt keine prozentuelle Eigenreduktion zu, daher kein gestaffeltes
+> Angebot möglich. Die Argumentation lautet nicht „ich will mehr", sondern
+> **„ich liefere bereits mehr — lasst uns das formalisieren."**
+>
+> **Datenbasis-Hinweis:** Vorjahreswerte zu lückenhaft. Ordentliche Erfassung läuft
+> seit Mai 2026 → Auswertung ab ~August 2026 (nach 10–12 Wochen).
 
-- [ ] **Wochendurchschnitt im Zuschläge-Sheet:**
-  - Effektiv-Äquivalent-Stunden / tatsächlich erfasste Wochen (nicht pauschal 52)
-  - Macht „ich arbeite faktisch X h/Woche" direkt ablesbar
+**Kern-Kennzahl:** Effektiv-Äquivalent-Stunden ÷ 38,5 h × 100 = % Vollzeit
+→ Wenn dieser Wert bei 45–55 % liegt, ist das Argument für 50 % Vertrag mit
+Zahlen belegt, nicht nur behauptet.
+
+- [ ] **Vollzeitäquivalent im Zuschläge-Sheet:**
+  - Effektiv-Stunden / tatsächlich erfasste Wochen (nicht pauschal 52) = h/Woche
+  - h/Woche ÷ 38,5 × 100 = % Vollzeit → direkt ablesbar
+  - Gegenüberstellung: vertraglich 20 % vs. geleistet ~X %
 
 - [ ] **Hochrechnung Überstundenpauschale:**
-  - Monatsdurchschnitt der zuschlagspflichtigen Stunden × Stundensatz → geschätzter Monatsbetrag
-  - Jahresprojektion (× 12) sowie Gegenüberstellung mit 360 €/Monat-Grenze (§ 68 EStG)
-  - Für DN und DG getrennt ausweisen (beide Seiten steuerfrei)
+  - Monatsdurchschnitt zuschlagspflichtiger Stunden × Stundensatz → geschätzter Monatsbetrag
+  - Jahresprojektion sowie Gegenüberstellung mit 360 €/Monat-Grenze (§ 68 EStG)
+  - Für DN und DG getrennt ausweisen (beide Seiten profitieren steuerfrei)
 
-- [ ] **Aufschlüsselung nach Tätigkeitstyp im Zuschläge-Sheet:**
-  - Führungen / allgemeine Gartenarbeit / Homeoffice als eigene Untergruppen
-  - Zeigt welcher Anteil überhaupt zuschlagspflichtig ist
+- [ ] **Aufschlüsselung nach Tätigkeitstyp:**
+  - Führungen / Gartenarbeit / Homeoffice als eigene Untergruppen
+  - Zeigt welcher Anteil zuschlagspflichtig ist und welcher als Normalarbeit gilt
 
-- [ ] **Ziel-Szenario-Vergleich:**
-  - Aktuelle Situation (8 h/Woche, kein Zuschlag) vs.
-  - Szenario A: 10 h/Woche-Vertrag
-  - Szenario B: 8 h + Überstundenpauschale
-  - Szenario C: 10 h + reduzierte Pauschale
-  - Netto-Auswirkung für DN und DG jeweils beziffern
+- [ ] **Szenario-Vergleich (Netto-Auswirkung DN + DG):**
+  - Ist: 20 % / 8 h ohne Zuschlag
+  - Szenario A: 50 % formalisiert (entspricht ~Ist-Leistung)
+  - Szenario B: 75 % + gesetzliche Zuschläge (~1 Jahr Zwischenstufe)
+  - Szenario C: 100 % All-in (Endziel)
+  - Je Szenario: Brutto DN, Lohnnebenkosten DG, steuerfreie Anteile
+
 - [x] **Telefonat-Tracking erweitert:** Anruf-Log-Integration (READ_CALL_LOG) – letzte Anrufe in der Activity-Timeline anzeigen und direkt als Eintrag übernehmen *(v1.17)*
 - [ ] **Anruf-Overlay:** Schwebender Button über der Phone-App bei aktivem Anruf (SYSTEM_ALERT_WINDOW) – sofortige Arbeitszeiterfassung ohne App-Wechsel
 
