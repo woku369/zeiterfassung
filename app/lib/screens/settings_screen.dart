@@ -776,9 +776,48 @@ class _ActivityTrackingCardState extends State<_ActivityTrackingCard> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editWhitelist(context, ap),
           ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.devices_outlined),
+            title: const Text('Gerätename'),
+            subtitle: Text(ap.deviceName),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editDeviceName(context, ap),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _editDeviceName(BuildContext context, ActivityProvider ap) async {
+    final ctrl = TextEditingController(text: ap.deviceName);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gerätename'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Name',
+            hintText: 'z.B. Büro-PC, Tablet',
+          ),
+          autofocus: true,
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (saved != null) await ap.setDeviceName(saved);
   }
 
   Future<void> _editWhitelist(BuildContext context, ActivityProvider ap) async {

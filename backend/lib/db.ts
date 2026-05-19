@@ -92,6 +92,17 @@ function initSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_splits_entry ON entry_project_splits(entry_id);
 
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id TEXT PRIMARY KEY,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      title TEXT NOT NULL,
+      app_name TEXT NOT NULL,
+      device_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_log_start ON activity_log(start_time);
+
     CREATE TABLE IF NOT EXISTS sync_state (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

@@ -5,6 +5,8 @@ import '../models/activity_log.dart';
 import '../database/database_helper.dart';
 import '../services/activity_tracking_service.dart';
 
+const _kDeviceName = 'device_name';
+
 class ActivityProvider extends ChangeNotifier {
   static const _keyWhitelist = 'activity_whitelist';
   static const _keyMinDuration = 'activity_min_duration_minutes';
@@ -31,6 +33,7 @@ class ActivityProvider extends ChangeNotifier {
   bool _isTracking = false;
   bool _hasPermission = false;
   DateTime _selectedDate = DateTime.now();
+  String _deviceName = 'Dieses Gerät';
   // Per-key timestamps (start at epoch = never locally changed).
   String _whitelistTs     = epochTs;
   String _minDurationTs   = epochTs;
@@ -49,6 +52,7 @@ class ActivityProvider extends ChangeNotifier {
   bool get isTracking => _isTracking;
   bool get hasPermission => _hasPermission;
   DateTime get selectedDate => _selectedDate;
+  String get deviceName => _deviceName;
   /// Per-key timestamps for sync payload.
   String get whitelistChangedAt     => _whitelistTs;
   String get minDurationChangedAt   => _minDurationTs;
@@ -58,12 +62,31 @@ class ActivityProvider extends ChangeNotifier {
 
   Future<void> init() async {
     await _loadSettings();
+    final prefs = await SharedPreferences.getInstance();
+    _deviceName = prefs.getString(_kDeviceName) ?? _defaultHostname();
+    ActivityTrackingService.instance.setDeviceName(_deviceName);
     if (Platform.isAndroid) {
       _hasPermission = await ActivityTrackingService.instance.hasAndroidUsagePermission();
       _hasCallLogPermission = await ActivityTrackingService.instance.hasCallLogPermission();
     } else {
       _hasPermission = true;
     }
+    notifyListeners();
+  }
+
+  String _defaultHostname() {
+    try {
+      return Platform.localHostname;
+    } catch (_) {
+      return 'Dieses Gerät';
+    }
+  }
+
+  Future<void> setDeviceName(String name) async {
+    _deviceName = name.trim().isEmpty ? _defaultHostname() : name.trim();
+    ActivityTrackingService.instance.setDeviceName(_deviceName);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kDeviceName, _deviceName);
     notifyListeners();
   }
 
@@ -211,11 +234,15 @@ class ActivityProvider extends ChangeNotifier {
   Future<void> loadSessions(DateTime date) async {
     _selectedDate = date;
     if (Platform.isAndroid) {
-      _sessions = await ActivityTrackingService.instance.queryAndroid(
+      final raw = await ActivityTrackingService.instance.queryAndroid(
         date: date,
         whitelist: _whitelist,
         minDurationMinutes: _minDurationMinutes,
       );
+      // Persist this device's sessions so they sync to other devices.
+      await DatabaseHelper.instance.insertActivityLogs(raw);
+      // Load from DB to include pooled sessions from other devices.
+      _sessions = await DatabaseHelper.instance.getActivityLogsForDate(date);
       if (_hasCallLogPermission) {
         _calls = await ActivityTrackingService.instance.queryCallLog(date: date);
       }

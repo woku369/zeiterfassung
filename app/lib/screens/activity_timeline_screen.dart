@@ -363,6 +363,8 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                             ...ap.sessions.map((s) {
                               final checked  = _selected.contains(s.id);
                               final adopted  = ap.isSessionAdopted(s.id);
+                              final isRemote = s.deviceId != null &&
+                                  s.deviceId != ap.deviceName;
                               return Opacity(
                                 opacity: adopted ? 0.45 : 1.0,
                                 child: Card(
@@ -404,6 +406,10 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                                                 : null,
                                           ),
                                         ),
+                                        if (isRemote) ...[
+                                          const SizedBox(width: 6),
+                                          _DeviceChip(name: s.deviceId!),
+                                        ],
                                       ],
                                     ),
                                     subtitle: Text(
@@ -708,6 +714,40 @@ class _WindowsTrackingBar extends StatelessWidget {
                   }
                 : () => ap.startTracking(),
             child: Text(ap.isTracking ? 'Stopp' : 'Start'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Device chip ─────────────────────────────────────────────────────────────
+
+class _DeviceChip extends StatelessWidget {
+  final String name;
+  const _DeviceChip({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.devices_outlined, size: 10, color: cs.onSecondaryContainer),
+          const SizedBox(width: 3),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 10,
+              color: cs.onSecondaryContainer,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

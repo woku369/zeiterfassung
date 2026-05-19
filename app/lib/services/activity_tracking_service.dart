@@ -40,8 +40,11 @@ class ActivityTrackingService {
   Timer? _pollTimer;
   String? _lastTitle;
   DateTime? _sessionStart;
+  String? _deviceName;
 
   bool get isWindowsTracking => _pollTimer != null;
+
+  void setDeviceName(String name) => _deviceName = name;
 
   // ── Windows ───────────────────────────────────────────────────────────────
 
@@ -111,6 +114,7 @@ class ActivityTrackingService {
       endTime: end,
       title: title,
       appName: title,
+      deviceId: _deviceName,
     );
     DatabaseHelper.instance.insertActivityLog(log);
   }
@@ -129,6 +133,7 @@ class ActivityTrackingService {
       endTime: end,
       title: title,
       appName: title,
+      deviceId: _deviceName,
     ));
   }
 
@@ -163,6 +168,7 @@ class ActivityTrackingService {
           endTime: end,
           title: title,
           appName: pkg,
+          deviceId: _deviceName,
         ));
       }
       logs.sort((a, b) => a.startTime.compareTo(b.startTime));

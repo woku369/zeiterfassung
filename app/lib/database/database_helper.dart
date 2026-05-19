@@ -20,7 +20,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 14,
+      version: 15,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -76,6 +76,7 @@ class DatabaseHelper {
     await _createV11Tables(db);
     await _createV13Tables(db);
     await _createV14Tables(db);
+    await _createV15Tables(db);
   }
 
   Future<void> _upgrade(Database db, int oldVersion, int newVersion) async {
@@ -143,6 +144,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 14) {
       await _createV14Tables(db);
+    }
+    if (oldVersion < 15) {
+      await _createV15Tables(db);
     }
   }
 
@@ -229,6 +233,18 @@ class DatabaseHelper {
         deleted_at TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<void> _createV15Tables(Database db) async {
+    // Add pooling columns to activity_log; wrap in try/catch – safe on fresh install
+    // (the _createV7Tables already creates the table without these columns).
+    try {
+      await db.execute('ALTER TABLE activity_log ADD COLUMN device_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute(
+          'ALTER TABLE activity_log ADD COLUMN is_synced INTEGER NOT NULL DEFAULT 0');
+    } catch (_) {}
   }
 
   Future<void> _createV14Tables(Database db) async {
@@ -722,7 +738,19 @@ class DatabaseHelper {
 
   Future<void> insertActivityLog(ActivityLog log) async {
     final db = await database;
-    await db.insert('activity_log', log.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('activity_log', log.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> insertActivityLogs(List<ActivityLog> logs) async {
+    if (logs.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final log in logs) {
+      batch.insert('activity_log', log.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<List<ActivityLog>> getActivityLogsForDate(DateTime date) async {
@@ -736,6 +764,35 @@ class DatabaseHelper {
       orderBy: 'start_time ASC',
     );
     return rows.map(ActivityLog.fromMap).toList();
+  }
+
+  Future<List<ActivityLog>> getUnsyncedActivityLogs() async {
+    final db = await database;
+    final rows = await db.query('activity_log',
+        where: 'is_synced = 0 OR is_synced IS NULL');
+    return rows.map(ActivityLog.fromMap).toList();
+  }
+
+  Future<void> markActivityLogsSynced(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    final placeholders = ids.map((_) => '?').join(',');
+    await db.rawUpdate(
+        'UPDATE activity_log SET is_synced = 1 WHERE id IN ($placeholders)',
+        ids);
+  }
+
+  Future<void> upsertActivityLogsFromServer(List<ActivityLog> logs) async {
+    if (logs.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final log in logs) {
+      // Mark as synced = 1 so we don't push foreign logs back on next sync
+      final map = {...log.toMap(), 'is_synced': 1};
+      batch.insert('activity_log', map,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> deleteActivityLogsForDate(DateTime date) async {

@@ -4,6 +4,7 @@ class ActivityLog {
   final DateTime endTime;
   final String title;
   final String appName;
+  final String? deviceId; // device name; null = created before pooling
 
   // Phone-call specific (null for app sessions)
   final bool isPhoneCall;
@@ -16,6 +17,7 @@ class ActivityLog {
     required this.endTime,
     required this.title,
     required this.appName,
+    this.deviceId,
     this.isPhoneCall = false,
     this.phoneNumber,
     this.callType,
@@ -23,22 +25,50 @@ class ActivityLog {
 
   Duration get duration => endTime.difference(startTime);
   int get durationMinutes => duration.inMinutes;
-
   bool get isMissed => isPhoneCall && callType == 3;
 
+  ActivityLog copyWith({
+    String? id,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? title,
+    String? appName,
+    String? deviceId,
+    bool? isPhoneCall,
+    String? phoneNumber,
+    int? callType,
+  }) =>
+      ActivityLog(
+        id: id ?? this.id,
+        startTime: startTime ?? this.startTime,
+        endTime: endTime ?? this.endTime,
+        title: title ?? this.title,
+        appName: appName ?? this.appName,
+        deviceId: deviceId ?? this.deviceId,
+        isPhoneCall: isPhoneCall ?? this.isPhoneCall,
+        phoneNumber: phoneNumber ?? this.phoneNumber,
+        callType: callType ?? this.callType,
+      );
+
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'start_time': startTime.toIso8601String(),
-    'end_time': endTime.toIso8601String(),
-    'title': title,
-    'app_name': appName,
-  };
+        'id': id,
+        'start_time': startTime.toIso8601String(),
+        'end_time': endTime.toIso8601String(),
+        'title': title,
+        'app_name': appName,
+        'device_id': deviceId,
+      };
 
   factory ActivityLog.fromMap(Map<String, dynamic> m) => ActivityLog(
-    id: m['id'] as String,
-    startTime: DateTime.parse(m['start_time'] as String),
-    endTime: DateTime.parse(m['end_time'] as String),
-    title: m['title'] as String,
-    appName: m['app_name'] as String,
-  );
+        id: m['id'] as String,
+        startTime: DateTime.parse(m['start_time'] as String),
+        endTime: DateTime.parse(m['end_time'] as String),
+        title: m['title'] as String,
+        appName: m['app_name'] as String,
+        deviceId: m['device_id'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => toMap();
+  factory ActivityLog.fromJson(Map<String, dynamic> json) =>
+      ActivityLog.fromMap(json);
 }

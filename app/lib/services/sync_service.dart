@@ -5,6 +5,7 @@ import '../models/employer.dart';
 import '../models/tracked_location.dart';
 import '../models/project.dart';
 import '../models/entry_project_split.dart';
+import '../models/activity_log.dart';
 import '../database/database_helper.dart';
 
 class SyncResult {
@@ -92,6 +93,7 @@ class SyncService {
 
     final deletedIds = await db.getDeletionsSince(lastSync);
     final allSplits = await db.getAllSplitsForSync();
+    final unsyncedLogs = await db.getUnsyncedActivityLogs();
 
     try {
       final body = jsonEncode({
@@ -101,6 +103,7 @@ class SyncService {
         'locations': locations.map((l) => l.toJson()).toList(),
         'projects':  projects.map((p) => p.toJson()).toList(),
         if (allSplits.isNotEmpty) 'splits': allSplits.map((s) => s.toJson()).toList(),
+        if (unsyncedLogs.isNotEmpty) 'activity_logs': unsyncedLogs.map((a) => a.toJson()).toList(),
         if (deletedIds.isNotEmpty) 'deleted_ids': deletedIds,
         if (localSettings != null && localSettings.isNotEmpty)
           'settings': localSettings,
@@ -158,6 +161,13 @@ class SyncService {
         await db.upsertSplitsFromServer(serverSplits);
       }
 
+      final serverLogs = (data['activity_logs'] as List<dynamic>? ?? [])
+          .map((e) => ActivityLog.fromJson(e as Map<String, dynamic>))
+          .toList();
+      if (serverLogs.isNotEmpty) {
+        await db.upsertActivityLogsFromServer(serverLogs);
+      }
+
       // Apply deletions from other devices
       final serverDeletedIds = (data['deleted_ids'] as List<dynamic>? ?? [])
           .map((e) => e as String).toList();
@@ -165,9 +175,12 @@ class SyncService {
         await db.applyRemoteDeletions(serverDeletedIds);
       }
 
-      // Mark local entries as synced, save sync timestamp
+      // Mark local entries + activity logs as synced, save sync timestamp
       if (unsynced.isNotEmpty) {
         await db.markAsSynced(unsynced.map((e) => e.id).toList());
+      }
+      if (unsyncedLogs.isNotEmpty) {
+        await db.markActivityLogsSynced(unsyncedLogs.map((a) => a.id).toList());
       }
       await db.setSyncState('last_sync_at', serverTs);
 
@@ -175,8 +188,8 @@ class SyncService {
       final rawSettings = data['settings'] as Map<String, dynamic>?;
 
       return SyncResult(
-        pushed: unsynced.length,
-        pulled: serverEntries.length + serverEmployers.length + serverLocations.length + serverProjects.length,
+        pushed: unsynced.length + unsyncedLogs.length,
+        pulled: serverEntries.length + serverEmployers.length + serverLocations.length + serverProjects.length + serverLogs.length,
         errors: errors,
         serverSettings: rawSettings,
       );

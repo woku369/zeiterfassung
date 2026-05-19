@@ -23,6 +23,7 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     locations?: Record<string, unknown>[];
     projects?: Record<string, unknown>[];
     splits?: Record<string, unknown>[];
+    activity_logs?: Record<string, unknown>[];
     deleted_ids?: string[];
     settings?: Record<string, unknown>;
   };
@@ -183,6 +184,27 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     upsertSplits(splits);
   }
 
+  // ── Upsert activity logs ──────────────────────────────────────────────────
+  const activityLogs: Record<string, unknown>[] = body.activity_logs ?? [];
+  if (activityLogs.length > 0) {
+    const upsertLog = db.prepare(`
+      INSERT INTO activity_log (id,start_time,end_time,title,app_name,device_id,created_at)
+      VALUES (@id,@start_time,@end_time,@title,@app_name,@device_id,@created_at)
+      ON CONFLICT(id) DO NOTHING
+    `);
+    const upsertLogs = db.transaction((items: Record<string, unknown>[]) => {
+      for (const a of items) {
+        upsertLog.run({
+          id: a['id'], start_time: a['start_time'], end_time: a['end_time'],
+          title: a['title'] ?? '', app_name: a['app_name'] ?? '',
+          device_id: a['device_id'] ?? null,
+          created_at: a['created_at'] ?? now,
+        });
+      }
+    });
+    upsertLogs(activityLogs);
+  }
+
   // ── Settings (LWW: last-write wins, NAS is authoritative store) ───────────
   if (body.settings && Object.keys(body.settings).length > 0) {
     const upsertSetting = db.prepare(
@@ -219,6 +241,14 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     `SELECT * FROM entry_project_splits WHERE updated_at > ? ORDER BY updated_at`
   ).all(lastSync) as Record<string, unknown>[];
 
+  // Activity logs from other devices since last_sync (don't send back the requester's own)
+  const requestingDevice = (activityLogs[0]?.['device_id'] as string | undefined) ?? null;
+  const pulledActivityLogs = (db.prepare(
+    `SELECT * FROM activity_log WHERE created_at > ? ORDER BY start_time`
+  ).all(lastSync) as Record<string, unknown>[]).filter(
+    a => requestingDevice === null || a['device_id'] !== requestingDevice
+  );
+
   // Deletions accumulated on NAS since last_sync (from other devices)
   const serverDeletedIds = (db.prepare(
     `SELECT id FROM deletion_log WHERE deleted_at > ?`
@@ -243,6 +273,7 @@ function handleSync(req: NextApiRequest, res: NextApiResponse) {
     locations: pulledLocations,
     projects: pulledProjects,
     splits: pulledSplits,
+    activity_logs: pulledActivityLogs.length > 0 ? pulledActivityLogs : undefined,
     deleted_ids: serverDeletedIds,
     settings: Object.keys(savedSettings).length > 0 ? savedSettings : undefined,
   });
