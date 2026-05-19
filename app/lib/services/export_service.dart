@@ -586,17 +586,13 @@ class ExportService {
 
     // ── Argumentation section ───────────────────────────────────────────────
     void argRow(String label, String value, {bool isHeader = false}) {
-      final labelBg = isHeader ? _argHeader : _argBg;
-      final fontCol = isHeader ? _white      : null;
       for (var c = 0; c < 12; c++) {
         final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
         if (c == 0) cell.value = TextCellValue(label);
         if (c == 1) cell.value = TextCellValue(value);
-        cell.cellStyle = CellStyle(
-          bold: isHeader || c == 0,
-          backgroundColorHex: labelBg,
-          fontColorHex: fontCol,
-        );
+        cell.cellStyle = isHeader
+            ? CellStyle(bold: true, backgroundColorHex: _argHeader, fontColorHex: _white)
+            : CellStyle(bold: c == 0, backgroundColorHex: _argBg);
       }
       row++;
     }

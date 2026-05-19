@@ -634,7 +634,6 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
           columns: ['start_time', 'work_type', 'break_minutes'],
           where: 'id = ? AND end_time IS NULL',
           whereArgs: [entryId], limit: 1);
-      int breakMinutes = 0;
       if (rows.isNotEmpty) {
         final existing = rows.first;
         final start = DateTime.parse(existing['start_time'] as String);
@@ -707,6 +706,7 @@ Future<void> _finalizeTrip({
     // Too short – delete skeleton
     try {
       final db = await _openDb();
+      int breakMinutes = 0;
       try {
         await db.delete('trips', where: 'id = ?', whereArgs: [id]);
       } finally {
