@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
-import '../services/surcharge_service.dart';
 
 class ExportService {
   static final ExportService instance = ExportService._();
@@ -231,8 +230,8 @@ class ExportService {
       backgroundColorHex: _title,
       fontColorHex: _white,
     );
-    // Blank the other columns with same bg
-    for (var c = 1; c < 10; c++) {
+    // Blank the other columns with same bg (12 covers Zuschläge sheet width)
+    for (var c = 1; c < 12; c++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row))
           .cellStyle = CellStyle(backgroundColorHex: _title);
     }

@@ -626,6 +626,22 @@ class HelpScreen extends StatelessWidget {
               _SubHeading('Jahresbericht'),
               _KeyValue(label: 'Öffnen', value: 'Berichte → Tab „Wirtschaftsjahr" → „Jahresbericht exportieren"'),
               _KeyValue(label: 'Inhalt', value: 'Alle Einträge des Wirtschaftsjahres als XLSX inkl. Jahressumme'),
+              _SubHeading('Zuschläge-Tab (nur Gurktaler AG)'),
+              _Para(
+                'Beim Jahresbericht wird automatisch ein zusätzliches Sheet „Zuschläge" '
+                'erstellt. Es schlüsselt jeden Eintrag nach Zuschlagspflicht auf:',
+              ),
+              _KeyValue(label: 'Sa vor 13:00', value: 'Normal (×1.0)'),
+              _KeyValue(label: 'Sa 13–20 Uhr', value: '+50 % (×1.5) – hellgelb'),
+              _KeyValue(label: 'Sa/Werktag nach 20 Uhr', value: '+100 % (×2.0) – hellrosa'),
+              _KeyValue(label: 'Sonn- und Feiertage', value: '+100 % (×2.0) – hellrosa'),
+              _KeyValue(label: 'Homeoffice', value: 'immer normal (keine Zuschlagspflicht)'),
+              _Para(
+                'Am Ende des Sheets folgt eine Argumentation-Sektion: '
+                'Wochensoll vertraglich vs. effektiv-gewichtetes Äquivalent, '
+                'Differenz zum 10-h-Ziel, km-/Fahrzeit-Summen sowie ein Hinweis auf '
+                'die steuerfreie Überstundenpauschale (§ 68 EStG, bis ~360 €/Monat für DN und DG).',
+              ),
               _Hint(
                 'Arbeitgeberwechsel direkt in der AppBar des Berichte-Screens (auch '
                 'auf der Einträge-Seite): Symbol ⇄ erscheint wenn ≥ 2 Arbeitgeber vorhanden.',

@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-19 – v1.22 Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
+> Letztes Update: 2026-05-19 – v1.22 Zuschläge-Tab + Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
 
 ---
 
@@ -57,6 +57,8 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - `database_helper.dart`: `insertActivityLogs()` verwendete `ConflictAlgorithm.replace` → resettet `is_synced=0` bei jedem `loadSessions()`-Aufruf (Android-IDs deterministisch). Fix: `ConflictAlgorithm.ignore`
   - `help_screen.dart`: „nichts wird separat gespeichert" war nach Pooling-Feature falsch → korrigiert
   - `help_screen.dart`: Projektzuordnung-Sektion beschrieb alten Single-Dropdown → auf Multi-Split aktualisiert
+  - `export_service.dart`: unbenutzter `surcharge_service`-Import entfernt (Lint-Warnung)
+  - `export_service.dart`: `_writeTitleRow` füllte nur Spalten 0–9 mit Titelfarbe; Zuschläge-Sheet hat 12 Spalten → auf 0–11 erweitert
 
 ### v1.21 – Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
 
