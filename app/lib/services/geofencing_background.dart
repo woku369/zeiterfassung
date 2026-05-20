@@ -353,19 +353,29 @@ Future<void> _onStart(ServiceInstance service) async {
       if (!wasInside && measuredInside) {
         exitConfirm.remove(id);
         inside.add(id);
-        (await SharedPreferences.getInstance())
-            .setString(_kInsideZonesKey, inside.join(','));
         timers[id]?.cancel();
         timers.remove(id);
-        // Wenn Karenz-Timer anderer Zonen laufen, ist der Nutzer eindeutig
-        // weitergezogen → alte Timer abbrechen und alten Auto-Eintrag sofort
-        // schließen, damit _autoClockIn nicht durch "Bereits eingestempelt" blockiert.
+
+        // Alle anderen Zonen-States bereinigen: Karenz-Timer abbrechen,
+        // andere Zonen aus 'inside' entfernen (exitConfirm-Zähler auch).
+        // Dann aktiven Eintrag immer schließen bevor neuer geöffnet wird –
+        // _autoClockOut ist no-op wenn kein Eintrag offen ist.
         if (timers.isNotEmpty) {
           for (final t in timers.values) t.cancel();
           timers.clear();
-          await _log('KARENZ-CANCEL', 'Neue Zone ${loc['name']} – laufende Karenz-Timer beendet');
-          await _autoClockOut(notifications);
         }
+        final otherInside = inside.where((zid) => zid != id).toList();
+        for (final zid in otherInside) {
+          inside.remove(zid);
+          exitConfirm.remove(zid);
+        }
+        if (otherInside.isNotEmpty) {
+          await _log('ZONE-SWITCH',
+              '${otherInside.length} andere Zone(n) verlassen beim Eintritt in ${loc['name']}');
+        }
+        (await SharedPreferences.getInstance())
+            .setString(_kInsideZonesKey, inside.join(','));
+        await _autoClockOut(notifications);
         await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
         await _autoClockIn(loc, notifications);
         service.invoke('zoneChange', {
