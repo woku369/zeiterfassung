@@ -524,7 +524,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] **Whitelist-Sync mit korrektem LWW verifiziert:** Whitelist auf Gerät ändern → anderes Gerät syncen → Änderungen erscheinen korrekt. Fresh-Installs überschreiben keine bestehenden NAS-Whitelist-Werte mehr (epochTs-Guard)
 - [ ] **Backup-Restore-Test:** Backup auf NAS → neue Einträge anlegen → altes Backup wiederherstellen → Sync → fehlende Einträge müssen vom NAS zurückkommen
 - [x] **Boot-Persistenz auf Xiaomi verifizieren:** Geofencing aktivieren → Telefon neu starten → Service muss ohne App-Öffnen wieder laufen – **verifiziert 2026-05-19** (Xiaomi Poco X7 Pro, HyperOS 3)
-- [ ] **Auto Clock-in/out auf Xiaomi verifizieren:** Geofencing-Zone fahren → Notification + Eintrag erscheint → Zone verlassen → 5 Min Karenz → Eintrag wird geschlossen
+- [x] **Auto Clock-in/out auf Xiaomi verifiziert:** Gurk (500 m Zone) → Clock-in beim Betreten, Clock-out nach 5 Min Karenz beim Verlassen – **verifiziert 2026-05-20** (Xiaomi Poco X7 Pro, HyperOS 3). 5-Min-Puffer akzeptiert (geht zu Gunsten Arbeitnehmer; bei aktivem Fahrtmodus ohnehin präziser via BT/Geschwindigkeitstrigger)
 - [ ] **Watchdog-Notification testen:** Auto-Eintrag offen lassen, >30 Min außerhalb aller Zonen bleiben → Reminder muss erscheinen
 - [x] **Geofencing-Duplikate dauerhaft behoben:** Beide Root Causes beseitigt (ensureSpecialLocations + NAS LWW-Timestamps). Keine Neuerstellung soft-gelöschter Standorte mehr.
 - [ ] **Location-Deduplizierung auf NAS verifizieren:** Nach App-Start sollen verbleibende historische Dubletten verschwinden, der NAS-Stand muss konsistent werden
