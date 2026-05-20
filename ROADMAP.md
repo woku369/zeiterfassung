@@ -539,6 +539,15 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 >
 > **Datenbasis-Hinweis:** Vorjahreswerte zu lückenhaft. Ordentliche Erfassung läuft
 > seit Mai 2026 → Auswertung ab ~August 2026 (nach 10–12 Wochen).
+>
+> **Vertragliche Wochenstunden Gurktaler AG:**
+> | Wirtschaftsjahr | Wochenstunden |
+> |---|---|
+> | WJ 24/25 | 4 h/Woche |
+> | WJ 25/26 (aktuell) | 8 h/Woche |
+>
+> ⚠ Beim XLSX-Export eines historischen WJ das Wochensoll im Arbeitgeber-Profil
+> vor dem Export auf den damaligen Wert setzen, danach zurückstellen.
 
 **Kern-Kennzahl:** Effektiv-Äquivalent-Stunden ÷ 38,5 h × 100 = % Vollzeit
 → Wenn dieser Wert bei 45–55 % liegt, ist das Argument für 50 % Vertrag mit
