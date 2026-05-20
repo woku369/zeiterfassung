@@ -696,6 +696,41 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   }
 
   Future<void> _exportYearXlsx() async {
+    // Wochensoll-Dialog: ermöglicht Korrektur für historische WJ
+    final defaultHours = _employer?.weeklyHours ?? 40.0;
+    final ctrl = TextEditingController(
+        text: defaultHours == defaultHours.truncate()
+            ? defaultHours.toInt().toString()
+            : defaultHours.toString());
+    final endYear = (_fyStart.year + 1) % 100;
+    final fyLabel = 'WJ ${_fyStart.year}/${endYear.toString().padLeft(2, '0')}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Wochensoll für $fyLabel'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Wochenstunden',
+            suffixText: 'h',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Abbrechen')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Exportieren')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final weeklyHours =
+        double.tryParse(ctrl.text.replaceAll(',', '.')) ?? defaultHours;
+
     setState(() => _exportingYear = true);
     try {
       final employer = _employer;
@@ -709,7 +744,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         allEntries: entries,
         fyStart: _fyStart,
         employerName: employer?.name ?? '',
-        weeklyHours: employer?.weeklyHours ?? 40,
+        weeklyHours: weeklyHours,
         isSurchargeEmployer: SurchargeService.isSurchargeEmployer(employer),
       );
       if (!mounted) return;
