@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-19 – v1.22 Zuschläge-Tab + Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
+> Letztes Update: 2026-05-20 – v1.22 Geofencing-Bugfixes + Wochensoll-Dialog + Gurk-Zonenkonsolidierung
 
 ---
 
@@ -64,12 +64,20 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Unterstandort (Büro / Mazeration / Garten) wird nach Auto-Clock-in manuell im Eintrag ergänzt
   - Wien, Salzburg, sonstige Außentermine: bei Bedarf als eigene Standorte anlegen
 
+- [x] **Wochensoll-Dialog vor Jahresbericht-Export:**
+  - Vor dem Export erscheint ein Dialog „Wochensoll für WJ XX/XX" mit dem aktuellen Wert vorausgefüllt
+  - Editierbar für historische Wirtschaftsjahre (z.B. WJ 24/25 = 4 h, WJ 25/26 = 8 h)
+  - Ändert das gespeicherte Arbeitgeber-Profil nicht – gilt nur für diesen Export
+  - Sobald ein neuer Wert vertraglich fixiert wird (10 h oder 12 h), wird er im Code fest verankert
+
 - [x] **Bugfixes v1.22:**
   - `database_helper.dart`: `insertActivityLogs()` verwendete `ConflictAlgorithm.replace` → resettet `is_synced=0` bei jedem `loadSessions()`-Aufruf (Android-IDs deterministisch). Fix: `ConflictAlgorithm.ignore`
   - `help_screen.dart`: „nichts wird separat gespeichert" war nach Pooling-Feature falsch → korrigiert
   - `help_screen.dart`: Projektzuordnung-Sektion beschrieb alten Single-Dropdown → auf Multi-Split aktualisiert
   - `export_service.dart`: unbenutzter `surcharge_service`-Import entfernt (Lint-Warnung)
   - `export_service.dart`: `_writeTitleRow` füllte nur Spalten 0–9 mit Titelfarbe; Zuschläge-Sheet hat 12 Spalten → auf 0–11 erweitert
+  - `geofencing_background.dart`: `breakMinutes` außerhalb innerem `try`-Block deklariert (war out-of-scope nach `finally`)
+  - `export_service.dart`: `fontColorHex` akzeptiert kein `ExcelColor?` → `CellStyle` im `argRow`-Closure aufgeteilt
 
 ### v1.21 – Deletion-Sync + Geofencing-Stabilität + Zuschlagsregeln
 
@@ -546,8 +554,9 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 > | WJ 24/25 | 4 h/Woche |
 > | WJ 25/26 (aktuell) | 8 h/Woche |
 >
-> ⚠ Beim XLSX-Export eines historischen WJ das Wochensoll im Arbeitgeber-Profil
-> vor dem Export auf den damaligen Wert setzen, danach zurückstellen.
+> Beim XLSX-Export erscheint ein Dialog mit editierbarem Wochensoll – für
+> historische WJ einfach den damaligen Wert eintragen (ändert Profil nicht).
+> Sobald ein neuer Vertragswert (10 h oder 12 h) fixiert ist, wird er im Code fest verankert.
 
 **Kern-Kennzahl:** Effektiv-Äquivalent-Stunden ÷ 38,5 h × 100 = % Vollzeit
 → Wenn dieser Wert bei 45–55 % liegt, ist das Argument für 50 % Vertrag mit
