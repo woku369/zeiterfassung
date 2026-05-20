@@ -53,6 +53,17 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Argumentation-Sektion (lila): Soll vs. effektiv-gewichtet, Wochen-Äquivalent, Differenz zum 10h-Ziel, km/Fahrzeit-Summen, Hinweis auf § 68 EStG (360 €/Monat steuerfrei DN+DG)
   - Homeoffice-Einträge werden als „normal" geführt (kein Zuschlag per Vereinbarung)
 
+- [x] **Geofencing-Bugfixes v1.22 (3 Root Causes):**
+  - **EXIT für nie-betretene Zonen:** Exit-Block lief als Fallthrough wenn `wasInside=false && !measuredInside` → alle 6 Zonen starteten alle 5 Min Karenz-Timer. Fix: Exit-Block in `if (wasInside)` eingeschlossen
+  - **CLOCK-IN blockiert bei Zonenwechsel während laufender Karenz:** `_autoClockIn` fand offenen Eintrag der alten Zone → „Bereits eingestempelt". Fix: beim ENTER laufende Karenz-Timer anderer Zonen abbrechen + sofort `_autoClockOut` aufrufen
+  - **CLOCK-IN blockiert wenn alte Zone noch in `inside` steckt (kein Karenz-Timer):** Tritt auf wenn Nutzer direkt von Zone A zu Zone B fährt ohne Exit-Bestätigung abzuwarten (z.B. Brückl → Labegg). Fix: beim ENTER alle anderen Zonen aus `inside`/`exitConfirm` entfernen + immer `_autoClockOut` vor `_autoClockIn`
+
+- [x] **Geofencing-Architektur-Entscheidung: Ein Standort pro Gelände:**
+  - Gurk: 3 Einzelzonen (Büro Hemmaweg, Domplatz, Kräutergarten) auf **einen Standort „Gurktaler Gurk"** zusammengeführt, Radius 500 m
+  - Begründung: GPS-Genauigkeit ~20–80 m, Exit-Puffer +80 m → Einzelzonen mit <300 m Abstand führen zu Überlappungen und Fehldetektionen
+  - Unterstandort (Büro / Mazeration / Garten) wird nach Auto-Clock-in manuell im Eintrag ergänzt
+  - Wien, Salzburg, sonstige Außentermine: bei Bedarf als eigene Standorte anlegen
+
 - [x] **Bugfixes v1.22:**
   - `database_helper.dart`: `insertActivityLogs()` verwendete `ConflictAlgorithm.replace` → resettet `is_synced=0` bei jedem `loadSessions()`-Aufruf (Android-IDs deterministisch). Fix: `ConflictAlgorithm.ignore`
   - `help_screen.dart`: „nichts wird separat gespeichert" war nach Pooling-Feature falsch → korrigiert

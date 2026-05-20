@@ -175,9 +175,18 @@ class HelpScreen extends StatelessWidget {
                 'Fehlalarme.',
               ),
               _SubHeading('Standorte für dieses Projekt'),
-              _KeyValue(label: 'Gurk (Kräutergarten)', value: 'Radius ~300 m · AG: Gurktaler'),
-              _KeyValue(label: 'Wien (Büro)', value: 'Radius ~150 m · AG: Gurktaler Wien'),
-              _KeyValue(label: 'Homeoffice', value: 'Radius ~100 m · manuell einstempeln'),
+              _KeyValue(label: 'Gurk (gesamt)', value: 'Radius 500 m · Mittelpunkt Geländemitte · AG: Gurktaler'),
+              _KeyValue(label: 'Labegg 11', value: 'Radius 250 m · AG: Gurktaler'),
+              _KeyValue(label: 'Brückl', value: 'Radius 150 m · AG: Gurktaler'),
+              _KeyValue(label: 'Wien / Salzburg', value: 'Bei Bedarf anlegen · AG entsprechend'),
+              _Hint(
+                'Liegen mehrere Tätigkeitsorte enger als ~300 m beieinander (z.B. '
+                'Büro, Lager und Garten auf demselben Gelände), einen einzigen '
+                'Standort mit ausreichend großem Radius verwenden. GPS-Genauigkeit '
+                'auf Mobilgeräten beträgt typisch 20–80 m – enge Einzelzonen '
+                'führen zu Fehldetektionen. Den Unterstandort nach dem Auto-'
+                'Clock-in manuell im Eintrag ergänzen.',
+              ),
               _SubHeading('Verhalten nach Geräteneustart'),
               _Para(
                 'Wurde das Tracking aktiviert, läuft es nach jedem Neustart '
