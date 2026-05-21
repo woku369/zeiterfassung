@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'providers/employer_provider.dart';
 import 'providers/time_entry_provider.dart';
@@ -128,6 +129,14 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
     await tp.refresh();
     if (GeofencingService.instance.isTracking) {
       GeofencingService.instance.updateLocations(lp.activeLocations);
+    }
+    // Auto-start geofencing on fresh install (key never set = null).
+    if (Platform.isAndroid && !GeofencingService.instance.isTracking) {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('geofencing_active') == null &&
+          lp.activeLocations.isNotEmpty) {
+        await GeofencingService.instance.startTracking(lp.activeLocations);
+      }
     }
   }
 
