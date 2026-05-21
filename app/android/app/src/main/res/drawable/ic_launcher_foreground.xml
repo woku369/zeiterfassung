@@ -1,18 +1,155 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground — stopwatch (grayscale, glassy).
+  Canvas: 108 × 108 dp  |  Safe zone: center 72 dp (18–90 each axis)
+  Watch center: (54, 62)  |  Ring radius: 36 dp
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,28 L54,80 M34,54 L74,54"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="8"
-        android:strokeLineCap="round"/>
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,36 Q54,28 70,36 L74,60 Q54,72 34,60 Z"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1"/>
+
+    <!-- ── Crown (top button) ──────────────────────────────────────── -->
+    <path android:pathData="M50,14 Q50,10 54,10 Q58,10 58,14 L58,30 Q58,34 54,34 Q50,34 50,30 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="50" android:startY="10"
+                android:endX="58"   android:endY="34"
+                android:startColor="#909090"
+                android:endColor="#2a2a2a"/>
+        </aapt:attr>
+    </path>
+    <!-- Crown gloss -->
+    <path android:pathData="M51.5,12 L54,12 Q55.5,12 55.5,13.5 L55.5,26 Q55.5,27.5 54,27.5 L51.5,27.5 Q50,27.5 50,26 L50,13.5 Q50,12 51.5,12 Z"
+        android:fillColor="#ffffff"
+        android:fillAlpha="0.18"/>
+
+    <!-- ── Side pusher (right) ─────────────────────────────────────── -->
+    <path android:pathData="M93,55 Q93,52 96,52 L98,52 Q101,52 101,55 L101,69 Q101,72 98,72 L96,72 Q93,72 93,69 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="93" android:startY="52"
+                android:endX="101"  android:endY="72"
+                android:startColor="#909090"
+                android:endColor="#2a2a2a"/>
+        </aapt:attr>
+    </path>
+
+    <!-- ── Outer ring ──────────────────────────────────────────────── -->
+    <!-- Circle: center (54,62) r=36 → M18,62 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0 -->
+    <path android:pathData="M18,62 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial"
+                android:centerX="46"
+                android:centerY="52"
+                android:gradientRadius="42"
+                android:startColor="#888888"
+                android:endColor="#1c1c1c"/>
+        </aapt:attr>
+    </path>
+
+    <!-- Bezel gloss (thin arc at top edge) -->
+    <path android:pathData="M18,62 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0"
+        android:fillColor="#00000000"
+        android:strokeColor="#ffffff"
+        android:strokeWidth="0.6"
+        android:strokeAlpha="0.14"/>
+
+    <!-- ── Watch face ─────────────────────────────────────────────── -->
+    <!-- Circle: center (54,62) r=30 → M24,62 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0 -->
+    <path android:pathData="M24,62 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial"
+                android:centerX="44"
+                android:centerY="50"
+                android:gradientRadius="36"
+                android:startColor="#e0e0e0"
+                android:endColor="#686868"/>
+        </aapt:attr>
+    </path>
+
+    <!-- ── Tick marks ─────────────────────────────────────────────── -->
+    <!-- 12 o'clock (major) -->
+    <group android:pivotX="54" android:pivotY="62" android:rotation="0">
+        <path android:pathData="M52.5,33 L55.5,33 Q56.5,33 56.5,34 L56.5,38.5 Q56.5,39.5 55.5,39.5 L52.5,39.5 Q51.5,39.5 51.5,38.5 L51.5,34 Q51.5,33 52.5,33 Z"
+            android:fillColor="#333333"/>
+    </group>
+    <!-- 3 o'clock (major) -->
+    <group android:pivotX="54" android:pivotY="62" android:rotation="90">
+        <path android:pathData="M52.5,33 L55.5,33 Q56.5,33 56.5,34 L56.5,38.5 Q56.5,39.5 55.5,39.5 L52.5,39.5 Q51.5,39.5 51.5,38.5 L51.5,34 Q51.5,33 52.5,33 Z"
+            android:fillColor="#333333"/>
+    </group>
+    <!-- 6 o'clock (major) -->
+    <group android:pivotX="54" android:pivotY="62" android:rotation="180">
+        <path android:pathData="M52.5,33 L55.5,33 Q56.5,33 56.5,34 L56.5,38.5 Q56.5,39.5 55.5,39.5 L52.5,39.5 Q51.5,39.5 51.5,38.5 L51.5,34 Q51.5,33 52.5,33 Z"
+            android:fillColor="#333333"/>
+    </group>
+    <!-- 9 o'clock (major) -->
+    <group android:pivotX="54" android:pivotY="62" android:rotation="270">
+        <path android:pathData="M52.5,33 L55.5,33 Q56.5,33 56.5,34 L56.5,38.5 Q56.5,39.5 55.5,39.5 L52.5,39.5 Q51.5,39.5 51.5,38.5 L51.5,34 Q51.5,33 52.5,33 Z"
+            android:fillColor="#333333"/>
+    </group>
+    <!-- Minor ticks (30° intervals between majors) -->
+    <group android:pivotX="54" android:pivotY="62" android:rotation="30">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="60">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="120">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="150">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="210">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="240">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="300">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+    <group android:pivotX="54" android:pivotY="62" android:rotation="330">
+        <path android:pathData="M53,34.5 L55,34.5 Q55.8,34.5 55.8,35.3 L55.8,38.5 Q55.8,39.3 55,39.3 L53,39.3 Q52.2,39.3 52.2,38.5 L52.2,35.3 Q52.2,34.5 53,34.5 Z"
+            android:fillColor="#787878"/>
+    </group>
+
+    <!-- ── Second hand (~10 s = 60° clockwise from 12) ──────────────── -->
+    <!--  sin60°=0.866, cos60°=0.5
+          Tip:  54+0.866×27=77.4,  62−0.5×27=48.5
+          Tail: 54−0.866×8 =47.1,  62+0.5×8 =66  -->
+    <path android:pathData="M47.1,66 L77.4,48.5"
+        android:strokeColor="#282828"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"/>
+
+    <!-- ── Center pivot ──────────────────────────────────────────────── -->
+    <!-- Outer cap -->
+    <path android:pathData="M54,62 m-3.5,0 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#3c3c3c"/>
+    <!-- Gloss ring -->
+    <path android:pathData="M54,62 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        android:fillColor="#909090"/>
+    <!-- Pin -->
+    <path android:pathData="M54,62 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0"
+        android:fillColor="#242424"/>
+
+    <!-- ── Glass shine overlay ───────────────────────────────────────── -->
+    <!-- Ellipse approximated as path, clipped to face area, semi-white fill -->
+    <path android:pathData="M36,46 Q38,35 50,33 Q62,31 68,40 Q74,49 66,58 Q58,67 46,63 Q34,59 36,46 Z"
+        android:fillAlpha="0.22"
+        android:fillColor="#ffffff"/>
+
 </vector>
