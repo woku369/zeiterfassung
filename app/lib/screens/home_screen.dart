@@ -173,11 +173,11 @@ class _DashboardTabState extends State<_DashboardTab> {
   Future<void> _clockOut() async {
     final tp = context.read<TimeEntryProvider>();
     final active = tp.activeEntry;
-    // Pause vorschlagen wenn ≥5h und kein Homeoffice
+    // Pause vorschlagen wenn ≥6h und kein Homeoffice (§ 11 AZG)
     int suggestedBreak = 0;
     if (active != null) {
       final durationMinutes = DateTime.now().difference(active.startTime).inMinutes;
-      if (durationMinutes >= 300 && active.workType != WorkType.homeoffice) {
+      if (durationMinutes >= 360 && active.workType != WorkType.homeoffice) {
         suggestedBreak = 30;
       }
     }

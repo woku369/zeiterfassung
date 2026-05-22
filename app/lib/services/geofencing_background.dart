@@ -652,7 +652,7 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
   try {
     final db = await _openDb();
     try {
-      // Gesetzliche Pause: ab 5h automatisch 30 Min., außer Homeoffice.
+      // Gesetzliche Pause: ab 6h automatisch 30 Min. (§ 11 AZG), außer Homeoffice.
       final rows = await db.query('time_entries',
           columns: ['start_time', 'work_type', 'break_minutes'],
           where: 'id = ? AND end_time IS NULL',
@@ -663,7 +663,7 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
         final durationMinutes = now.difference(start).inMinutes;
         final workType = existing['work_type'] as String;
         final alreadySet = (existing['break_minutes'] as int?) ?? 0;
-        if (alreadySet == 0 && durationMinutes >= 300 && workType != 'homeoffice') {
+        if (alreadySet == 0 && durationMinutes >= 360 && workType != 'homeoffice') {
           breakMinutes = 30;
           await _log('PAUSE', 'Auto 30 Min. eingetragen (${durationMinutes}min Arbeitszeit)');
         }
