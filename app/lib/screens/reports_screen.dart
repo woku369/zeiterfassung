@@ -255,7 +255,12 @@ class _MonthTabState extends State<_MonthTab> {
     final entries = tp.entries;
     final monthHours = tp.totalHoursForMonth();
     final weeklyTarget = employer?.weeklyHours ?? 40.0;
-    final monthTarget = weeklyTarget * 4.33;
+    final vacationDays = entries.where((e) => e.workType == WorkType.vacation).length;
+    final sickDays = entries.where((e) => e.workType == WorkType.sick).length;
+    final zaDays = entries.where((e) => e.workType == WorkType.compensatoryLeave).length;
+    final absenceDays = vacationDays + sickDays + zaDays;
+    final absenceReduction = absenceDays * (weeklyTarget / 5);
+    final monthTarget = (weeklyTarget * 4.33 - absenceReduction).clamp(0.0, weeklyTarget * 4.33);
     final diff = monthHours - monthTarget;
     final byType = <WorkType, double>{};
     for (final e in entries) {
@@ -303,7 +308,13 @@ class _MonthTabState extends State<_MonthTab> {
                     style: Theme.of(context).textTheme.titleMedium),
                 const Divider(),
                 _SummaryRow('Ist-Stunden', _fmtH(monthHours)),
-                _SummaryRow('Soll-Stunden', _fmtH(monthTarget)),
+                _SummaryRow(
+                  absenceDays > 0 ? 'Soll (bereinigt)' : 'Soll-Stunden',
+                  _fmtH(monthTarget),
+                  subtext: absenceDays > 0
+                      ? '${_fmtH(weeklyTarget * 4.33)} − ${_fmtH(absenceReduction)} Abw.'
+                      : null,
+                ),
                 _SummaryRow(
                   diff >= 0 ? 'Mehrarbeit' : 'Minderstunden',
                   '${diff >= 0 ? '+' : ''}${_fmtH(diff)}',
@@ -317,16 +328,9 @@ class _MonthTabState extends State<_MonthTab> {
                 if (tp.totalKmForMonth() > 0)
                   _SummaryRow('Fahrtstrecke',
                       '${tp.totalKmForMonth().toStringAsFixed(1)} km'),
-                ...() {
-                  final vacation = entries.where((e) => e.workType == WorkType.vacation).length;
-                  final sick = entries.where((e) => e.workType == WorkType.sick).length;
-                  final za = entries.where((e) => e.workType == WorkType.compensatoryLeave).length;
-                  return [
-                    if (vacation > 0) _SummaryRow('Urlaubstage', '$vacation', color: Colors.blue.shade600),
-                    if (sick > 0) _SummaryRow('Krankenstandstage', '$sick', color: Colors.orange.shade700),
-                    if (za > 0) _SummaryRow('Zeitausgleich', '$za', color: Colors.green.shade700),
-                  ];
-                }(),
+                if (vacationDays > 0) _SummaryRow('Urlaubstage', '$vacationDays', color: Colors.blue.shade600),
+                if (sickDays > 0) _SummaryRow('Krankenstandstage', '$sickDays', color: Colors.orange.shade700),
+                if (zaDays > 0) _SummaryRow('Zeitausgleich', '$zaDays', color: Colors.green.shade700),
               ],
             ),
           ),
@@ -622,6 +626,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   final List<double> _monthHours = List.filled(12, 0.0);
   // Month index → Vertragsäquivalent (Ist × Zuschlagsfaktor).
   final List<double> _monthEquivalent = List.filled(12, 0.0);
+  // Month index → absence days (Urlaub + KS + ZA) for Soll reduction.
+  final List<int> _monthAbsenceDays = List.filled(12, 0);
   bool _showEquivalent = false;
   int _vacationDays = 0;
   int _sickDays = 0;
@@ -664,6 +670,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
     for (var i = 0; i < 12; i++) {
       _monthHours[i] = 0.0;
       _monthEquivalent[i] = 0.0;
+      _monthAbsenceDays[i] = 0;
     }
     _vacationDays = 0;
     _sickDays = 0;
@@ -677,6 +684,11 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         _monthHours[monthIndex] += e.totalHours;
         _monthEquivalent[monthIndex] +=
             SurchargeService.equivalentHours(e, isSurchargeEmployer: isSurcharge);
+        if (e.workType == WorkType.vacation ||
+            e.workType == WorkType.sick ||
+            e.workType == WorkType.compensatoryLeave) {
+          _monthAbsenceDays[monthIndex]++;
+        }
       }
       if (e.workType == WorkType.vacation) _vacationDays++;
       if (e.workType == WorkType.sick) _sickDays++;
@@ -809,6 +821,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                     const Divider(height: 1),
                     _TotalRow(
                       monthHours: _monthHours,
+                      monthSolls: _buildMonthSolls(weeklyHours),
                       monthEquivalent: _monthEquivalent,
                       weeklyHours: weeklyHours,
                       showEquivalent: _showEquivalent,
@@ -889,11 +902,13 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
     final rows = <Widget>[];
     double cumDiff = 0;
     final mf = DateFormat('MMM', 'de_AT');
+    final absenceHoursPerDay = weeklyHours / 5;
 
     for (var i = 0; i < 12; i++) {
-      final monthDate =
-          DateTime(_fyStart.year, _fyStart.month + i);
-      final soll = weeklyHours * 4.33;
+      final monthDate = DateTime(_fyStart.year, _fyStart.month + i);
+      final rawSoll = weeklyHours * 4.33;
+      final absenceReduction = _monthAbsenceDays[i] * absenceHoursPerDay;
+      final soll = (rawSoll - absenceReduction).clamp(0.0, rawSoll);
       final ist = _monthHours[i];
       final diff = ist - soll;
       cumDiff += diff;
@@ -903,6 +918,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       rows.add(_MonthRow(
         label: mf.format(monthDate),
         soll: soll,
+        absenceDays: _monthAbsenceDays[i],
         ist: ist,
         equivalent: _monthEquivalent[i],
         showEquivalent: _showEquivalent,
@@ -912,6 +928,15 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       ));
     }
     return rows;
+  }
+
+  List<double> _buildMonthSolls(double weeklyHours) {
+    final absenceHoursPerDay = weeklyHours / 5;
+    return List.generate(12, (i) {
+      final rawSoll = weeklyHours * 4.33;
+      final reduction = _monthAbsenceDays[i] * absenceHoursPerDay;
+      return (rawSoll - reduction).clamp(0.0, rawSoll);
+    });
   }
 }
 
@@ -944,6 +969,7 @@ class _TableHeader extends StatelessWidget {
 class _MonthRow extends StatelessWidget {
   final String label;
   final double soll;
+  final int absenceDays;
   final double ist;
   final double equivalent;
   final bool showEquivalent;
@@ -954,6 +980,7 @@ class _MonthRow extends StatelessWidget {
   const _MonthRow({
     required this.label,
     required this.soll,
+    this.absenceDays = 0,
     required this.ist,
     this.equivalent = 0,
     this.showEquivalent = false,
@@ -993,9 +1020,22 @@ class _MonthRow extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: textColor))),
         Expanded(
-            child: Text(_fmtH(soll),
-                style: TextStyle(fontSize: 12, color: textColor),
-                textAlign: TextAlign.right)),
+            child: Tooltip(
+              message: absenceDays > 0
+                  ? '$absenceDays Abwesenheitstag${absenceDays > 1 ? 'e' : ''} abgezogen'
+                  : '',
+              child: Text(
+                absenceDays > 0 ? '${_fmtH(soll)}*' : _fmtH(soll),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: absenceDays > 0
+                        ? (isFuture
+                            ? textColor
+                            : Theme.of(context).colorScheme.primary.withOpacity(0.8))
+                        : textColor),
+                textAlign: TextAlign.right,
+              ),
+            )),
         Expanded(
             child: Text(ist > 0 || !isFuture ? _fmtH(ist) : '–',
                 style: TextStyle(fontSize: 12, color: textColor),
@@ -1034,12 +1074,14 @@ class _MonthRow extends StatelessWidget {
 
 class _TotalRow extends StatelessWidget {
   final List<double> monthHours;
+  final List<double> monthSolls;
   final List<double> monthEquivalent;
   final double weeklyHours;
   final bool showEquivalent;
 
   const _TotalRow({
     required this.monthHours,
+    this.monthSolls = const [],
     this.monthEquivalent = const [],
     required this.weeklyHours,
     this.showEquivalent = false,
@@ -1047,7 +1089,9 @@ class _TotalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalSoll = weeklyHours * 4.33 * 12;
+    final totalSoll = monthSolls.isNotEmpty
+        ? monthSolls.fold(0.0, (s, v) => s + v)
+        : weeklyHours * 4.33 * 12;
     final totalIst = monthHours.fold(0.0, (s, h) => s + h);
     final totalEq  = monthEquivalent.fold(0.0, (s, h) => s + h);
     final diff = totalIst - totalSoll;
@@ -1204,18 +1248,27 @@ class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  const _SummaryRow(this.label, this.value, {this.color});
+  final String? subtext;
+  const _SummaryRow(this.label, this.value, {this.color, this.subtext});
   @override
   Widget build(BuildContext context) {
+    final subtextStyle = TextStyle(
+        fontSize: 11,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55));
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label),
-          Text(value,
-              style: TextStyle(
-                  fontWeight: FontWeight.w600, color: color)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(value,
+                  style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+              if (subtext != null) Text(subtext!, style: subtextStyle),
+            ],
+          ),
         ],
       ),
     );
