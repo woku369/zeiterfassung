@@ -603,7 +603,7 @@ Future<void> _autoClockIn(
       await db.insert('time_entries', {
         'id':            id,
         'employer_id':   employerId,
-        'date':          DateTime(now.year, now.month, now.day).toIso8601String(),
+        'date':          '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}',
         'start_time':    now.toIso8601String(),
         'end_time':      null,
         'work_type':     workType,

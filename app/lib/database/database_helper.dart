@@ -8,6 +8,7 @@ import '../models/activity_log.dart';
 import '../models/project.dart';
 import '../models/trip_record.dart';
 import '../models/entry_project_split.dart';
+import '../services/holiday_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -20,7 +21,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 15,
+      version: 16,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -148,6 +149,33 @@ class DatabaseHelper {
     if (oldVersion < 15) {
       await _createV15Tables(db);
     }
+    if (oldVersion < 16) {
+      await _fixDayTypes(db);
+    }
+  }
+
+  /// Retroactively corrects day_type for all entries based on their date.
+  /// Runs once as migration v16; also called from _create for fresh installs
+  /// (no-op since there are no entries yet).
+  Future<void> _fixDayTypes(Database db) async {
+    final rows = await db.query('time_entries', columns: ['id', 'date']);
+    if (rows.isEmpty) return;
+    final batch = db.batch();
+    for (final row in rows) {
+      final rawDate = row['date'] as String;
+      // Support both 'YYYY-MM-DD' and 'YYYY-MM-DDThh:mm:ss...' formats.
+      final date = DateTime.parse(rawDate.length > 10 ? rawDate.substring(0, 10) : rawDate);
+      final correct = HolidayService.instance.isHoliday(date)
+          ? 'holiday'
+          : date.weekday == 6
+              ? 'saturday'
+              : date.weekday == 7
+                  ? 'sunday'
+                  : 'workday';
+      batch.update('time_entries', {'day_type': correct},
+          where: 'id = ?', whereArgs: [row['id']]);
+    }
+    await batch.commit(noResult: true);
   }
 
   Future<void> _createV2Tables(Database db) async {
