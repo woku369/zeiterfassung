@@ -65,6 +65,7 @@ class _EntryCalendarPickerState extends State<EntryCalendarPicker> {
   late DateTime _selected;
   Map<DateTime, _DayMeta> _meta = {};
   bool _loading = false;
+  int _loadGen = 0; // incremented per load; guards against stale async results
 
   @override
   void initState() {
@@ -76,6 +77,7 @@ class _EntryCalendarPickerState extends State<EntryCalendarPicker> {
 
   Future<void> _loadMonth() async {
     if (!mounted) return;
+    final gen = ++_loadGen;
     setState(() => _loading = true);
     final from = _displayMonth;
     final to =
@@ -100,7 +102,10 @@ class _EntryCalendarPickerState extends State<EntryCalendarPicker> {
                 e.workType != WorkType.compensatoryLeave),
       );
     }
-    if (mounted) setState(() { _meta = map; _loading = false; });
+    // Only apply if this is still the latest request (guard stale results).
+    if (mounted && gen == _loadGen) {
+      setState(() { _meta = map; _loading = false; });
+    }
   }
 
   void _navigate(int delta) {

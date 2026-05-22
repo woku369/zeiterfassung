@@ -598,6 +598,19 @@ class HelpScreen extends StatelessWidget {
                 'Abwesenheiten (Urlaub, Krankenstand, Zeitausgleich) werden als '
                 'eigene Eintragstypen erfasst. Sie zählen nicht als Arbeitszeit.',
               ),
+              _SubHeading('Kalender-Picker: Belegung auf einen Blick'),
+              _Para(
+                'Beim Tippen auf das Datumsfeld im Eintragsformular öffnet sich ein '
+                'eigener Kalender, der bereits belegte Tage markiert:',
+              ),
+              _KeyValue(label: 'U', value: 'Urlaubstag eingetragen (blau)'),
+              _KeyValue(label: 'K', value: 'Krankenstandstag (orange)'),
+              _KeyValue(label: 'ZA', value: 'Zeitausgleich (grün)'),
+              _KeyValue(label: '●', value: 'Sonstiger Eintrag vorhanden (grau)'),
+              _Hint(
+                'Freie Werktage ohne Marker sind ideale Urlaubskandidaten. '
+                'Urlaubstage im Voraus eintragen – nächste Termine bewusst drum herum planen.',
+              ),
               _SubHeading('Urlaubstage-Kontingent'),
               _Step(number: '1', text: 'Einstellungen → Arbeitgeber bearbeiten → „Urlaubstage/Jahr" eingeben'),
               _Step(number: '2', text: 'Standard: 25 Tage (KV). Gurktaler AG ggf. 26 Tage (laut Dienstvertrag prüfen)'),
@@ -609,6 +622,19 @@ class HelpScreen extends StatelessWidget {
               _SubHeading('Zeitausgleich'),
               _Step(number: '1', text: 'Eintrag anlegen → Tätigkeitsart „Zeitausgleich" wählen'),
               _Step(number: '2', text: 'ZA-Tage erscheinen im Wirtschaftsjahr-Bericht unter Abwesenheiten'),
+              _SubHeading('Soll-Bereinigung durch Abwesenheiten'),
+              _Para(
+                'Urlaubs-, Krankenstand- und ZA-Tage reduzieren das Monatssoll '
+                'automatisch – der Arbeitstag entfällt, der Anspruch deckt ihn ab.',
+              ),
+              _KeyValue(label: 'Formel', value: 'Soll − Abwesenheitstage × (Wochenstunden ÷ 5)'),
+              _KeyValue(label: 'Beispiel 8 h/Wo', value: '5 Urlaubstage = 8 h Reduktion → Monatssaldo 0'),
+              _KeyValue(label: 'Monatsbericht', value: 'Zeile heißt „Soll (bereinigt)" + Subtext mit Aufschlüsselung'),
+              _KeyValue(label: 'Wirtschaftsjahr', value: 'Betroffene Monate zeigen Soll mit * + Tooltip'),
+              _Hint(
+                'Urlaub bewusst in Phasen mit wenig Arbeitsaufwand legen – '
+                'das bereinigte Soll zeigt die echte Über-/Minderstunden-Situation.',
+              ),
               _SubHeading('Jahresbericht – Abwesenheitsübersicht'),
               _KeyValue(label: 'Urlaub', value: 'verbraucht / Kontingent + Resturlaub (Progressbalken)'),
               _KeyValue(label: 'Krankenstand', value: 'Anzahl Krankentage im Wirtschaftsjahr'),

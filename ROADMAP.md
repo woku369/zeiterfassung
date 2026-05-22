@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-20 – v1.22 Geofencing-Bugfixes + Wochensoll-Dialog + Gurk-Zonenkonsolidierung
+> Letztes Update: 2026-05-22 – v1.23 App-Icon + Kalender-Picker + Soll-Bereinigung + Geofencing-Autostart
 
 ---
 
@@ -25,6 +25,40 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.23 – App-Icon + Kalender-Picker + Soll-Bereinigung + UX-Polishing
+
+- [x] **App-Icon ersetzt (Android + Windows):**
+  - Neues Icon: analoge Stoppuhr, weiß/silber/glassy (ChatGPT-generiert, 1254×1254 PNG)
+  - Android: adaptive Icon (alle 5 Mipmap-Dichten mdpi–xxxhdpi, Foreground-Canvas 108dp, Safe-Zone 72dp)
+  - Windows: `tray_icon.ico` mit 6 Größen (256/128/64/48/32/16 px)
+  - SVG-Quelldatei `app/assets/icon_source.svg` als Referenz im Repo
+  - `values/colors.xml`: `ic_launcher_background = #FFFFFF`
+
+- [x] **Geofencing: Auto-Start bei Neuinstallation:**
+  - `geofencing_active`-Key in SharedPreferences war nie gesetzt (null) → Geofencing war nach Neuinstallation inaktiv
+  - Fix: in `app.dart._setupSync()` nach `lp.load()`: wenn Pref null + Standorte vorhanden → automatisch starten
+  - Manuelle Ein-/Aus-Schaltung durch User bleibt weiterhin persistent (false/true wird nicht überschrieben)
+  - Verifiziert: Gurk-Zone (500 m) → Auto-Clock-in + Auto-Clock-out nach 5 Min Karenz ✓ (2026-05-20)
+
+- [x] **Kalender-Picker mit Eintragsindikator (`entry_calendar_picker.dart`):**
+  - Ersetzt Standard-`showDatePicker` im Eintragsformular durch eigenen Dialog
+  - Lädt Einträge aller Arbeitgeber für den angezeigten Monat aus der DB
+  - Indikatoren pro Tag: **U** (Urlaub, blau) · **K** (Krankenstand, orange) · **ZA** (Zeitausgleich, grün) · **●** (sonstiger Eintrag, grau)
+  - Monatsnavigation ← →, Heute-Ring, Ausgewählt-Füllung, Wochenenden gedimmt, Feiertage gedimmt
+  - Legende am unteren Rand; Race-Condition bei schneller Navigation per Generation-Counter abgesichert
+  - Nutzen: freie Werktage sofort erkennbar für Urlaubsplanung; Urlaub im Voraus eintragen
+
+- [x] **Soll-Bereinigung um Abwesenheitstage (Urlaub, KS, ZA):**
+  - Formel: `bereinigtesSoll = weeklyHours × 4,33 − absenceDays × (weeklyHours / 5)`
+  - Bei 8 h/Woche: 1 Abwesenheitstag = 1,6 h Soll-Reduktion; 5 Tage (1 Woche) = 8 h → Monatssaldo 0
+  - **Monatsbericht:** Soll-Zeile heißt bei Abwesenheiten „Soll (bereinigt)" mit Subtext `rawSoll − Reduktion Abw.`
+  - **Wirtschaftsjahr-Tabelle:** pro Monat bereinigtes Soll; Monate mit Abwesenheiten zeigen `26,6h*` + Tooltip
+  - **Gesamtzeile:** summiert bereinigte Monats-Solls statt `weeklyHours × 4,33 × 12`
+  - `_SummaryRow` um optionalen `subtext`-Parameter erweitert
+
+- [x] **Bugfixes v1.23:**
+  - `entry_calendar_picker.dart`: Race Condition bei schneller Monatsnavigation – Generation-Counter verhindert, dass ältere DB-Abfragen neuere Ergebnisse überschreiben
 
 ### v1.22 – Activity-Pooling + Projekt-Aufschlüsselung (DB v14/v15)
 
