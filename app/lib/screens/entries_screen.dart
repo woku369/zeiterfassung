@@ -215,7 +215,9 @@ class _EntryRow extends StatelessWidget {
           trailing: entry.workType.isAbsence
               ? Chip(
                   label: Text(entry.workType.label,
-                      style: const TextStyle(fontSize: 11)),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: _absenceChipTextColor(context))),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   backgroundColor: _absenceChipColor(context),
                 )
@@ -281,37 +283,49 @@ class _EntryRow extends StatelessWidget {
   }
 
   Color? _rowColor(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     if (entry.workType.isAbsence) {
       return switch (entry.workType) {
-        WorkType.vacation => Colors.blue.shade50,
-        WorkType.sick => Colors.orange.shade50,
-        WorkType.compensatoryLeave => Colors.green.shade50,
+        WorkType.vacation        => dark ? Colors.blue.withOpacity(0.13)   : Colors.blue.shade50,
+        WorkType.sick            => dark ? Colors.orange.withOpacity(0.13) : Colors.orange.shade50,
+        WorkType.compensatoryLeave => dark ? Colors.green.withOpacity(0.13) : Colors.green.shade50,
         _ => null,
       };
     }
     return switch (entry.dayType) {
-      DayType.holiday => Colors.red.shade50,
-      DayType.sunday => Colors.orange.shade50,
-      DayType.saturday => Colors.amber.shade50,
-      DayType.workday => null,
+      DayType.holiday  => dark ? Colors.red.withOpacity(0.10)    : Colors.red.shade50,
+      DayType.sunday   => dark ? Colors.orange.withOpacity(0.10) : Colors.orange.shade50,
+      DayType.saturday => dark ? Colors.amber.withOpacity(0.10)  : Colors.amber.shade50,
+      DayType.workday  => null,
     };
   }
 
   Color? _iconColor(BuildContext context) {
     return switch (entry.workType) {
-      WorkType.vacation => Colors.blue.shade600,
-      WorkType.sick => Colors.orange.shade700,
-      WorkType.compensatoryLeave => Colors.green.shade700,
+      WorkType.vacation          => Colors.blue.shade400,
+      WorkType.sick              => Colors.orange.shade400,
+      WorkType.compensatoryLeave => Colors.green.shade400,
       _ => null,
     };
   }
 
   Color? _absenceChipColor(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return switch (entry.workType) {
-      WorkType.vacation => Colors.blue.shade100,
-      WorkType.sick => Colors.orange.shade100,
-      WorkType.compensatoryLeave => Colors.green.shade100,
+      WorkType.vacation          => dark ? Colors.blue.withOpacity(0.22)   : Colors.blue.shade100,
+      WorkType.sick              => dark ? Colors.orange.withOpacity(0.22) : Colors.orange.shade100,
+      WorkType.compensatoryLeave => dark ? Colors.green.withOpacity(0.22)  : Colors.green.shade100,
       _ => null,
+    };
+  }
+
+  Color _absenceChipTextColor(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return switch (entry.workType) {
+      WorkType.vacation          => dark ? Colors.blue.shade300   : Colors.blue.shade800,
+      WorkType.sick              => dark ? Colors.orange.shade300 : Colors.orange.shade900,
+      WorkType.compensatoryLeave => dark ? Colors.green.shade300  : Colors.green.shade900,
+      _ => Theme.of(context).colorScheme.onSurface,
     };
   }
 
