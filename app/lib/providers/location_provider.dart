@@ -129,6 +129,7 @@ class LocationProvider extends ChangeNotifier {
     double radiusMeters = 200.0,
     WorkType workType = WorkType.offsite,
     String? employerId,
+    double? defaultKm,
   }) async {
     final loc = TrackedLocation(
       id: const Uuid().v4(),
@@ -138,6 +139,7 @@ class LocationProvider extends ChangeNotifier {
       radiusMeters: radiusMeters,
       workType: workType,
       employerId: employerId,
+      defaultKm: defaultKm,
     );
     await DatabaseHelper.instance.insertLocation(loc);
     _locations.add(loc);

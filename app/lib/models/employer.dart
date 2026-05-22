@@ -23,7 +23,7 @@ class Employer {
     this.deletedAt,
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
-  static final _kNoValue = Object();
+  static const Object _kNoValue = Object();
 
   Employer copyWith({
     String? id,
@@ -33,7 +33,7 @@ class Employer {
     int? vacationDaysPerYear,
     String? nasUrl,
     String? nasApiKey,
-    Object? monthlyGross = _kNoValue,  // sentinel
+    Object? monthlyGross = _kNoValue,
   }) => Employer(
     id: id ?? this.id,
     name: name ?? this.name,

@@ -9,6 +9,7 @@ class TrackedLocation {
   final WorkType workType;
   final bool isActive;
   final String? employerId;
+  final double? defaultKm;
   final String updatedAt;
   final String? deletedAt;
 
@@ -21,6 +22,7 @@ class TrackedLocation {
     this.workType = WorkType.offsite,
     this.isActive = true,
     this.employerId,
+    this.defaultKm,
     String? updatedAt,
     this.deletedAt,
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
@@ -34,6 +36,7 @@ class TrackedLocation {
     WorkType? workType,
     bool? isActive,
     String? employerId,
+    Object? defaultKm = const Object(),
   }) =>
       TrackedLocation(
         id: id ?? this.id,
@@ -44,6 +47,7 @@ class TrackedLocation {
         workType: workType ?? this.workType,
         isActive: isActive ?? this.isActive,
         employerId: employerId ?? this.employerId,
+        defaultKm: identical(defaultKm, const Object()) ? this.defaultKm : (defaultKm as double?),
         updatedAt: DateTime.now().toIso8601String(),
       );
 
@@ -56,6 +60,7 @@ class TrackedLocation {
         'work_type': workType.name,
         'is_active': isActive ? 1 : 0,
         'employer_id': employerId,
+        'default_km': defaultKm,
         'updated_at': updatedAt,
         'deleted_at': deletedAt,
       };
@@ -69,6 +74,7 @@ class TrackedLocation {
         workType: WorkType.fromString(m['work_type'] as String? ?? 'offsite'),
         isActive: (m['is_active'] as int? ?? 1) == 1,
         employerId: m['employer_id'] as String?,
+        defaultKm: (m['default_km'] as num?)?.toDouble(),
         updatedAt: m['updated_at'] as String?,
         deletedAt: m['deleted_at'] as String?,
       );
@@ -82,6 +88,7 @@ class TrackedLocation {
         'work_type': workType.name,
         'is_active': isActive ? 1 : 0,
         'employer_id': employerId,
+        'default_km': defaultKm,
         'updated_at': updatedAt,
         'deleted_at': deletedAt,
       };

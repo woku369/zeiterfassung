@@ -91,6 +91,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
         radiusMeters: result.radiusMeters,
         workType: result.workType,
         employerId: result.employerId,
+        defaultKm: result.defaultKm,
       );
     } else {
       await lp.update(existing.copyWith(
@@ -100,6 +101,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
         radiusMeters: result.radiusMeters,
         workType: result.workType,
         employerId: result.employerId,
+        defaultKm: result.defaultKm,
       ));
     }
     if (_tracking) {
@@ -208,7 +210,8 @@ class _LocationCard extends StatelessWidget {
         ),
         title: Text(location.name),
         subtitle: Text(
-          '${location.workType.label} · ${location.radiusMeters.toInt()} m · $employerLabel\n'
+          '${location.workType.label} · ${location.radiusMeters.toInt()} m · $employerLabel'
+          '${location.defaultKm != null ? ' · ${location.defaultKm!.toStringAsFixed(0)} km' : ''}\n'
           '${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
         ),
         isThreeLine: true,
@@ -242,6 +245,7 @@ class _LocationFormResult {
   final double radiusMeters;
   final WorkType workType;
   final String? employerId;
+  final double? defaultKm;
 
   _LocationFormResult({
     required this.name,
@@ -250,6 +254,7 @@ class _LocationFormResult {
     required this.radiusMeters,
     required this.workType,
     this.employerId,
+    this.defaultKm,
   });
 }
 
@@ -266,6 +271,7 @@ class _LocationDialogState extends State<_LocationDialog> {
   late final TextEditingController _latCtrl;
   late final TextEditingController _lngCtrl;
   late final TextEditingController _radiusCtrl;
+  late final TextEditingController _kmCtrl;
   late WorkType _workType;
   String? _employerId; // null = alle Arbeitgeber
   bool _loadingGps = false;
@@ -281,6 +287,8 @@ class _LocationDialogState extends State<_LocationDialog> {
         text: e != null ? e.longitude.toStringAsFixed(6) : '');
     _radiusCtrl =
         TextEditingController(text: (e?.radiusMeters ?? 200.0).toInt().toString());
+    _kmCtrl = TextEditingController(
+        text: e?.defaultKm != null ? e!.defaultKm!.toStringAsFixed(0) : '');
     _workType = e?.workType ?? WorkType.offsite;
     _employerId = e?.employerId;
   }
@@ -291,6 +299,7 @@ class _LocationDialogState extends State<_LocationDialog> {
     _latCtrl.dispose();
     _lngCtrl.dispose();
     _radiusCtrl.dispose();
+    _kmCtrl.dispose();
     super.dispose();
   }
 
@@ -320,6 +329,7 @@ class _LocationDialogState extends State<_LocationDialog> {
 
     if (name.isEmpty || lat == null || lng == null) return;
 
+    final km = double.tryParse(_kmCtrl.text.replaceAll(',', '.'));
     Navigator.pop(
       context,
       _LocationFormResult(
@@ -329,6 +339,7 @@ class _LocationDialogState extends State<_LocationDialog> {
         radiusMeters: radius,
         workType: _workType,
         employerId: _employerId,
+        defaultKm: (km != null && km > 0) ? km : null,
       ),
     );
   }
@@ -393,6 +404,18 @@ class _LocationDialogState extends State<_LocationDialog> {
                 border: OutlineInputBorder(),
                 suffixText: 'm',
                 helperText: 'Empfohlen: 100–500 m',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _kmCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Standard-km bei Auto-Einstempeln (optional)',
+                border: OutlineInputBorder(),
+                suffixText: 'km',
+                helperText: 'Hin- & Rückfahrt, z. B. 78 für Labegg ↔ Gurk',
               ),
             ),
             const SizedBox(height: 12),

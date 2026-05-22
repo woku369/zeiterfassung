@@ -622,7 +622,7 @@ Future<void> _autoClockIn(
         'day_type':      dayType,
         'note':          'Auto · $name',
         'break_minutes': 0,
-        'distance_km':   null,
+        'distance_km':   (loc['defaultKm'] as num?)?.toDouble(),
         'created_at':    now.toIso8601String(),
       });
     } finally {

@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 17,
+      version: 18,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -156,6 +156,9 @@ class DatabaseHelper {
     if (oldVersion < 17) {
       await db.execute('ALTER TABLE employers ADD COLUMN monthly_gross REAL');
     }
+    if (oldVersion < 18) {
+      await db.execute('ALTER TABLE tracked_locations ADD COLUMN default_km REAL');
+    }
   }
 
   /// Retroactively corrects day_type for all entries based on their date.
@@ -193,6 +196,7 @@ class DatabaseHelper {
         work_type TEXT NOT NULL DEFAULT 'offsite',
         is_active INTEGER NOT NULL DEFAULT 1,
         employer_id TEXT,
+        default_km REAL,
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         deleted_at TEXT
       )
