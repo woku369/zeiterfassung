@@ -615,6 +615,37 @@ class ExportService {
         '${yearDiff10h >= 0 ? '+' : ''}${_fmtH(yearDiff10h)}');
     row++;
 
+    argRow('MONATLICHE SAISONÜBERSICHT', '', isHeader: true);
+    // Group entries by month within fiscal year
+    final mf2 = DateFormat('MMM yyyy', 'de_AT');
+    final monthlyData = <int, ({double istH, double soFtH, int soFtDays})>{};
+    for (final e in workEntries) {
+      if (e.workType.isAbsence) continue;
+      final ym = e.date.year * 12 + e.date.month;
+      final prev = monthlyData[ym];
+      final soFt = e.dayType == DayType.saturday ||
+                   e.dayType == DayType.sunday ||
+                   e.dayType == DayType.holiday;
+      monthlyData[ym] = (
+        istH: (prev?.istH ?? 0) + e.totalHours,
+        soFtH: (prev?.soFtH ?? 0) + (soFt ? e.totalHours : 0),
+        soFtDays: (prev?.soFtDays ?? 0) + (soFt && e.totalHours > 0 ? 1 : 0),
+      );
+    }
+    for (final entry in monthlyData.entries.toList()..sort((a, b) => a.key.compareTo(b.key))) {
+      final rawMonth = entry.key % 12;
+      final month3 = rawMonth == 0 ? 12 : rawMonth;
+      final year3 = rawMonth == 0 ? (entry.key ~/ 12) - 1 : entry.key ~/ 12;
+      final mDate = DateTime(year3, month3);
+      final avgWeekly = entry.value.istH / 4.33;
+      argRow(
+        mf2.format(mDate),
+        'Ist: ${_fmtH(entry.value.istH)}  ·  Ø ${avgWeekly.toStringAsFixed(1)}h/W'
+        '${entry.value.soFtDays > 0 ? '  ·  So/FT: ${entry.value.soFtH.toStringAsFixed(1)}h (${entry.value.soFtDays}×)' : ''}',
+      );
+    }
+    row++;
+
     argRow('+50%-Zuschlag (Std gesamt)', _fmtH(totS50));
     argRow('+100%-Zuschlag (Std gesamt)', _fmtH(totS100));
     argRow('km gesamt', '${totKm.toStringAsFixed(1)} km');

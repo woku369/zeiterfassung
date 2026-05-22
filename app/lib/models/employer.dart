@@ -6,6 +6,7 @@ class Employer {
   final int vacationDaysPerYear;
   final String? nasUrl;
   final String? nasApiKey;
+  final double? monthlyGross;
   final String updatedAt;
   final String? deletedAt;
 
@@ -17,9 +18,12 @@ class Employer {
     this.vacationDaysPerYear = 25,
     this.nasUrl,
     this.nasApiKey,
+    this.monthlyGross,
     String? updatedAt,
     this.deletedAt,
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
+
+  static final _kNoValue = Object();
 
   Employer copyWith({
     String? id,
@@ -29,18 +33,19 @@ class Employer {
     int? vacationDaysPerYear,
     String? nasUrl,
     String? nasApiKey,
-  }) =>
-      Employer(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        weeklyHours: weeklyHours ?? this.weeklyHours,
-        fiscalYearStartMonth: fiscalYearStartMonth ?? this.fiscalYearStartMonth,
-        vacationDaysPerYear: vacationDaysPerYear ?? this.vacationDaysPerYear,
-        nasUrl: nasUrl ?? this.nasUrl,
-        nasApiKey: nasApiKey ?? this.nasApiKey,
-        updatedAt: DateTime.now().toIso8601String(),
-        deletedAt: deletedAt,
-      );
+    Object? monthlyGross = _kNoValue,  // sentinel
+  }) => Employer(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    weeklyHours: weeklyHours ?? this.weeklyHours,
+    fiscalYearStartMonth: fiscalYearStartMonth ?? this.fiscalYearStartMonth,
+    vacationDaysPerYear: vacationDaysPerYear ?? this.vacationDaysPerYear,
+    nasUrl: nasUrl ?? this.nasUrl,
+    nasApiKey: nasApiKey ?? this.nasApiKey,
+    monthlyGross: identical(monthlyGross, _kNoValue) ? this.monthlyGross : (monthlyGross as double?),
+    updatedAt: DateTime.now().toIso8601String(),
+    deletedAt: deletedAt,
+  );
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -50,6 +55,7 @@ class Employer {
         'vacation_days_per_year': vacationDaysPerYear,
         'nas_url': nasUrl,
         'nas_api_key': nasApiKey,
+        'monthly_gross': monthlyGross,
         'updated_at': updatedAt,
         'deleted_at': deletedAt,
       };
@@ -62,6 +68,7 @@ class Employer {
         vacationDaysPerYear: m['vacation_days_per_year'] as int? ?? 25,
         nasUrl: m['nas_url'] as String?,
         nasApiKey: m['nas_api_key'] as String?,
+        monthlyGross: (m['monthly_gross'] as num?)?.toDouble(),
         updatedAt: m['updated_at'] as String?,
         deletedAt: m['deleted_at'] as String?,
       );

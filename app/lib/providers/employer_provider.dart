@@ -27,13 +27,14 @@ class EmployerProvider extends ChangeNotifier {
   }
 
   Future<void> add(String name, double weeklyHours,
-      {int fiscalYearStartMonth = 4, int vacationDaysPerYear = 25}) async {
+      {int fiscalYearStartMonth = 4, int vacationDaysPerYear = 25, double? monthlyGross}) async {
     final e = Employer(
         id: const Uuid().v4(),
         name: name,
         weeklyHours: weeklyHours,
         fiscalYearStartMonth: fiscalYearStartMonth,
-        vacationDaysPerYear: vacationDaysPerYear);
+        vacationDaysPerYear: vacationDaysPerYear,
+        monthlyGross: monthlyGross);
     await DatabaseHelper.instance.insertEmployer(e);
     _employers.add(e);
     _active ??= e;

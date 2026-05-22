@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 16,
+      version: 17,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -151,6 +151,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 16) {
       await _fixDayTypes(db);
+    }
+    if (oldVersion < 17) {
+      await db.execute('ALTER TABLE employers ADD COLUMN monthly_gross REAL');
     }
   }
 

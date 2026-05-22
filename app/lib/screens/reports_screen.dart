@@ -626,6 +626,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   final List<double> _monthHours = List.filled(12, 0.0);
   // Month index → Vertragsäquivalent (Ist × Zuschlagsfaktor).
   final List<double> _monthEquivalent = List.filled(12, 0.0);
+  final List<int>    _monthSpecialDays  = List.filled(12, 0);
+  final List<double> _monthSpecialHours = List.filled(12, 0.0);
   // Month index → absence days (Urlaub + KS + ZA) for Soll reduction.
   final List<int> _monthAbsenceDays = List.filled(12, 0);
   bool _showEquivalent = false;
@@ -671,6 +673,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       _monthHours[i] = 0.0;
       _monthEquivalent[i] = 0.0;
       _monthAbsenceDays[i] = 0;
+      _monthSpecialDays[i]  = 0;
+      _monthSpecialHours[i] = 0.0;
     }
     _vacationDays = 0;
     _sickDays = 0;
@@ -688,6 +692,14 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
             e.workType == WorkType.sick ||
             e.workType == WorkType.compensatoryLeave) {
           _monthAbsenceDays[monthIndex]++;
+        }
+        if (!e.workType.isAbsence &&
+            (e.dayType == DayType.saturday ||
+             e.dayType == DayType.sunday ||
+             e.dayType == DayType.holiday) &&
+            e.totalHours > 0) {
+          _monthSpecialDays[monthIndex]++;
+          _monthSpecialHours[monthIndex] += e.totalHours;
         }
       }
       if (e.workType == WorkType.vacation) _vacationDays++;
@@ -881,6 +893,22 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              _SaisonmusterCard(
+                fyStart: _fyStart,
+                monthHours: List.unmodifiable(_monthHours),
+                monthSpecialDays: List.unmodifiable(_monthSpecialDays),
+                weeklyHours: weeklyHours,
+              ),
+              if (_showEquivalent) ...[
+                const SizedBox(height: 12),
+                _PauschaleCard(
+                  fyStart: _fyStart,
+                  monthSpecialHours: List.unmodifiable(_monthSpecialHours),
+                  weeklyHours: weeklyHours,
+                  monthlyGross: employer?.monthlyGross,
+                ),
+              ],
               const SizedBox(height: 12),
               // ── Legende ──────────────────────────────────────────────
               _Legend(),
@@ -1304,6 +1332,368 @@ class _ActionTile extends StatelessWidget {
             Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.chevron_right),
         onTap: loading ? null : onTap,
+      ),
+    );
+  }
+}
+
+// ── Saisonmuster ─────────────────────────────────────────────────────────────
+
+class _SaisonmusterCard extends StatelessWidget {
+  final DateTime fyStart;
+  final List<double> monthHours;
+  final List<int> monthSpecialDays;
+  final double weeklyHours;
+
+  const _SaisonmusterCard({
+    required this.fyStart,
+    required this.monthHours,
+    required this.monthSpecialDays,
+    required this.weeklyHours,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final mf = DateFormat('MMM', 'de_AT');
+    final now = DateTime.now();
+    // max avg weekly hours across all months (for bar scaling), min 1 to avoid /0
+    final maxAvg = monthHours.fold(0.0, (m, h) => h / 4.33 > m ? h / 4.33 : m)
+        .clamp(weeklyHours * 1.5, double.infinity);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Saisonmuster', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Ø Wochenstunden pro Monat vs. Vertragssoll (${weeklyHours}h)',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+            const Divider(),
+            ...List.generate(12, (i) {
+              final monthDate = DateTime(fyStart.year, fyStart.month + i);
+              final isFuture = monthDate.isAfter(now);
+              final avgWeekly = monthHours[i] / 4.33;
+              final ratio = weeklyHours > 0 ? avgWeekly / weeklyHours : 0.0;
+              final barValue = maxAvg > 0 ? avgWeekly / maxAvg : 0.0;
+
+              final Color barColor;
+              if (isFuture || avgWeekly < 0.1) {
+                barColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.12);
+              } else if (ratio < 0.5) {
+                barColor = Colors.blueGrey.shade300;
+              } else if (ratio <= 1.05) {
+                barColor = Colors.green.shade400;
+              } else if (ratio <= 1.5) {
+                barColor = Colors.orange.shade400;
+              } else {
+                barColor = Colors.deepOrange.shade400;
+              }
+
+              final textColor = isFuture
+                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.35)
+                  : null;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 36,
+                      child: Text(mf.format(monthDate),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: textColor)),
+                    ),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: isFuture ? 0.0 : barValue.clamp(0.0, 1.0),
+                          minHeight: 10,
+                          color: barColor,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 46,
+                      child: Text(
+                        isFuture ? '–' : '${avgWeekly.toStringAsFixed(1)}h',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: ratio > 1.05 ? FontWeight.w600 : FontWeight.normal,
+                            color: isFuture ? textColor : barColor),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 32,
+                      child: monthSpecialDays[i] > 0 && !isFuture
+                          ? Tooltip(
+                              message: '${monthSpecialDays[i]} Sa/So/Feiertag-Eintrag/-Einträge',
+                              child: Text(
+                                '${monthSpecialDays[i]}✶',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange.shade600),
+                                textAlign: TextAlign.right,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              children: [
+                _LegendItem(color: Colors.blueGrey.shade300, label: '< 50% Soll'),
+                _LegendItem(color: Colors.green.shade400, label: '≈ Soll'),
+                _LegendItem(color: Colors.orange.shade400, label: '> Soll'),
+                _LegendItem(color: Colors.deepOrange.shade400, label: '> 150% Soll'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── So/FT-Pauschale ───────────────────────────────────────────────────────────
+
+class _PauschaleCard extends StatelessWidget {
+  final DateTime fyStart;
+  final List<double> monthSpecialHours;
+  final double weeklyHours;
+  final double? monthlyGross;
+
+  static const double _kCeiling = 360.0;   // § 68 EStG max steuerfrei/Monat
+  static const double _kDnSv    = 0.1812;  // DN-SV-Satz ~18.12%
+  static const double _kDgSv    = 0.2148;  // DG-SV-Satz ~21.48%
+
+  const _PauschaleCard({
+    required this.fyStart,
+    required this.monthSpecialHours,
+    required this.weeklyHours,
+    this.monthlyGross,
+  });
+
+  double get _hourlyRate {
+    if (monthlyGross == null || monthlyGross! <= 0 || weeklyHours <= 0) return 0;
+    return monthlyGross! / (weeklyHours * 4.33);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mf = DateFormat('MMM', 'de_AT');
+    final now = DateTime.now();
+    final rate = _hourlyRate;
+    final hasRate = rate > 0;
+
+    double totalSpecialH  = 0;
+    double totalSurcharge = 0;
+    double totalTaxFree   = 0;
+
+    for (var i = 0; i < 12; i++) {
+      final monthDate = DateTime(fyStart.year, fyStart.month + i);
+      if (monthDate.isAfter(now)) continue;
+      totalSpecialH += monthSpecialHours[i];
+      if (hasRate) {
+        final surcharge = monthSpecialHours[i] * rate;
+        totalSurcharge += surcharge;
+        totalTaxFree   += surcharge.clamp(0.0, _kCeiling);
+      }
+    }
+
+    final savingDn = totalTaxFree * (0.35 + _kDnSv); // ~35% marginal LSt estimate
+    final savingDg = totalTaxFree * _kDgSv;
+    final savingTotal = savingDn + savingDg;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.calculate_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text('So/FT-Pauschale — Potenzial',
+                    style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '§ 68 EStG: So/FT-Zuschläge steuer- & SV-frei bis €${_kCeiling.toInt()}/Monat',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+            if (!hasRate) ...[
+              const Divider(),
+              Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16,
+                      color: Colors.orange.shade600),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Bruttogehalt/Monat in den AG-Einstellungen eintragen für €-Berechnung.',
+                      style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const Divider(),
+            // Monthly detail rows
+            Row(
+              children: [
+                SizedBox(width: 36,
+                    child: Text('Monat',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55)))),
+                Expanded(child: Text('So/FT-h',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55)),
+                    textAlign: TextAlign.right)),
+                if (hasRate) ...[
+                  Expanded(child: Text('Zuschlag',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55)),
+                      textAlign: TextAlign.right)),
+                  Expanded(child: Text('Steuerfrei',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55)),
+                      textAlign: TextAlign.right)),
+                ],
+              ],
+            ),
+            const SizedBox(height: 4),
+            ...List.generate(12, (i) {
+              final monthDate = DateTime(fyStart.year, fyStart.month + i);
+              final isFuture = monthDate.isAfter(now);
+              if (isFuture && monthSpecialHours[i] < 0.01) return const SizedBox.shrink();
+              final surcharge = hasRate ? monthSpecialHours[i] * rate : 0.0;
+              final taxFree   = surcharge.clamp(0.0, _kCeiling);
+              final isAtCap   = surcharge > _kCeiling + 0.01;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    SizedBox(width: 36,
+                        child: Text(mf.format(monthDate),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: isFuture
+                                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.35)
+                                    : null))),
+                    Expanded(
+                        child: Text(
+                            isFuture ? '–' : '${monthSpecialHours[i].toStringAsFixed(1)}h',
+                            style: TextStyle(fontSize: 12,
+                                color: monthSpecialHours[i] > 0 && !isFuture
+                                    ? Colors.orange.shade600 : null),
+                            textAlign: TextAlign.right)),
+                    if (hasRate) ...[
+                      Expanded(
+                          child: Text(
+                              isFuture ? '–' : '€${surcharge.toStringAsFixed(0)}',
+                              style: const TextStyle(fontSize: 12),
+                              textAlign: TextAlign.right)),
+                      Expanded(
+                          child: Text(
+                            isFuture
+                                ? '–'
+                                : isAtCap
+                                    ? '€${taxFree.toStringAsFixed(0)} ⚠'
+                                    : '€${taxFree.toStringAsFixed(0)} ✓',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isFuture
+                                  ? null
+                                  : isAtCap
+                                      ? Colors.orange.shade700
+                                      : Colors.green.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.right,
+                          )),
+                    ],
+                  ],
+                ),
+              );
+            }),
+            const Divider(),
+            // Summary
+            _SummaryRow('So/FT-Stunden gesamt',
+                '${totalSpecialH.toStringAsFixed(1)}h'),
+            if (hasRate) ...[
+              _SummaryRow('Zuschlag gesamt (100%)',
+                  '€${totalSurcharge.toStringAsFixed(0)}'),
+              _SummaryRow('Davon steuerfrei',
+                  '€${totalTaxFree.toStringAsFixed(0)}',
+                  color: Colors.green.shade700),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Jährlicher Steuervorteil (Schätzung)',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade800)),
+                    const SizedBox(height: 4),
+                    Text('DN (~35% LSt + 18% SV): €${savingDn.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 12)),
+                    Text('DG (~21% SV): €${savingDg.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 12)),
+                    Text('Gesamtvorteil: €${savingTotal.toStringAsFixed(0)}/Jahr',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Voraussetzung: So/FT-Zuschlag muss im Dienstvertrag vereinbart sein.',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontStyle: FontStyle.italic,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.55)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

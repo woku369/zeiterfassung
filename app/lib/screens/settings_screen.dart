@@ -313,6 +313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             result['hours']!,
             fiscalYearStartMonth: result['fiscalMonth']!,
             vacationDaysPerYear: result['vacationDays'] ?? 25,
+            monthlyGross: result['monthlyGross'] as double?,
           );
     }
   }
@@ -326,6 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               weeklyHours: result['hours'],
               fiscalYearStartMonth: result['fiscalMonth'],
               vacationDaysPerYear: result['vacationDays'],
+              monthlyGross: result['monthlyGross'] as double?,
             ),
           );
     }
@@ -338,6 +340,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextEditingController(text: existing?.weeklyHours.toString() ?? '40');
     final vacationCtrl = TextEditingController(
         text: (existing?.vacationDaysPerYear ?? 25).toString());
+    final grossCtrl = TextEditingController(
+        text: existing?.monthlyGross?.toStringAsFixed(2) ?? '');
     int fiscalMonth = existing?.fiscalYearStartMonth ?? 4;
     const monthNames = [
       'Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -379,6 +383,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     suffixText: 'Tage'),
               ),
               const SizedBox(height: 12),
+              TextField(
+                controller: grossCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Bruttogehalt/Monat (optional)',
+                  border: OutlineInputBorder(),
+                  suffixText: '€',
+                  helperText: 'Für So/FT-Pauschale-Berechnung',
+                ),
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 value: fiscalMonth,
                 decoration: const InputDecoration(
@@ -411,6 +426,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'hours': hours,
                   'fiscalMonth': fiscalMonth,
                   'vacationDays': vacation,
+                  'monthlyGross': grossCtrl.text.trim().isEmpty
+                      ? null
+                      : double.tryParse(grossCtrl.text.trim().replaceAll(',', '.')),
                 });
               },
               child: const Text('Speichern'),
