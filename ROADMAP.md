@@ -633,6 +633,19 @@ Zahlen belegt, nicht nur behauptet.
 - [x] **Hochrechnung Überstundenpauschale:** *(implementiert in v1.24 – So/FT-Pauschale-Karte)*
   - Monatliche So/FT-h × Stundensatz, Gegenüberstellung €360-Grenze (§ 68 EStG), DN + DG getrennt
 
+- [ ] **Fahrtenleistung an So/FT als Verhandlungsargument (informativ):**
+  - **Hintergrund:** Gurk ist vereinbarter Dienstort → Privatfahrten, keine Reisekostenersatzpflicht. Rechtlich akzeptiert.
+    Moralisch/argumentativ: Wer für einen 8h/Woche-Job an Sonn- und Feiertagen 100+ km fährt, erbringt eine
+    persönliche Zusatzleistung, die nirgends sichtbar ist — aber das Argument für Stundenerhöhung + Pauschale stärkt.
+  - **In der Pauschale-Karte (App):** neuer Abschnitt „Fahrtenleistung an So/FT":
+    - Anzahl So/FT-Fahrten (Einträge mit km > 0 an So/FT-Tagen)
+    - km gesamt + Fahrzeit gesamt
+    - Aufwand-Äquivalent: km × €0,42 (steuerfreier KM-Geld-Satz als Referenz, rein informativ)
+    - Hinweis: *„Privatfahrten ohne Rechtsanspruch – dient als Verhandlungsargument"*
+  - **Im XLSX Zuschläge-Sheet (Argumentation-Sektion):** selbe Zahlen explizit als „privater Mehraufwand So/FT"
+  - **Voraussetzung:** km-Feld bei So/FT-Einträgen befüllen (Geofencing-Einträge haben kein Auto-km → manuell nachtragen)
+  - *Datenbasis wird ab ~August 2026 aussagekräftig (10–12 Wochen saubere Erfassung)*
+
 - [ ] **Aufschlüsselung nach Tätigkeitstyp:**
   - Führungen / Gartenarbeit / Homeoffice als eigene Untergruppen
   - Zeigt welcher Anteil zuschlagspflichtig ist und welcher als Normalarbeit gilt
