@@ -635,15 +635,18 @@ Zahlen belegt, nicht nur behauptet.
 
 - [ ] **Fahrtenleistung an So/FT als Verhandlungsargument (informativ):**
   - **Hintergrund:** Gurk ist vereinbarter Dienstort → Privatfahrten, keine Reisekostenersatzpflicht. Rechtlich akzeptiert.
-    Moralisch/argumentativ: Wer für einen 8h/Woche-Job an Sonn- und Feiertagen 100+ km fährt, erbringt eine
+    Moralisch/argumentativ: Wer für einen 8h/Woche-Job an Sonn- und Feiertagen 78 km fährt, erbringt eine
     persönliche Zusatzleistung, die nirgends sichtbar ist — aber das Argument für Stundenerhöhung + Pauschale stärkt.
+  - **Strecke:** Labegg → Gurk einfach 39 km / 40 Min → Hin+Rücktour: **78 km / 80 Min**
   - **In der Pauschale-Karte (App):** neuer Abschnitt „Fahrtenleistung an So/FT":
     - Anzahl So/FT-Fahrten (Einträge mit km > 0 an So/FT-Tagen)
     - km gesamt + Fahrzeit gesamt
-    - Aufwand-Äquivalent: km × €0,42 (steuerfreier KM-Geld-Satz als Referenz, rein informativ)
+    - Aufwand-Äquivalent: km × **€0,50** (amtliches Kilometergeld 2026, rein informativ)
     - Hinweis: *„Privatfahrten ohne Rechtsanspruch – dient als Verhandlungsargument"*
   - **Im XLSX Zuschläge-Sheet (Argumentation-Sektion):** selbe Zahlen explizit als „privater Mehraufwand So/FT"
-  - **Voraussetzung:** km-Feld bei So/FT-Einträgen befüllen (Geofencing-Einträge haben kein Auto-km → manuell nachtragen)
+  - **Geofencing-Auto-km:** km-Feld bei Geofencing-Einträgen der Zone Gurk automatisch mit 78 km vorbelegen
+    (konfigurierbarer Standardwert pro Zone → Zone-Einstellungen erweitern)
+  - **Voraussetzung:** km-Feld bei So/FT-Einträgen befüllt — mit Auto-km wird das automatisch
   - *Datenbasis wird ab ~August 2026 aussagekräftig (10–12 Wochen saubere Erfassung)*
 
 - [ ] **Aufschlüsselung nach Tätigkeitstyp:**
