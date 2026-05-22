@@ -353,13 +353,15 @@ Future<void> _onStart(ServiceInstance service) async {
       if (!wasInside && measuredInside) {
         exitConfirm.remove(id);
         inside.add(id);
+
+        // Prüfen ob für diese Zone gerade ein Karenz-Timer läuft (User kehrt
+        // zur selben Zone zurück bevor der Timer ausgelöst hat).
+        final returningFromCarenz = timers.containsKey(id);
         timers[id]?.cancel();
         timers.remove(id);
 
         // Alle anderen Zonen-States bereinigen: Karenz-Timer abbrechen,
         // andere Zonen aus 'inside' entfernen (exitConfirm-Zähler auch).
-        // Dann aktiven Eintrag immer schließen bevor neuer geöffnet wird –
-        // _autoClockOut ist no-op wenn kein Eintrag offen ist.
         if (timers.isNotEmpty) {
           for (final t in timers.values) t.cancel();
           timers.clear();
@@ -375,15 +377,25 @@ Future<void> _onStart(ServiceInstance service) async {
         }
         (await SharedPreferences.getInstance())
             .setString(_kInsideZonesKey, inside.join(','));
-        await _autoClockOut(notifications);
-        await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
-        await _autoClockIn(loc, notifications);
-        service.invoke('zoneChange', {
-          'locationId': id,
-          'locationName': loc['name'] as String,
-          'employerId': loc['employerId'],
-          'entered': true,
-        });
+
+        if (returningFromCarenz && otherInside.isEmpty) {
+          // User ist innerhalb der Karenz-Zeit in dieselbe Zone zurückgekehrt.
+          // Bestehenden Eintrag behalten – kein Clock-out / Clock-in nötig.
+          await _log('CANCEL',
+              'Karenz abgebrochen – zurück in Zone ${loc['name']}');
+        } else {
+          // Normaler Eintritt (oder Zonenwechsel): alten Eintrag schließen,
+          // neuen öffnen. _autoClockOut ist no-op wenn kein Eintrag offen ist.
+          await _autoClockOut(notifications);
+          await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
+          await _autoClockIn(loc, notifications);
+          service.invoke('zoneChange', {
+            'locationId': id,
+            'locationName': loc['name'] as String,
+            'employerId': loc['employerId'],
+            'entered': true,
+          });
+        }
         continue;
       }
 
@@ -665,14 +677,16 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
     } finally {
       await db.close();
     }
+    // Key erst nach erfolgreichem DB-Update entfernen. Schlägt der Update
+    // fehl (Exception oben), bleibt der Key erhalten und der nächste Aufruf
+    // kann den Eintrag erneut versuchen zu schließen.
+    await prefs.remove(_kAutoEntryKey);
+    await prefs.remove(_kAutoEntryEmployerKey);
     final breakNote = breakMinutes > 0 ? ' · 30 Min. Pause eingetragen' : '';
     _notify(n, 996, 'Ausgestempelt',
         'Geofencing hat automatisch gestoppt.$breakNote Zum Bearbeiten App öffnen.');
-  } catch (_) {
-    // Ignore – entry stays open, user clocks out manually.
-  } finally {
-    await prefs.remove(_kAutoEntryKey);
-    await prefs.remove(_kAutoEntryEmployerKey);
+  } catch (e) {
+    await _log('ERROR', 'Auto-Ausstempeln fehlgeschlagen: $e');
   }
 }
 
