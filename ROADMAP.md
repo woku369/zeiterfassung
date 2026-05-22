@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-22 – v1.23 App-Icon + Kalender-Picker + Soll-Bereinigung + Geofencing-Autostart
+> Letztes Update: 2026-05-22 – v1.24 Saisonmuster + So/FT-Pauschale + Arbeitsrecht-Bugfixes (DB v16/v17)
 
 ---
 
@@ -25,6 +25,35 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.24 – Saisonmuster + So/FT-Pauschale + Arbeitsrecht-Bugfixes (DB v16/v17)
+
+- [x] **Sa/So/Feiertag-Kennzeichnung automatisch + retroaktiv (DB v16):**
+  - `HolidayService`: österreichische Feiertage (Gauss-Osterformel, 13 gesetzliche FT)
+  - DB-Migration v16: alle bestehenden Einträge retroaktiv korrigiert (`day_type` = `saturday`/`sunday`/`holiday`/`workday`)
+  - Neue Einträge: `DayType` wird beim Anlegen automatisch gesetzt (Clock-in, Formular, Geofencing)
+
+- [x] **Saisonmuster-Karte im Wirtschaftsjahr-Tab:**
+  - Balkendiagramm: Ø h/Woche pro Monat vs. Vertragssoll
+  - Farbkodierung: blaugrau (< 50 %) → grün (≈ Soll) → orange (> Soll) → tiefrot (> 150 %)
+  - Sa/So/FT-Marker (Anzahl Einträge je Monat)
+
+- [x] **So/FT-Pauschale-Rechner (nur Gurktaler AG):**
+  - § 68 EStG: So/FT-Zuschläge steuer- & SV-frei bis €360/Monat
+  - Monatliche Aufschlüsselung + Deckel-Indikator (✓ / ⚠)
+  - Jährlicher Gesamtvorteil DN (LSt + SV) + DG (SV)
+  - Neues Feld `monthly_gross` (DB v17) in AG-Einstellungen für €-Berechnung
+
+- [x] **XLSX Zuschläge-Sheet: monatliche Saisonübersicht:**
+  - Neuer Argumentationsabschnitt: Ist-h, Ø h/Woche, So/FT-h pro Monat
+
+- [x] **Bugfixes v1.24:**
+  - Auto-Pause-Schwelle 5h → 6h (§ 11 AZG): geofencing_background.dart + home_screen.dart
+  - Geofencing: kein Re-Clock-in nach Karenz-Rückkehr in selbe Zone – `returningFromCarenz`-Flag verhindert unnötiges Clock-out/Clock-in
+  - `_autoClockOut`: SharedPreferences-Key erst nach erfolgreichem DB-Update entfernen (Retry-Sicherheit)
+  - Geofencing date-Feld: ISO-8601-konformes Format mit Null-Padding statt `toIso8601String()`
+  - Dark-Mode: hardcoded `Colors.black87`/`shade800`/`shade900` in entry_form, entries_screen, reports_screen ersetzt
+  - DB `_create()`: `monthly_gross REAL`-Spalte war in CREATE TABLE vergessen (nur in Migration vorhanden)
 
 ### v1.23 – App-Icon + Kalender-Picker + Soll-Bereinigung + UX-Polishing
 
@@ -601,10 +630,8 @@ Zahlen belegt, nicht nur behauptet.
   - h/Woche ÷ 38,5 × 100 = % Vollzeit → direkt ablesbar
   - Gegenüberstellung: vertraglich 20 % vs. geleistet ~X %
 
-- [ ] **Hochrechnung Überstundenpauschale:**
-  - Monatsdurchschnitt zuschlagspflichtiger Stunden × Stundensatz → geschätzter Monatsbetrag
-  - Jahresprojektion sowie Gegenüberstellung mit 360 €/Monat-Grenze (§ 68 EStG)
-  - Für DN und DG getrennt ausweisen (beide Seiten profitieren steuerfrei)
+- [x] **Hochrechnung Überstundenpauschale:** *(implementiert in v1.24 – So/FT-Pauschale-Karte)*
+  - Monatliche So/FT-h × Stundensatz, Gegenüberstellung €360-Grenze (§ 68 EStG), DN + DG getrennt
 
 - [ ] **Aufschlüsselung nach Tätigkeitstyp:**
   - Führungen / Gartenarbeit / Homeoffice als eigene Untergruppen

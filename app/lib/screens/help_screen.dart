@@ -661,6 +661,27 @@ class HelpScreen extends StatelessWidget {
               _SubHeading('Jahresbericht'),
               _KeyValue(label: 'Öffnen', value: 'Berichte → Tab „Wirtschaftsjahr" → „Jahresbericht exportieren"'),
               _KeyValue(label: 'Inhalt', value: 'Alle Einträge des Wirtschaftsjahres als XLSX inkl. Jahressumme'),
+              _SubHeading('Saisonmuster (Wirtschaftsjahr-Tab)'),
+              _Para(
+                'Zeigt die durchschnittlichen Wochenstunden pro Monat als Balkendiagramm – '
+                'saisonale Spitzen werden sofort sichtbar statt im Jahressaldo zu verschwinden.',
+              ),
+              _KeyValue(label: 'Blaugrau', value: '< 50 % des Wochensoll'),
+              _KeyValue(label: 'Grün', value: '≈ Wochensoll'),
+              _KeyValue(label: 'Orange', value: 'Über Soll'),
+              _KeyValue(label: 'Tiefrot', value: 'Über 150 % des Solls'),
+              _KeyValue(label: '3✶', value: 'Anzahl Sa/So/FT-Einträge in diesem Monat'),
+              _SubHeading('So/FT-Pauschale – Potenzial (nur Gurktaler AG)'),
+              _Para(
+                '§ 68 EStG: Sonntags- und Feiertagszuschläge sind bis zu €360/Monat '
+                'steuer- und SV-frei – für Dienstnehmer UND Dienstgeber ein Vorteil. '
+                'Die Karte zeigt monatliche So/FT-Stunden, steuerfreien Anteil und den '
+                'geschätzten jährlichen Gesamtvorteil.',
+              ),
+              _KeyValue(label: 'Voraussetzung', value: 'Bruttogehalt/Monat in AG-Einstellungen eintragen'),
+              _KeyValue(label: '€XXX ✓', value: 'Zuschlag vollständig steuerfrei (unter €360-Deckel)'),
+              _KeyValue(label: '€360 ⚠', value: 'Deckel erreicht – Überschuss steuerpflichtig'),
+              _Hint('Die Pauschale muss im Dienstvertrag vereinbart werden – die Karte liefert das Verhandlungsargument.'),
               _SubHeading('Zuschläge-Tab (nur Gurktaler AG)'),
               _Para(
                 'Beim Jahresbericht wird automatisch ein zusätzliches Sheet „Zuschläge" '
@@ -674,8 +695,8 @@ class HelpScreen extends StatelessWidget {
               _Para(
                 'Am Ende des Sheets folgt eine Argumentation-Sektion: '
                 'Wochensoll vertraglich vs. effektiv-gewichtetes Äquivalent, '
-                'Differenz zum 10-h-Ziel, km-/Fahrzeit-Summen sowie ein Hinweis auf '
-                'die steuerfreie Überstundenpauschale (§ 68 EStG, bis ~360 €/Monat für DN und DG).',
+                'Differenz zum 10-h-Ziel, km-/Fahrzeit-Summen, monatliche Saisonübersicht '
+                'sowie ein Hinweis auf die steuerfreie Pauschale (§ 68 EStG).',
               ),
               _Hint(
                 'Arbeitgeberwechsel direkt in der AppBar des Berichte-Screens (auch '

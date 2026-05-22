@@ -38,6 +38,7 @@ class DatabaseHelper {
         vacation_days_per_year INTEGER NOT NULL DEFAULT 25,
         nas_url TEXT,
         nas_api_key TEXT,
+        monthly_gross REAL,
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         deleted_at TEXT
       )
