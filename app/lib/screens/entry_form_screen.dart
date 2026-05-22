@@ -8,6 +8,7 @@ import '../models/work_type.dart';
 import '../models/entry_project_split.dart';
 import '../providers/time_entry_provider.dart';
 import '../providers/employer_provider.dart';
+import '../widgets/entry_calendar_picker.dart';
 import '../providers/project_provider.dart';
 import '../services/holiday_service.dart';
 import '../services/surcharge_service.dart';
@@ -124,12 +125,11 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   }
 
   Future<void> _pickDate() async {
-    final d = await showDatePicker(
-      context: context,
+    final d = await EntryCalendarPicker.show(
+      context,
       initialDate: _date,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      locale: const Locale('de', 'AT'),
     );
     if (d != null) setState(() { _date = d; _dayType = _defaultDayType(d); });
   }
