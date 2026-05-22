@@ -1121,7 +1121,7 @@ class _TotalRow extends StatelessWidget {
               child: Text(_fmtH(totalEq),
                   style: style.copyWith(
                       color: totalEq > totalIst + 0.01
-                          ? Colors.amber.shade800
+                          ? Colors.amber.shade600
                           : null),
                   textAlign: TextAlign.right)),
         Expanded(

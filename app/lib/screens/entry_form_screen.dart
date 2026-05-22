@@ -507,7 +507,9 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.orange.withOpacity(0.10)
+              : Colors.orange.shade50,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.orange.shade300),
         ),
@@ -515,21 +517,31 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(Icons.star_outline, size: 18, color: Colors.orange.shade800),
+              Icon(Icons.star_outline, size: 18,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.orange.shade400
+                      : Colors.orange.shade800),
               const SizedBox(width: 6),
               Text('Gurktaler-Sonderoptionen',
                   style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Colors.orange.shade900)),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.orange.shade300
+                          : Colors.orange.shade900)),
             ]),
             if (projects.isNotEmpty) ...[
               const SizedBox(height: 10),
               Row(children: [
-                Icon(Icons.folder_outlined, size: 16, color: Colors.orange.shade800),
+                Icon(Icons.folder_outlined, size: 16,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.orange.shade400
+                        : Colors.orange.shade800),
                 const SizedBox(width: 6),
                 Text('Projekt-Aufschlüsselung',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                        color: Colors.orange.shade900)),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.orange.shade300
+                            : Colors.orange.shade900)),
               ]),
               const SizedBox(height: 6),
               ..._splits.asMap().entries.map((entry) {
@@ -547,7 +559,7 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                         decoration: InputDecoration(
                           labelText: 'Projekt',
                           border: const OutlineInputBorder(),
-                          fillColor: Colors.white,
+                          fillColor: Theme.of(context).colorScheme.surface,
                           filled: true,
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
@@ -570,13 +582,13 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                         controller: draft.ctrl,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Min.',
-                          border: OutlineInputBorder(),
-                          fillColor: Colors.white,
+                          border: const OutlineInputBorder(),
+                          fillColor: Theme.of(context).colorScheme.surface,
                           filled: true,
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
+                          contentPadding: const EdgeInsets.symmetric(
                               vertical: 8, horizontal: 8),
                         ),
                         onChanged: (_) => setState(() {}),
@@ -603,7 +615,11 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               ] else if (allocMin > 0) ...[
                 const SizedBox(height: 4),
                 Text('Zugeordnet: ${_fmtMin(allocMin)}',
-                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.orange.shade300
+                            : Colors.orange.shade800)),
               ],
               const SizedBox(height: 6),
               OutlinedButton.icon(
@@ -628,10 +644,15 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
               dense: true,
               contentPadding: EdgeInsets.zero,
               title: const Text('Sonderarbeitszeit (Führung u. ä.)',
-                  style: TextStyle(fontSize: 14, color: Colors.black87)),
+                  style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 surchargeLabel(),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.65)),
               ),
               value: _isSpecialHours,
               onChanged: (v) => setState(() => _isSpecialHours = v),
@@ -639,14 +660,17 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
             const Divider(height: 16, color: Colors.orange),
             Row(children: [
               Icon(Icons.directions_car_outlined,
-                  size: 18, color: Colors.grey.shade800),
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _travelMinutes > 0
                       ? 'Fahrtzeit: $_travelMinutes Min. (Hin+Rück)'
                       : 'Fahrtzeit (Hin+Rück) hinzufügen:',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade900),
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface),
                 ),
               ),
               if (_travelMinutes > 0) ...[
@@ -696,10 +720,14 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   }
 
   Color? _dayTypeTileColor(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return switch (_dayType) {
-      DayType.saturday => Colors.amber.shade50,
-      DayType.sunday => Colors.orange.shade50,
-      DayType.holiday => Colors.red.shade50,
+      DayType.saturday =>
+          dark ? Colors.amber.withOpacity(0.13) : Colors.amber.shade50,
+      DayType.sunday =>
+          dark ? Colors.orange.withOpacity(0.13) : Colors.orange.shade50,
+      DayType.holiday =>
+          dark ? Colors.red.withOpacity(0.13) : Colors.red.shade50,
       DayType.workday => Theme.of(context).colorScheme.surfaceContainerLow,
     };
   }
@@ -778,7 +806,9 @@ class _SplitBudgetBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: frac,
             minHeight: 6,
-            backgroundColor: Colors.orange.shade100,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.orange.withOpacity(0.20)
+                : Colors.orange.shade100,
             valueColor: AlwaysStoppedAnimation(
                 over ? Colors.red.shade400 : Colors.orange.shade600),
           ),
@@ -786,7 +816,11 @@ class _SplitBudgetBar extends StatelessWidget {
         const SizedBox(height: 3),
         Row(children: [
           Text('Zugeordnet: ${_fmtMin(allocated)} / ${_fmtMin(total)}',
-              style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.orange.shade300
+                      : Colors.orange.shade800)),
           const Spacer(),
           Text(
             over

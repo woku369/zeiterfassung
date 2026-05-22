@@ -170,11 +170,22 @@ class _WeekChip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: over ? Colors.orange.shade100 : Theme.of(context).colorScheme.primaryContainer,
+        color: over
+            ? (Theme.of(context).brightness == Brightness.dark
+                ? Colors.orange.withOpacity(0.22)
+                : Colors.orange.shade100)
+            : Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text('${hh}h ${mm.toString().padLeft(2, '0')}m',
-        style: TextStyle(fontSize: 12, color: over ? Colors.orange.shade800 : null, fontWeight: FontWeight.w500)),
+        style: TextStyle(
+            fontSize: 12,
+            color: over
+                ? (Theme.of(context).brightness == Brightness.dark
+                    ? Colors.orange.shade300
+                    : Colors.orange.shade800)
+                : null,
+            fontWeight: FontWeight.w500)),
     );
   }
 }
