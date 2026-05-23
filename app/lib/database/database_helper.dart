@@ -743,12 +743,19 @@ class DatabaseHelper {
 
   Future<void> upsertEmployersFromServer(List<Employer> employers) async {
     final db = await database;
-    final batch = db.batch();
     for (final e in employers) {
-      batch.insert('employers', e.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      // monthly_gross is device-local; the NAS doesn't manage it.
+      // Preserve the local value instead of overwriting it with server null.
+      final map = e.toMap();
+      if (e.monthlyGross == null) {
+        final existing = await db.query('employers',
+            columns: ['monthly_gross'], where: 'id = ?', whereArgs: [e.id], limit: 1);
+        if (existing.isNotEmpty && existing.first['monthly_gross'] != null) {
+          map['monthly_gross'] = existing.first['monthly_gross'];
+        }
+      }
+      await db.insert('employers', map, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    await batch.commit(noResult: true);
   }
 
   // ── imap_config ───────────────────────────────────────────────────────────
