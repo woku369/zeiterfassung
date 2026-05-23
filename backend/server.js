@@ -34,6 +34,7 @@ db.exec(`
     weekly_hours          REAL NOT NULL DEFAULT 40.0,
     fiscal_year_start_month INTEGER NOT NULL DEFAULT 4,
     vacation_days_per_year INTEGER NOT NULL DEFAULT 25,
+    monthly_gross         REAL,
     nas_url               TEXT,
     nas_api_key           TEXT,
     updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
@@ -119,6 +120,9 @@ try {
 try {
   db.exec("ALTER TABLE employers ADD COLUMN vacation_days_per_year INTEGER NOT NULL DEFAULT 25");
 } catch (_) { /* Spalte existiert bereits */ }
+try {
+  db.exec("ALTER TABLE employers ADD COLUMN monthly_gross REAL");
+} catch (_) { /* Spalte existiert bereits */ }
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_entries_employer   ON time_entries(employer_id);
@@ -188,13 +192,14 @@ const stmts = {
   // employers
   upsertEmployer: db.prepare(`
     INSERT INTO employers
-      (id,name,weekly_hours,fiscal_year_start_month,vacation_days_per_year,nas_url,nas_api_key,updated_at,deleted_at)
+      (id,name,weekly_hours,fiscal_year_start_month,vacation_days_per_year,monthly_gross,nas_url,nas_api_key,updated_at,deleted_at)
     VALUES
-      (@id,@name,@weekly_hours,@fiscal_year_start_month,@vacation_days_per_year,@nas_url,@nas_api_key,@updated_at,@deleted_at)
+      (@id,@name,@weekly_hours,@fiscal_year_start_month,@vacation_days_per_year,@monthly_gross,@nas_url,@nas_api_key,@updated_at,@deleted_at)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name, weekly_hours=excluded.weekly_hours,
       fiscal_year_start_month=excluded.fiscal_year_start_month,
       vacation_days_per_year=excluded.vacation_days_per_year,
+      monthly_gross=excluded.monthly_gross,
       nas_url=excluded.nas_url, nas_api_key=excluded.nas_api_key,
       updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
     WHERE excluded.updated_at > employers.updated_at
@@ -361,6 +366,7 @@ async function handleRequest(req, res) {
     const pushEmployers = db.transaction(items => items.forEach(e => stmts.upsertEmployer.run({
       id: e.id, name: e.name, weekly_hours: e.weekly_hours ?? 40,
       fiscal_year_start_month: e.fiscal_year_start_month ?? 4,
+      monthly_gross: e.monthly_gross ?? null,
       nas_url: e.nas_url ?? null, nas_api_key: e.nas_api_key ?? null,
       updated_at: e.updated_at ?? ts, deleted_at: e.deleted_at ?? null,
     })));
