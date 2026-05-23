@@ -1508,10 +1508,12 @@ class _PauschaleCard extends StatelessWidget {
     double totalSpecialH  = 0;
     double totalSurcharge = 0;
     double totalTaxFree   = 0;
+    int    pastMonths     = 0;
 
     for (var i = 0; i < 12; i++) {
       final monthDate = DateTime(fyStart.year, fyStart.month + i);
       if (monthDate.isAfter(now)) continue;
+      pastMonths++;
       totalSpecialH += monthSpecialHours[i];
       if (hasRate) {
         final surcharge = monthSpecialHours[i] * rate;
@@ -1519,6 +1521,7 @@ class _PauschaleCard extends StatelessWidget {
         totalTaxFree   += surcharge.clamp(0.0, _kCeiling);
       }
     }
+    final avgTaxFree = (hasRate && pastMonths > 0) ? totalTaxFree / pastMonths : 0.0;
 
     final savingDn = totalTaxFree * (0.35 + _kDnSv); // ~35% marginal LSt estimate
     final savingDg = totalTaxFree * _kDgSv;
@@ -1648,9 +1651,16 @@ class _PauschaleCard extends StatelessWidget {
             if (hasRate) ...[
               _SummaryRow('Zuschlag gesamt (100%)',
                   '€${totalSurcharge.toStringAsFixed(0)}'),
-              _SummaryRow('Davon steuerfrei',
+              _SummaryRow('Davon steuerfrei (gesamt)',
                   '€${totalTaxFree.toStringAsFixed(0)}',
                   color: Colors.green.shade700),
+              _SummaryRow(
+                'Ø steuerfrei/Monat (${pastMonths} Monate)',
+                '€${avgTaxFree.toStringAsFixed(0)}',
+                color: avgTaxFree >= _kCeiling - 0.5
+                    ? Colors.orange.shade700
+                    : Colors.green.shade700,
+              ),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
@@ -1662,6 +1672,36 @@ class _PauschaleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('Empfohlene Pauschale (Verhandlung)',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade800)),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text('~€${avgTaxFree.toStringAsFixed(0)}/Monat',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: avgTaxFree >= _kCeiling - 0.5
+                                    ? Colors.orange.shade700
+                                    : Colors.green.shade700)),
+                        const SizedBox(width: 8),
+                        Text(
+                          avgTaxFree >= _kCeiling - 0.5
+                              ? '(am §68-Limit €${_kCeiling.toInt()})'
+                              : '(unter §68-Limit €${_kCeiling.toInt()})',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text('Jährlicher Steuervorteil (Schätzung)',
                         style: TextStyle(
                             fontSize: 12,
