@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-24 – v1.25 Geofencing Auto-km + Sync-Bugfixes + Build-Nr.
+> Letztes Update: 2026-05-24 – v1.26 Geplante NAS-Backups + Sync-Datenintegrität
 
 ---
 
@@ -25,6 +25,39 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.26 – Geplante NAS-Backups + Sync-Datenintegrität
+
+- [x] **Geplante automatische NAS-Backups (Poco X7 Pro → NAS):**
+  - Täglich 02:00 → letzte 30 daily-Backups behalten
+  - Monatlich 01:30 am 1. des Monats → nie löschen
+  - Jährlich 01:00 am 1. des WJ-Startmonats → nie löschen
+  - Läuft im Geofencing-Foreground-Service (kein separater Prozess nötig)
+  - SharedPreferences trackt letzte Backup-Zeiten zur Deduplizierung
+
+- [x] **NAS-Backup-Liste & Restore (alle Geräte):**
+  - Einstellungen → NAS-Backups: Liste aller Backups (täglich/monatlich/jährlich)
+  - Gruppiert nach Typ, mit Datum und Dateigröße
+  - Wiederherstellen mit Bestätigungsdialog
+
+- [x] **Server: Backup-Endpunkte:**
+  - `POST /api/backup/scheduled` — typisiertes Backup + Rotation (daily×30)
+  - `GET /api/backup/list` — Backup-Liste
+  - `GET /api/backup/get?file=` — Backup abrufen (Path-Traversal-gesichert)
+
+- [x] **Sync-Status-Chip im Home-Screen:**
+  - Grün mit Uhrzeit wenn Sync < 2h
+  - Rot „Sync ausstehend" wenn > 2h ohne Sync (bei konfiguriertem NAS)
+  - `lastSyncAt` wird in SharedPreferences persistiert (überlebt App-Neustart)
+
+- [x] **Kritischer Sync-Bug behoben:**
+  - `updateEntry` hat `is_synced = 1` nicht zurückgesetzt → jede Bearbeitung nach erstem Sync wurde nie gepusht (Clock-out, Notiz, km, Pause)
+  - Ursache seit Projektbeginn im Code; alle Geräte hatten abweichende Datenstände
+
+- [x] **Bugfixes v1.26:**
+  - Backup-Timer in Geofencing-Service war nicht gecancelt → Timer-Leak beim `stop`-Event
+  - `vacation_days_per_year` fehlte in `pushEmployers`-Binding (server.js)
+  - Stale offene NAS-Einträge überschreiben lokal abgeschlossene nicht mehr
 
 ### v1.25 – Geofencing Auto-km + Sync-Bugfixes + Build-Nr. (DB v18)
 
@@ -794,7 +827,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.25)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.26)
 
 ---
 

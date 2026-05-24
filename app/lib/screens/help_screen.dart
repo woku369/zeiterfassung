@@ -389,32 +389,29 @@ class HelpScreen extends StatelessWidget {
             icon: Icons.backup_outlined,
             title: 'Backup & Restore',
             children: [
-              _Para(
-                'Vier Backup-Varianten in den Einstellungen unter "Datensicherung":',
-              ),
               _SubHeading('Lokales Backup (JSON-Datei)'),
-              _KeyValue(label: 'Backup erstellen', value: 'Speichert alle Tabellen + Settings als JSON'),
-              _KeyValue(label: 'Backup wiederherstellen', value: 'Lädt eine JSON-Datei und ersetzt alle Daten'),
-              _SubHeading('NAS-Backup'),
-              _KeyValue(label: 'Backup auf NAS', value: 'Schickt aktuellen Stand an /api/backup'),
-              _KeyValue(label: 'Backup vom NAS', value: 'Holt letzten NAS-Stand und stellt ihn wieder her'),
+              _KeyValue(label: 'Backup erstellen', value: 'Speichert alle Tabellen + Settings als JSON-Datei'),
+              _KeyValue(label: 'Backup wiederherstellen', value: 'Lädt eine JSON-Datei und ersetzt alle lokalen Daten'),
+              _SubHeading('Geplante NAS-Backups (automatisch)'),
               _Para(
-                'Auf dem NAS liegt immer nur das jeweils letzte Backup als '
-                'backup_latest.json im DATA_DIR. Zusätzlich erstellt '
-                'backup_synology.sh täglich ein DB-Backup mit 30 Tagen Aufbewahrung.',
+                'Das Poco X7 Pro erstellt automatisch Backups auf dem NAS '
+                '– der Geofencing-Dienst läuft im Hintergrund und prüft jede Minute die Uhrzeit.',
               ),
+              _KeyValue(label: 'Täglich', value: '02:00 Uhr – letzte 30 werden behalten'),
+              _KeyValue(label: 'Monatlich', value: '01:30 Uhr am 1. des Monats – werden nie gelöscht'),
+              _KeyValue(label: 'Jährlich', value: '01:00 Uhr am 1. des Wirtschaftsjahr-Startmonats – werden nie gelöscht'),
+              _KeyValue(label: 'Ansehen & Wiederherstellen', value: 'Einstellungen → NAS-Backups (alle Geräte)'),
+              _SubHeading('Manuelles NAS-Backup'),
+              _KeyValue(label: 'Backup auf NAS', value: 'Datensicherung → „Auf NAS sichern"'),
+              _KeyValue(label: 'Backup vom NAS', value: 'Holt das letzte manuelle Backup'),
               _Hint(
-                'Restore überschreibt alle bestehenden lokalen Daten und '
-                'setzt last_sync_at zurück. Beim nächsten Sync werden alle '
-                'NAS-Daten neu gezogen – Einträge die zwischen Backup-Erstellung '
-                'und Restore synct wurden, kommen automatisch zurück.',
+                'Restore setzt last_sync_at zurück – beim nächsten Sync kommen '
+                'alle NAS-Einträge neu. Einträge zwischen Backup und Restore '
+                'werden automatisch nachgezogen.',
               ),
-              _Hint(
-                'Praxis: Backup ist primär eine Notfall-Sicherung für den '
-                'Fall dass der NAS nicht erreichbar ist. Solange der NAS läuft, '
-                'ist er die "Single Source of Truth" – ein Restore alter '
-                'Daten + Sync = du landest wieder beim NAS-Stand.',
-              ),
+              _SubHeading('Sync-Status'),
+              _KeyValue(label: 'Grüner Chip', value: 'Sync erfolgreich – Uhrzeit des letzten Syncs'),
+              _KeyValue(label: 'Roter Chip', value: 'Kein Sync seit >2h – manuell über Einstellungen → Jetzt anstoßen'),
             ],
           ),
           SizedBox(height: 8),

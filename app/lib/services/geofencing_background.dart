@@ -262,13 +262,14 @@ Future<void> _onStart(ServiceInstance service) async {
   });
 
   // Scheduled-Backup-Timer: prüft jede Minute ob ein geplantes Backup fällig ist.
-  Timer.periodic(const Duration(minutes: 1), (_) async {
+  final backupTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
     await _checkScheduledBackup();
   });
 
   service.on('stop').listen((_) {
     watchdog.cancel();
     _keepAlive?.cancel();
+    backupTimer.cancel();
     _posSub?.cancel();
     for (final t in timers.values) t.cancel();
     service.stopSelf();
