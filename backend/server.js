@@ -460,6 +460,103 @@ async function handleRequest(req, res) {
     return send(res, 200, data);
   }
 
+  // ── POST /api/backup/scheduled ────────────────────────────────────────────
+  // Empfängt {type: 'daily'|'monthly'|'yearly', data: {...}}
+  // Speichert in data/backups/, rotiert daily-Backups auf 30.
+  if (path_ === '/api/backup/scheduled' && method === 'POST') {
+    const body = await readBody(req);
+    const type = body.type;
+    if (!['daily', 'monthly', 'yearly'].includes(type)) {
+      return send(res, 400, { error: 'Ungültiger Backup-Typ' });
+    }
+    const backupsDir = path.join(DATA_DIR, 'backups');
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    let filename;
+    if (type === 'daily') {
+      filename = `daily_${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}.json`;
+    } else if (type === 'monthly') {
+      filename = `monthly_${today.getFullYear()}-${pad(today.getMonth()+1)}.json`;
+    } else {
+      // yearly – Dateiname aus den Daten ableiten wenn möglich, sonst aktueller Monat
+      const ym = `${today.getFullYear()}-${pad(today.getMonth()+1)}`;
+      filename = `yearly_${ym}.json`;
+    }
+
+    const filePath = path.join(backupsDir, filename);
+    fs.writeFileSync(filePath, JSON.stringify(body.data ?? body, null, 2), 'utf8');
+    console.log(`Scheduled backup gespeichert: ${filename}`);
+
+    // Rotation für daily: maximal 30 behalten
+    if (type === 'daily') {
+      const files = fs.readdirSync(backupsDir)
+        .filter(f => f.startsWith('daily_') && f.endsWith('.json'))
+        .sort(); // lexikografisch = chronologisch dank ISO-Datum
+      if (files.length > 30) {
+        const toDelete = files.slice(0, files.length - 30);
+        for (const f of toDelete) {
+          try { fs.unlinkSync(path.join(backupsDir, f)); } catch (_) {}
+          console.log(`Altes Daily-Backup gelöscht: ${f}`);
+        }
+      }
+    }
+    // monthly und yearly: nie löschen
+
+    return send(res, 200, { ok: true, filename });
+  }
+
+  // ── GET /api/backup/list ──────────────────────────────────────────────────
+  // Gibt Liste aller Backups zurück, sortiert nach Datum absteigend.
+  if (path_ === '/api/backup/list' && method === 'GET') {
+    const backupsDir = path.join(DATA_DIR, 'backups');
+    if (!fs.existsSync(backupsDir)) {
+      return send(res, 200, { backups: [] });
+    }
+    const files = fs.readdirSync(backupsDir).filter(f => f.endsWith('.json'));
+    const backups = files.map(filename => {
+      const filePath = path.join(backupsDir, filename);
+      const stat = fs.statSync(filePath);
+      let type = 'unknown';
+      if (filename.startsWith('daily_')) type = 'daily';
+      else if (filename.startsWith('monthly_')) type = 'monthly';
+      else if (filename.startsWith('yearly_')) type = 'yearly';
+      // Datum aus Dateiname extrahieren
+      const match = filename.match(/\d{4}-\d{2}(?:-\d{2})?/);
+      const date = match ? match[0] : filename;
+      return { filename, type, date, size_bytes: stat.size };
+    });
+    // Absteigend nach Dateiname (= Datum)
+    backups.sort((a, b) => b.filename.localeCompare(a.filename));
+    return send(res, 200, { backups });
+  }
+
+  // ── GET /api/backup/get?file=FILENAME ────────────────────────────────────
+  // Gibt ein spezifisches Backup zurück. Sicherheitscheck gegen Path-Traversal.
+  if (path_ === '/api/backup/get' && method === 'GET') {
+    const filename = url.searchParams.get('file');
+    if (!filename) return send(res, 400, { error: 'Parameter "file" fehlt' });
+    // Sicherheitscheck: nur einfache Dateinamen ohne Pfadtrenner
+    if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) {
+      return send(res, 400, { error: 'Ungültiger Dateiname' });
+    }
+    const backupsDir = path.join(DATA_DIR, 'backups');
+    const filePath = path.join(backupsDir, filename);
+    // Sicherstellen, dass der aufgelöste Pfad wirklich im backups-Verzeichnis liegt
+    const resolved = path.resolve(filePath);
+    const resolvedDir = path.resolve(backupsDir);
+    if (!resolved.startsWith(resolvedDir + path.sep)) {
+      return send(res, 403, { error: 'Zugriff verweigert' });
+    }
+    if (!fs.existsSync(filePath)) {
+      return send(res, 404, { error: 'Backup nicht gefunden' });
+    }
+    const content = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(content);
+    return send(res, 200, data);
+  }
+
   // ── Legacy: POST /api/entries/sync (Rückwärtskompatibilität) ───────────────
   if (path_ === '/api/entries/sync' && method === 'POST') {
     const body = await readBody(req);

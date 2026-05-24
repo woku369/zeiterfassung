@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -12,7 +13,16 @@ class BackupService {
   static final BackupService instance = BackupService._();
 
   static const _version = 1;
-  static const _tables = ['employers', 'time_entries', 'tracked_locations', 'imap_config'];
+  static const _tables = [
+    'employers',
+    'time_entries',
+    'tracked_locations',
+    'imap_config',
+    'projects',
+    'trips',
+    'entry_project_splits',
+    'deletion_log',
+  ];
   static const _prefKeys = [
     'activity_whitelist',
     'activity_min_duration_minutes',
@@ -112,6 +122,71 @@ class BackupService {
     await DatabaseHelper.instance.setSyncState(
       'last_sync_at', '1970-01-01T00:00:00.000Z',
     );
+  }
+
+  // ── Geplante NAS-Backups (täglich / monatlich / jährlich) ─────────────────
+
+  String _normalize(String url) =>
+      url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+
+  Map<String, String> _headers(String? apiKey) => {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey.isNotEmpty) 'x-api-key': apiKey,
+      };
+
+  /// Erstellt ein vollständiges Backup und sendet es als geplantes Backup
+  /// (täglich/monatlich/jährlich) an `/api/backup/scheduled`.
+  Future<bool> scheduledNasBackup({
+    required String nasUrl,
+    String? apiKey,
+    required String type,
+  }) async {
+    try {
+      final payload = await _buildPayload();
+      final body = jsonEncode({'type': type, 'data': payload});
+      final uri = Uri.parse('${_normalize(nasUrl)}/api/backup/scheduled');
+      final response = await http.post(uri,
+          headers: _headers(apiKey), body: body);
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Listet alle verfügbaren NAS-Backups auf.
+  Future<List<Map<String, dynamic>>> listNasBackups({
+    required String nasUrl,
+    String? apiKey,
+  }) async {
+    try {
+      final uri = Uri.parse('${_normalize(nasUrl)}/api/backup/list');
+      final response = await http.get(uri, headers: _headers(apiKey));
+      if (response.statusCode != 200) return [];
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final backups = data['backups'] as List? ?? [];
+      return backups.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Lädt ein spezifisches NAS-Backup und importiert es lokal.
+  Future<bool> restoreFromNasBackup({
+    required String nasUrl,
+    String? apiKey,
+    required String filename,
+  }) async {
+    try {
+      final uri = Uri.parse(
+          '${_normalize(nasUrl)}/api/backup/get?file=${Uri.encodeQueryComponent(filename)}');
+      final response = await http.get(uri, headers: _headers(apiKey));
+      if (response.statusCode != 200) return false;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      await _applyPayload(data);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ── Lokales Backup (Datei) ──────────────────────────────────────────────────

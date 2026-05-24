@@ -5,11 +5,12 @@ import '../services/sync_service.dart';
 import 'activity_provider.dart';
 
 class SyncProvider extends ChangeNotifier {
-  static const _prefInterval = 'sync_interval_minutes';
-  static const _prefNasUrl   = 'global_nas_url';
-  static const _prefNasKey   = 'global_nas_api_key';
-  static const _prefTmUrl    = 'tm_url';
-  static const _prefTmKey    = 'tm_api_key';
+  static const _prefInterval  = 'sync_interval_minutes';
+  static const _prefNasUrl    = 'global_nas_url';
+  static const _prefNasKey    = 'global_nas_api_key';
+  static const _prefTmUrl     = 'tm_url';
+  static const _prefTmKey     = 'tm_api_key';
+  static const _prefLastSyncAt = 'sync_last_at';
   static const _defaultInterval = 30;
 
   bool _isSyncing = false;
@@ -36,6 +37,13 @@ class SyncProvider extends ChangeNotifier {
   String get tmApiKey => _tmApiKey;
   bool get hasTmConfig => _tmUrl.isNotEmpty;
 
+  /// True wenn NAS konfiguriert ist und der letzte Sync null oder > 2 Stunden her ist.
+  bool get isSyncStale {
+    if (!hasNasConfig) return false;
+    if (_lastSyncAt == null) return true;
+    return DateTime.now().difference(_lastSyncAt!).inHours >= 2;
+  }
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _intervalMinutes = prefs.getInt(_prefInterval) ?? _defaultInterval;
@@ -43,6 +51,10 @@ class SyncProvider extends ChangeNotifier {
     _nasApiKey = prefs.getString(_prefNasKey) ?? '';
     _tmUrl   = prefs.getString(_prefTmUrl)   ?? '';
     _tmApiKey  = prefs.getString(_prefTmKey)   ?? '';
+    final lastSyncStr = prefs.getString(_prefLastSyncAt);
+    if (lastSyncStr != null) {
+      _lastSyncAt = DateTime.tryParse(lastSyncStr);
+    }
   }
 
   void setActivityProvider(ActivityProvider ap) {
@@ -147,7 +159,11 @@ class SyncProvider extends ChangeNotifier {
         localSettings: localSettings,
       );
       _lastError = result.errors.isEmpty ? null : result.errors.first;
-      if (_lastError == null) _lastSyncAt = DateTime.now();
+      if (_lastError == null) {
+        _lastSyncAt = DateTime.now();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefLastSyncAt, _lastSyncAt!.toIso8601String());
+      }
 
       // Server-Settings anwenden (NAS ist master)
       if (result.serverSettings != null && _activityProvider != null) {
