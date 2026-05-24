@@ -534,11 +534,26 @@ class DatabaseHelper {
 
   Future<void> insertOrUpdateEntries(List<TimeEntry> entries) async {
     final db = await database;
+
+    // Split: entries with end_time can always be replaced (they're immutable).
+    // Entries without end_time (still "active" on server) must not overwrite a
+    // locally-closed entry — that would resurrect a stale open entry when the
+    // clock-out was never pushed to NAS (e.g. network failure on Android).
+    final closed  = entries.where((e) => e.endTime != null).toList();
+    final open    = entries.where((e) => e.endTime == null).toList();
+
     final batch = db.batch();
-    for (final e in entries) {
+    for (final e in closed) {
       batch.insert('time_entries', e.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
+
+    for (final e in open) {
+      final existing = await db.query('time_entries',
+          columns: ['end_time'], where: 'id = ?', whereArgs: [e.id], limit: 1);
+      if (existing.isNotEmpty && existing.first['end_time'] != null) continue;
+      await db.insert('time_entries', e.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    }
   }
 
   /// Findet Einträge, die am selben Tag beim selben Arbeitgeber innerhalb
