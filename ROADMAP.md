@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-22 – v1.24 Saisonmuster + So/FT-Pauschale + Arbeitsrecht-Bugfixes (DB v16/v17)
+> Letztes Update: 2026-05-24 – v1.25 Geofencing Auto-km + Sync-Bugfixes + Build-Nr.
 
 ---
 
@@ -25,6 +25,32 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.25 – Geofencing Auto-km + Sync-Bugfixes + Build-Nr. (DB v18)
+
+- [x] **Geofencing Standard-km pro Zone (DB v18):**
+  - Neues Feld `default_km` in `tracked_locations` – pro Zone konfigurierbar
+  - Im Standort-Dialog: TextField „Standard-km bei Auto-Einstempeln"
+  - Zone-Kachel zeigt km wenn gesetzt
+  - Beim Auto-Clock-in: `distance_km` wird automatisch vorausgefüllt (kein leerer Eintrag mehr)
+
+- [x] **So/FT-Pauschale: Jahressumme + Monatsdurchschnitt:**
+  - Neue Summary-Zeile „Ø steuerfrei/Monat (N Monate)"
+  - Prominente „Empfohlene Pauschale"-Anzeige im grünen Block mit §68-Limit-Hinweis
+  - Erleichtert Verhandlung: Jahresdurchschnitt als konkreter Betrag sichtbar
+
+- [x] **Bruttogehalt via NAS synchronisieren:**
+  - `server.js`: `monthly_gross REAL` in CREATE TABLE + Migration + upsertEmployer
+  - Einmalige Eingabe auf einem Gerät → alle Geräte erhalten den Wert via Sync
+  - Fix: `vacation_days_per_year` fehlte ebenfalls im `pushEmployers`-Binding
+
+- [x] **Build-Nr. in Einstellungen → Info:**
+  - `package_info_plus` hinzugefügt
+  - Zeigt „Version X.Y.Z · Build N" – Build-Nr. wird von `build.ps1` automatisch hochgezählt
+
+- [x] **Bugfixes v1.25:**
+  - **Kritisch:** Stale offene NAS-Einträge überschreiben lokal abgeschlossene nicht mehr – verhindert Phantom-Clock-ins nach Sync (z.B. Windows-Start nach Android-Absturz ohne Push)
+  - `employer.dart`: `static final _kNoValue` → `static const Object _kNoValue` (Build-Fehler Dart-Konstante)
 
 ### v1.24 – Saisonmuster + So/FT-Pauschale + Arbeitsrecht-Bugfixes (DB v16/v17)
 
@@ -760,12 +786,15 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v13: + `deletion_log (id, deleted_at)` – Deletion-Log für geräteübergreifende Lösch-Propagation
 - v14: + `entry_project_splits (id, entry_id, project_id, minutes, ...)` – Projekt-Aufschlüsselung pro Zeiteintrag
 - v15: + `device_id TEXT` + `is_synced INTEGER` auf `activity_log` – Geräte-Pooling + Sync-Flag
+- v16: `day_type` auf `time_entries` – retroaktive Sa/So/FT-Kennzeichnung
+- v17: + `monthly_gross REAL` (employers) – Bruttogehalt für Pauschalen-Rechner
+- v18: + `default_km REAL` (tracked_locations) – Standard-Fahrstrecke pro Geofencing-Zone
 
 **Server-DB:** `employers`, `tracked_locations`, `projects`, `deletion_log`, `entry_project_splits`, `activity_log`, `sync_state` – vollständig via `/api/sync.ts`; zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync (legacy `server.js`).
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.22)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.25)
 
 ---
 

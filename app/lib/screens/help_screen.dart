@@ -155,7 +155,8 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Zone verlassen', value: '5 Min warten → Auto-Ausstempeln'),
               _KeyValue(label: 'Re-Entry binnen 5 Min', value: 'Karenz wird abgebrochen, kein Clock-out'),
               _KeyValue(label: 'Manueller Eintrag aktiv', value: 'Wird nie automatisch geschlossen'),
-              _KeyValue(label: 'Auto-Pause', value: 'Bei ≥5h eingestempelt (außer Homeoffice) werden automatisch 30 Min Pause eingetragen'),
+              _KeyValue(label: 'Auto-Pause', value: 'Bei ≥6h eingestempelt (außer Homeoffice) werden automatisch 30 Min Pause eingetragen (§ 11 AZG)'),
+              _KeyValue(label: 'Standard-km', value: 'Pro Zone konfigurierbar – wird beim Auto-Einstempeln als Fahrstrecke vorausgefüllt'),
               _Hint(
                 'Notiz/Tätigkeit zum Auto-Eintrag ergänzen: auf der Übersicht '
                 'beim aktiven Eintrag „Notiz" antippen – Schnelldialog für '
@@ -678,9 +679,11 @@ class HelpScreen extends StatelessWidget {
                 'Die Karte zeigt monatliche So/FT-Stunden, steuerfreien Anteil und den '
                 'geschätzten jährlichen Gesamtvorteil.',
               ),
-              _KeyValue(label: 'Voraussetzung', value: 'Bruttogehalt/Monat in AG-Einstellungen eintragen'),
+              _KeyValue(label: 'Voraussetzung', value: 'Bruttogehalt/Monat in AG-Einstellungen eintragen – wird via NAS auf alle Geräte synchronisiert'),
               _KeyValue(label: '€XXX ✓', value: 'Zuschlag vollständig steuerfrei (unter €360-Deckel)'),
               _KeyValue(label: '€360 ⚠', value: 'Deckel erreicht – Überschuss steuerpflichtig'),
+              _KeyValue(label: 'Ø steuerfrei/Monat', value: 'Jahresdurchschnitt – empfohlene Höhe für die Pauschalvereinbarung'),
+              _KeyValue(label: 'Empfohlene Pauschale', value: 'Prominente Anzeige des Ø-Werts als Verhandlungsbasis, mit §68-Limit-Hinweis'),
               _Hint('Die Pauschale muss im Dienstvertrag vereinbart werden – die Karte liefert das Verhandlungsargument.'),
               _SubHeading('Zuschläge-Tab (nur Gurktaler AG)'),
               _Para(
@@ -779,6 +782,16 @@ class HelpScreen extends StatelessWidget {
                 'Falls Geofencing auf einem neuen Gerät nicht funktioniert, '
                 'ist das der erste Anlaufpunkt.',
               ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _Section(
+            icon: Icons.info_outline,
+            title: 'Info & Version',
+            children: const [
+              _KeyValue(label: 'Build-Nr. nachschlagen', value: 'Einstellungen → Info → „Version X.Y.Z · Build N"'),
+              _KeyValue(label: 'Build-Nr. Bedeutung', value: 'Wird bei jedem Build automatisch hochgezählt – eindeutige ID für Support-Anfragen'),
+              _Hint('Wenn ein Fehler auftritt: Build-Nr. notieren und beim Melden angeben.'),
             ],
           ),
           SizedBox(height: 24),
