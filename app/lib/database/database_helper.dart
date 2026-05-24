@@ -450,7 +450,9 @@ class DatabaseHelper {
 
   Future<void> updateEntry(TimeEntry e) async {
     final db = await database;
-    await db.update('time_entries', e.toMap(), where: 'id = ?', whereArgs: [e.id]);
+    // Always reset is_synced so the change gets pushed to NAS on next sync.
+    final map = e.toMap()..['is_synced'] = 0;
+    await db.update('time_entries', map, where: 'id = ?', whereArgs: [e.id]);
   }
 
   Future<void> deleteEntry(String id) async {
