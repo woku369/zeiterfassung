@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sqlite_api.dart';
 import 'package:uuid/uuid.dart';
+import 'backup_service.dart';
 import 'holiday_service.dart';
 
 // ── Geofence-Log ─────────────────────────────────────────────────────────────
@@ -258,6 +259,11 @@ Future<void> _onStart(ServiceInstance service) async {
       (service as AndroidServiceInstance).setForegroundNotificationInfo(
           title: 'Standort-Erkennung aktiv', content: msg);
     }
+  });
+
+  // Scheduled-Backup-Timer: prüft jede Minute ob ein geplantes Backup fällig ist.
+  Timer.periodic(const Duration(minutes: 1), (_) async {
+    await _checkScheduledBackup();
   });
 
   service.on('stop').listen((_) {
@@ -775,6 +781,104 @@ void _notify(FlutterLocalNotificationsPlugin n, int id, String title, String bod
       icon: '@mipmap/ic_launcher',
     ),
   ));
+}
+
+// ── Geplante Backups ──────────────────────────────────────────────────────────
+
+/// Prüft ob ein tägliches, monatliches oder jährliches Backup fällig ist
+/// und führt es bei Bedarf durch. Wird einmal pro Minute aufgerufen.
+Future<void> _checkScheduledBackup() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final nasUrl = prefs.getString('global_nas_url') ?? '';
+    if (nasUrl.isEmpty) return; // kein NAS konfiguriert
+
+    final apiKey = prefs.getString('global_nas_api_key');
+    final now = DateTime.now();
+    final h = now.hour;
+    final m = now.minute;
+
+    // ── Jährliches Backup (01:00 ±1 Min, 1. des Monats, Monat == WJ-Startmonat)
+    if (h == 1 && m <= 1 && now.day == 1) {
+      final fiscalMonth = await _getFiscalYearStartMonth();
+      if (now.month == fiscalMonth) {
+        final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        final lastYearly = prefs.getString('backup_last_yearly') ?? '';
+        if (lastYearly != ym) {
+          final ok = await BackupService.instance.scheduledNasBackup(
+            nasUrl: nasUrl,
+            apiKey: apiKey,
+            type: 'yearly',
+          );
+          if (ok) {
+            await prefs.setString('backup_last_yearly', ym);
+            await _log('BACKUP', 'Jährliches Backup erfolgreich: $ym');
+          } else {
+            await _log('BACKUP', 'Jährliches Backup fehlgeschlagen');
+          }
+        }
+      }
+    }
+
+    // ── Monatliches Backup (01:30 ±1 Min, 1. des Monats)
+    if (h == 1 && m >= 29 && m <= 31 && now.day == 1) {
+      final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final lastMonthly = prefs.getString('backup_last_monthly') ?? '';
+      if (lastMonthly != ym) {
+        final ok = await BackupService.instance.scheduledNasBackup(
+          nasUrl: nasUrl,
+          apiKey: apiKey,
+          type: 'monthly',
+        );
+        if (ok) {
+          await prefs.setString('backup_last_monthly', ym);
+          await _log('BACKUP', 'Monatliches Backup erfolgreich: $ym');
+        } else {
+          await _log('BACKUP', 'Monatliches Backup fehlgeschlagen');
+        }
+      }
+    }
+
+    // ── Tägliches Backup (02:00 ±1 Min)
+    if (h == 2 && m <= 1) {
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final lastDaily = prefs.getString('backup_last_daily') ?? '';
+      if (lastDaily != today) {
+        final ok = await BackupService.instance.scheduledNasBackup(
+          nasUrl: nasUrl,
+          apiKey: apiKey,
+          type: 'daily',
+        );
+        if (ok) {
+          await prefs.setString('backup_last_daily', today);
+          await _log('BACKUP', 'Tägliches Backup erfolgreich: $today');
+        } else {
+          await _log('BACKUP', 'Tägliches Backup fehlgeschlagen');
+        }
+      }
+    }
+  } catch (e) {
+    await _log('BACKUP-ERROR', e.toString());
+  }
+}
+
+/// Liest den Wirtschaftsjahr-Startmonat aus der DB (erster Arbeitgeber, Default 4).
+Future<int> _getFiscalYearStartMonth() async {
+  try {
+    final db = await _openDb();
+    try {
+      final rows = await db.query('employers',
+          columns: ['fiscal_year_start_month'],
+          where: 'deleted_at IS NULL',
+          limit: 1);
+      if (rows.isNotEmpty) {
+        return (rows.first['fiscal_year_start_month'] as int?) ?? 4;
+      }
+    } finally {
+      await db.close();
+    }
+  } catch (_) {}
+  return 4; // Default: April
 }
 
 double _haversine(double lat1, double lon1, double lat2, double lon2) {

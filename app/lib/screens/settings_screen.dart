@@ -233,6 +233,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _BackupCard(),
           ],
 
+          // ── NAS-Backups (alle Plattformen, nur wenn NAS konfiguriert) ──
+          if (context.watch<SyncProvider>().hasNasConfig) ...[
+            const SizedBox(height: 20),
+            Text('NAS-Backups', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.backup_outlined),
+                title: const Text('Geplante NAS-Backups'),
+                subtitle: const Text('Täglich / Monatlich / Jährlich – ansehen & wiederherstellen'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  final sp = context.read<SyncProvider>();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => _NasBackupListScreen(
+                        nasUrl: sp.nasUrl,
+                        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
           // ── Datenpflege ───────────────────────────────────────────────
           const SizedBox(height: 20),
           Text('Datenpflege', style: Theme.of(context).textTheme.titleSmall),
@@ -1563,6 +1590,219 @@ class _DedupDialogState extends State<_DedupDialog> {
           style: FilledButton.styleFrom(backgroundColor: Colors.red.shade600),
         ),
       ],
+    );
+  }
+}
+
+// ── NAS-Backup-Liste ──────────────────────────────────────────────────────────
+
+class _NasBackupListScreen extends StatefulWidget {
+  final String nasUrl;
+  final String? apiKey;
+  const _NasBackupListScreen({required this.nasUrl, this.apiKey});
+
+  @override
+  State<_NasBackupListScreen> createState() => _NasBackupListScreenState();
+}
+
+class _NasBackupListScreenState extends State<_NasBackupListScreen> {
+  List<Map<String, dynamic>>? _backups;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final list = await BackupService.instance.listNasBackups(
+        nasUrl: widget.nasUrl,
+        apiKey: widget.apiKey,
+      );
+      setState(() { _backups = list; _loading = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _restore(Map<String, dynamic> backup) async {
+    final filename = backup['filename'] as String;
+    final date = backup['date'] as String? ?? filename;
+    final type = backup['type'] as String? ?? '';
+    final typeLabel = type == 'daily' ? 'Täglich' : type == 'monthly' ? 'Monatlich' : 'Jährlich';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Backup wiederherstellen?'),
+        content: Text(
+          'Backup vom $date ($typeLabel) wiederherstellen?\n\n'
+          'Alle lokalen Daten werden überschrieben!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Wiederherstellen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final success = await BackupService.instance.restoreFromNasBackup(
+      nasUrl: widget.nasUrl,
+      apiKey: widget.apiKey,
+      filename: filename,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success
+          ? 'Backup wiederhergestellt. App bitte neu starten.'
+          : 'Wiederherstellung fehlgeschlagen.'),
+      backgroundColor: success ? Colors.green : Colors.red,
+      duration: const Duration(seconds: 5),
+    ));
+    if (success && mounted) {
+      context.read<EmployerProvider>().reload();
+    }
+  }
+
+  String _formatSize(dynamic sizeBytes) {
+    if (sizeBytes == null) return '';
+    final bytes = (sizeBytes as num).toInt();
+    if (bytes < 1024) return '${bytes} B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'daily': return 'Täglich';
+      case 'monthly': return 'Monatlich';
+      case 'yearly': return 'Jährlich';
+      default: return type;
+    }
+  }
+
+  Color _typeColor(String type) {
+    switch (type) {
+      case 'daily': return Colors.blue;
+      case 'monthly': return Colors.orange;
+      case 'yearly': return Colors.purple;
+      default: return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('NAS-Backups'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : _load,
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 12),
+                        Text('Fehler: $_error', textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        FilledButton(onPressed: _load, child: const Text('Erneut versuchen')),
+                      ],
+                    ),
+                  ),
+                )
+              : _backups == null || _backups!.isEmpty
+                  ? const Center(child: Text('Keine Backups vorhanden'))
+                  : _buildList(),
+    );
+  }
+
+  Widget _buildList() {
+    final backups = _backups!;
+    // Gruppieren nach Typ
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final b in backups) {
+      final type = (b['type'] as String?) ?? 'unknown';
+      grouped.putIfAbsent(type, () => []).add(b);
+    }
+
+    final sections = <Widget>[];
+    for (final type in ['yearly', 'monthly', 'daily']) {
+      final items = grouped[type];
+      if (items == null || items.isEmpty) continue;
+      sections.add(Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Text(
+          _typeLabel(type),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: _typeColor(type),
+          ),
+        ),
+      ));
+      sections.add(Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
+          children: items.asMap().entries.map((entry) {
+            final i = entry.key;
+            final b = entry.value;
+            final date = b['date'] as String? ?? b['filename'] as String;
+            final size = _formatSize(b['size_bytes']);
+            return Column(
+              children: [
+                if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: Icon(
+                    type == 'yearly'
+                        ? Icons.calendar_today
+                        : type == 'monthly'
+                            ? Icons.calendar_month_outlined
+                            : Icons.today_outlined,
+                    color: _typeColor(type),
+                  ),
+                  title: Text(date),
+                  subtitle: size.isNotEmpty ? Text(size) : null,
+                  trailing: TextButton.icon(
+                    icon: const Icon(Icons.restore, size: 16),
+                    label: const Text('Wiederherstellen'),
+                    onPressed: () => _restore(b),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
+      children: sections,
     );
   }
 }

@@ -19,6 +19,7 @@ import 'settings_screen.dart';
 import 'activity_timeline_screen.dart';
 import 'help_screen.dart';
 import '../providers/activity_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/geofencing_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -260,6 +261,7 @@ class _DashboardTabState extends State<_DashboardTab> {
   Widget build(BuildContext context) {
     final tp = context.watch<TimeEntryProvider>();
     final ep = context.watch<EmployerProvider>();
+    final sp = context.watch<SyncProvider>();
     final employer = ep.active;
     final ap = context.watch<ActivityProvider>();
     final now = DateTime.now();
@@ -285,6 +287,9 @@ class _DashboardTabState extends State<_DashboardTab> {
           children: [
             if (ep.employers.length > 1)
               _EmployerChipBar(ep: ep),
+            // ── Sync-Status-Chip ─────────────────────────────────────────
+            if (sp.hasNasConfig)
+              _SyncStatusChip(sp: sp),
             if (Platform.isAndroid)
               ValueListenableBuilder<List<String>>(
                 valueListenable: GeofencingService.instance.activeZones,
@@ -530,6 +535,53 @@ class _EmployerChipBar extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+// ── Sync-Status-Chip ──────────────────────────────────────────────────────────
+
+class _SyncStatusChip extends StatelessWidget {
+  final SyncProvider sp;
+  const _SyncStatusChip({required this.sp});
+
+  @override
+  Widget build(BuildContext context) {
+    final isStale = sp.isSyncStale;
+    final lastSync = sp.lastSyncAt;
+
+    String label;
+    Color bgColor;
+    Color fgColor;
+    IconData icon;
+
+    if (isStale) {
+      label = 'Sync ausstehend';
+      bgColor = Colors.red.shade100;
+      fgColor = Colors.red.shade800;
+      icon = Icons.sync_problem;
+    } else if (lastSync != null) {
+      label = 'Sync ${DateFormat('HH:mm').format(lastSync)}';
+      bgColor = Colors.green.shade100;
+      fgColor = Colors.green.shade800;
+      icon = Icons.sync;
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Chip(
+          avatar: Icon(icon, size: 14, color: fgColor),
+          label: Text(label, style: TextStyle(fontSize: 12, color: fgColor)),
+          backgroundColor: bgColor,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
       ),
     );
   }
