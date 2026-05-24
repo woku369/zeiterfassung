@@ -26,6 +26,7 @@ import 'trip_log_screen.dart';
 import 'bluetooth_trip_screen.dart';
 import 'activity_timeline_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -242,21 +243,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
           Text('Info', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Zeiterfassung für Android & Windows'),
-                  SizedBox(height: 4),
-                  Text('Keine automatischen Zuschlagsberechnungen.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('Synchronisation via Tailscale + Next.js auf NAS.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snap) {
+              final build = snap.data?.buildNumber ?? '–';
+              final version = snap.data?.version ?? '–';
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Zeiterfassung für Android & Windows'),
+                      const SizedBox(height: 4),
+                      Text('Version $version  ·  Build $build',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      Text('Keine automatischen Zuschlagsberechnungen.',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text('Synchronisation via Tailscale + Next.js auf NAS.',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
