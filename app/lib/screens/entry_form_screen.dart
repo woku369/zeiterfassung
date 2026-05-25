@@ -149,9 +149,21 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
-    final bm = _isAbsence ? 0 : (int.tryParse(_breakCtrl.text) ?? 0);
+    int bm = _isAbsence ? 0 : (int.tryParse(_breakCtrl.text) ?? 0);
     final km = _isAbsence ? null : double.tryParse(_kmCtrl.text.replaceAll(',', '.'));
     final start = _toDateTime(_startTime);
+
+    // Auto-Pause § 11 AZG: ≥ 6h Arbeitszeit → 30 Min. Pause wenn noch keine gesetzt.
+    bool autoPauseApplied = false;
+    if (!_isAbsence && _endTime != null && bm == 0 &&
+        _workType != WorkType.homeoffice) {
+      var end = _toDateTime(_endTime!);
+      if (end.isBefore(start)) end = end.add(const Duration(days: 1));
+      if (end.difference(start).inMinutes >= 360) {
+        bm = 30;
+        autoPauseApplied = true;
+      }
+    }
     DateTime? end;
     if (!_isAbsence && _endTime != null) {
       end = _toDateTime(_endTime!);
@@ -214,7 +226,17 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       await DatabaseHelper.instance.saveSplitsForEntry(entryId, splitModels);
     }
 
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      if (autoPauseApplied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Auto-Pause § 11 AZG: 30 Min. Pause eingetragen.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      Navigator.pop(context);
+    }
   }
 
   @override

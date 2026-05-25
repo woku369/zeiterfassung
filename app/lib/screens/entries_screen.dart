@@ -241,9 +241,6 @@ class _EntryRow extends StatelessWidget {
                     if (entry.distanceKm != null && entry.distanceKm! > 0)
                       Text('${entry.distanceKm!.toStringAsFixed(0)} km',
                           style: const TextStyle(fontSize: 11)),
-                    if (entry.travelMinutes > 0)
-                      Text('${entry.travelMinutes} min Fahrt',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                   ],
                 ),
           onTap: onTap,
@@ -271,6 +268,56 @@ class _EntryRow extends StatelessWidget {
         child: Chip(
           label: Text(entry.dayType.label, style: const TextStyle(fontSize: 10)),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ));
+    }
+    if (!entry.workType.isAbsence && entry.travelMinutes > 0) {
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Chip(
+          avatar: Icon(Icons.directions_car_outlined, size: 12,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.teal.shade300
+                  : Colors.teal.shade800),
+          label: Text('${entry.travelMinutes} min Fahrt',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.teal.shade300
+                      : Colors.teal.shade800)),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.teal.withOpacity(0.18)
+              : Colors.teal.shade50,
+          side: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.teal.withOpacity(0.40)
+                  : Colors.teal.shade200),
+        ),
+      ));
+    }
+    if (!entry.workType.isAbsence && entry.breakMinutes > 0) {
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Chip(
+          avatar: Icon(Icons.pause_circle_outline, size: 12,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.purple.shade300
+                  : Colors.purple.shade700),
+          label: Text('${entry.breakMinutes} min Pause',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.purple.shade300
+                      : Colors.purple.shade700)),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.purple.withOpacity(0.18)
+              : Colors.purple.shade50,
+          side: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.purple.withOpacity(0.40)
+                  : Colors.purple.shade200),
         ),
       ));
     }
