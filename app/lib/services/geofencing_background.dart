@@ -179,18 +179,27 @@ Future<void> _onStart(ServiceInstance service) async {
       locationSettings: AndroidSettings(
         accuracy: acc,
         // During trip: 10 m / 5 s – tight tracking.
-        // Idle (geofence-only): 50 m / 20 s – saves ~60 % battery vs continuous.
-        distanceFilter: highPrecision ? 10 : 50,
+        // Idle: distanceFilter=0 so Android sees continuous demand and does not
+        // suspend GPS hardware during Doze. intervalDuration=30 s limits wakeups.
+        distanceFilter: highPrecision ? 10 : 0,
         intervalDuration: highPrecision
             ? const Duration(seconds: 5)
-            : const Duration(seconds: 20),
+            : const Duration(seconds: 30),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationText: 'Standorterfassung aktiv',
           notificationTitle: 'Zeiterfassung',
           enableWakeLock: true,
         ),
       ),
-    ).listen(_posHandler);
+    ).listen(
+      _posHandler,
+      onError: (Object e) async {
+        await _log('GPS-ERROR', 'Stream-Fehler: $e – Neustart in 10 s');
+        await Future<void>.delayed(const Duration(seconds: 10));
+        _restartGps(acc);
+      },
+      cancelOnError: false,
+    );
   }
 
   // ── Receive commands from main isolate ─────────────────────────────────────
