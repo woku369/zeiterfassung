@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-24 – v1.26 Geplante NAS-Backups + Sync-Datenintegrität
+> Letztes Update: 2026-05-25 – v1.26 Geplante NAS-Backups + Sync-Datenintegrität + Force-Resync
 
 ---
 
@@ -53,6 +53,13 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 - [x] **Kritischer Sync-Bug behoben:**
   - `updateEntry` hat `is_synced = 1` nicht zurückgesetzt → jede Bearbeitung nach erstem Sync wurde nie gepusht (Clock-out, Notiz, km, Pause)
   - Ursache seit Projektbeginn im Code; alle Geräte hatten abweichende Datenstände
+
+- [x] **Vollständige Neusynchronisierung erzwingen (Einstellungen → Datenpflege):**
+  - Neuer Button `_ForceResyncCard`: markiert alle lokalen `time_entries` mit `is_synced=0`
+  - Anschließend sofortiger Sync → vollständiger Push aller Einträge ans NAS
+  - Andere Geräte ziehen beim nächsten Sync den korrekten Stand
+  - Behebt historische Diskrepanzen (z.B. KW 20: Poco 2:05h vs. Doogee 1:04h) die durch den pre-b16 `updateEntry`-Bug entstanden sind
+  - Warndialog mit Hinweis: nur auf dem Gerät mit korrekten Daten ausführen
 
 - [x] **Bugfixes v1.26:**
   - Backup-Timer in Geofencing-Service war nicht gecancelt → Timer-Leak beim `stop`-Event
@@ -845,7 +852,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Settings-Sync Timing | LWW basiert auf "Gerät hat Setting zuletzt geändert" – nicht auf Sync-Reihenfolge. Erfordert konsistente Systemuhren auf allen Geräten |
 | Backup-Restore | Setzt `last_sync_at` lokal auf Epoch zurück, damit beim nächsten Sync alle NAS-Daten neu gezogen werden. NAS-Stand gewinnt per LWW – Backup ist nur dann „die Wahrheit", wenn der NAS keine neueren Daten hat |
 | Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig |
-| NAS-Backup | Speichert immer nur das letzte Backup (`backup_latest.json`) – keine Versionierung. Tägliches DB-Backup via `backup_synology.sh` bleibt zusätzliche Sicherung |
+| NAS-Backup | Automatische geplante Backups (täglich×30, monatlich, jährlich) via Geofencing-Foreground-Service. Restore über Einstellungen → NAS-Backups. Manuelles Einzel-Backup (`backup_latest.json`) weiterhin möglich. |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge). Ausnahme: Vertragsäquivalent für Gurktaler AG im Jahresbericht – informativ, beeinflusst Ist-Stunden nicht |
