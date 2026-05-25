@@ -420,13 +420,23 @@ Future<void> _onStart(ServiceInstance service) async {
           // neuen öffnen. _autoClockOut ist no-op wenn kein Eintrag offen ist.
           await _autoClockOut(notifications);
           await _log('ENTER', '${loc['name']}  dist=${dist.toStringAsFixed(0)}m  radius=${radius.toStringAsFixed(0)}m');
-          await _autoClockIn(loc, notifications);
-          service.invoke('zoneChange', {
-            'locationId': id,
-            'locationName': loc['name'] as String,
-            'employerId': loc['employerId'],
-            'entered': true,
-          });
+          final clockedIn = await _autoClockIn(loc, notifications);
+          if (!clockedIn) {
+            // Clock-in wurde übersprungen (manueller Eintrag blockiert).
+            // Zone NICHT als 'inside' merken – verhindert falsche EXIT-Notifications
+            // wenn der Service nach Stunden neu startet und die Zone noch in den
+            // SharedPreferences steht.
+            inside.remove(id);
+            (await SharedPreferences.getInstance())
+                .setString(_kInsideZonesKey, inside.join(','));
+          } else {
+            service.invoke('zoneChange', {
+              'locationId': id,
+              'locationName': loc['name'] as String,
+              'employerId': loc['employerId'],
+              'entered': true,
+            });
+          }
         }
         continue;
       }
@@ -612,7 +622,7 @@ Future<void> _onStart(ServiceInstance service) async {
 
 // ── Auto clock-in / clock-out ─────────────────────────────────────────────────
 
-Future<void> _autoClockIn(
+Future<bool> _autoClockIn(
     Map<String, dynamic> loc, FlutterLocalNotificationsPlugin n) async {
   final prefs = await SharedPreferences.getInstance();
 
@@ -652,7 +662,7 @@ Future<void> _autoClockIn(
               'Manueller Eintrag blockiert $name – id=$existingId  start=$existingStart  type=$existingType  note=$existingNote');
           _notify(n, 995, 'Bei $name angekommen',
               'Bereits eingestempelt – Geofencing übersprungen.');
-          return;
+          return false;
         }
       }
 
@@ -688,9 +698,11 @@ Future<void> _autoClockIn(
     await _log('CLOCK-IN', 'OK  $name  workType=$workType  employerId=$employerId');
     _notify(n, 997, 'Eingestempelt: $name',
         'Automatisch gestartet. Tippen, um Notiz/Tätigkeit zu ergänzen.');
+    return true;
   } catch (e) {
     await _log('ERROR', 'Clock-in fehlgeschlagen: $e');
     _notify(n, 998, 'Auto-Einstempeln fehlgeschlagen', e.toString());
+    return false;
   }
 }
 
