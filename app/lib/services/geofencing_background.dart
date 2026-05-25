@@ -629,23 +629,27 @@ Future<void> _autoClockIn(
       // (identified by note prefix 'Auto · ') that were not properly cleaned up
       // when _kAutoEntryKey was lost due to a service restart.
       final active = await db.query('time_entries',
-          columns: ['id', 'note'], where: 'end_time IS NULL', limit: 1);
+          columns: ['id', 'note', 'start_time', 'work_type'],
+          where: 'end_time IS NULL', limit: 1);
       if (active.isNotEmpty) {
-        final existingNote = active.first['note'] as String? ?? '';
+        final existingId    = active.first['id']         as String;
+        final existingNote  = active.first['note']       as String? ?? '';
+        final existingStart = active.first['start_time'] as String? ?? '?';
+        final existingType  = active.first['work_type']  as String? ?? '?';
         if (existingNote.startsWith('Auto · ')) {
           // Stale auto-entry – close it so the new zone gets a fresh clock-in.
-          final staleId = active.first['id'] as String;
           await db.update(
             'time_entries',
             {'end_time': now.toIso8601String(), 'is_synced': 0},
             where: 'id = ? AND end_time IS NULL',
-            whereArgs: [staleId],
+            whereArgs: [existingId],
           );
           await prefs.remove(_kAutoEntryKey);
           await _log('AUTO-CLOSE-STALE',
-              'Veralteten Auto-Eintrag geschlossen: $staleId');
+              'Veralteten Auto-Eintrag geschlossen: $existingId  start=$existingStart  note=$existingNote');
         } else {
-          await _log('SKIP', 'Bereits eingestempelt (manuell) – $name übersprungen');
+          await _log('SKIP',
+              'Manueller Eintrag blockiert $name – id=$existingId  start=$existingStart  type=$existingType  note=$existingNote');
           _notify(n, 995, 'Bei $name angekommen',
               'Bereits eingestempelt – Geofencing übersprungen.');
           return;
