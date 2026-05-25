@@ -455,6 +455,11 @@ class DatabaseHelper {
     await db.update('time_entries', map, where: 'id = ?', whereArgs: [e.id]);
   }
 
+  Future<int> markAllUnsynced() async {
+    final db = await database;
+    return db.update('time_entries', {'is_synced': 0});
+  }
+
   Future<void> deleteEntry(String id) async {
     final db = await database;
     final batch = db.batch();

@@ -265,6 +265,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text('Datenpflege', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           const _DedupCard(),
+          const SizedBox(height: 8),
+          const _ForceResyncCard(),
 
           // ── Info ──────────────────────────────────────────────────────
           const SizedBox(height: 20),
@@ -1453,6 +1455,77 @@ class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
 }
 
 // ── Datenpflege: Duplikate bereinigen ─────────────────────────────────────────
+
+class _ForceResyncCard extends StatefulWidget {
+  const _ForceResyncCard();
+  @override
+  State<_ForceResyncCard> createState() => _ForceResyncCardState();
+}
+
+class _ForceResyncCardState extends State<_ForceResyncCard> {
+  bool _running = false;
+
+  Future<void> _run() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Vollständige Neusynchronisierung'),
+        content: const Text(
+          'Alle lokalen Einträge werden als unsynced markiert und beim nächsten Sync '
+          'vollständig ans NAS übertragen.\n\n'
+          'Das behebt Diskrepanzen zwischen Geräten, die durch ältere App-Versionen '
+          'entstanden sein können.\n\n'
+          'Nur auf dem Gerät mit den korrekten Daten ausführen!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Jetzt ausführen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _running = true);
+    try {
+      final count = await DatabaseHelper.instance.markAllUnsynced();
+      if (!mounted) return;
+      await context.read<SyncProvider>().syncNow();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$count Einträge neu synchronisiert.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: _running
+            ? const SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.sync_problem_outlined),
+        title: const Text('Vollständige Neusynchronisierung'),
+        subtitle: const Text('Alle Einträge erneut ans NAS übertragen'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _running ? null : _run,
+      ),
+    );
+  }
+}
 
 class _DedupCard extends StatefulWidget {
   const _DedupCard();
