@@ -856,8 +856,9 @@ Future<void> _checkScheduledBackup() async {
     final h = now.hour;
     final m = now.minute;
 
-    // ── Jährliches Backup (01:00 ±1 Min, 1. des Monats, Monat == WJ-Startmonat)
-    if (h == 1 && m <= 1 && now.day == 1) {
+    // ── Jährliches Backup (ab 01:00, 1. des Monats, Monat == WJ-Startmonat)
+    // Catch-up: läuft auch wenn 01:00 verpasst wurde (h >= 1 statt h == 1).
+    if (h >= 1 && now.day == 1) {
       final fiscalMonth = await _getFiscalYearStartMonth();
       if (now.month == fiscalMonth) {
         final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
@@ -878,8 +879,9 @@ Future<void> _checkScheduledBackup() async {
       }
     }
 
-    // ── Monatliches Backup (01:30 ±1 Min, 1. des Monats)
-    if (h == 1 && m >= 29 && m <= 31 && now.day == 1) {
+    // ── Monatliches Backup (ab 01:30, 1. des Monats)
+    // Catch-up: läuft auch wenn 01:30 verpasst wurde.
+    if ((h > 1 || (h == 1 && m >= 29)) && now.day == 1) {
       final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
       final lastMonthly = prefs.getString('backup_last_monthly') ?? '';
       if (lastMonthly != ym) {
@@ -897,8 +899,9 @@ Future<void> _checkScheduledBackup() async {
       }
     }
 
-    // ── Tägliches Backup (02:00 ±1 Min)
-    if (h == 2 && m <= 1) {
+    // ── Tägliches Backup (ab 02:00, Catch-up wenn Fenster verpasst)
+    // h >= 2: läuft beim nächsten aktiven Minute nach 02:00, nicht nur bei exakt 02:00.
+    if (h >= 2) {
       final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final lastDaily = prefs.getString('backup_last_daily') ?? '';
       if (lastDaily != today) {
