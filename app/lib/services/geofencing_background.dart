@@ -305,6 +305,22 @@ Future<void> _onStart(ServiceInstance service) async {
             _haversine(_prevLat!, _prevLng!, pos.latitude, pos.longitude) / dtSec;
       }
     }
+    // ── Service-Gap-Detektion ─────────────────────────────────────────────
+    // Wenn der Service >30 Min. inaktiv war (HyperOS-Suspension) und sich
+    // die Position um >1 km verändert hat, Nutzer benachrichtigen.
+    if (_prevTime != null && _prevLat != null && _prevLng != null) {
+      final gapMin = now.difference(_prevTime!).inMinutes;
+      if (gapMin > 30) {
+        final gapDist = _haversine(
+            _prevLat!, _prevLng!, pos.latitude, pos.longitude);
+        await _log('SERVICE-GAP',
+            'Inaktiv ${gapMin}min · ${(gapDist / 1000).toStringAsFixed(1)}km Positionsänderung');
+        if (gapDist > 1000 && _tripTrackingEnabled) {
+          _notify(notifications, 993, 'Fahrt evtl. nicht erfasst',
+              'Service war ${gapMin} Min. inaktiv. Fahrtenbuch und Einstempelstatus prüfen.');
+        }
+      }
+    }
     _prevLat  = pos.latitude;
     _prevLng  = pos.longitude;
     _prevTime = now;
@@ -600,15 +616,31 @@ Future<void> _autoClockIn(
   try {
     final db = await _openDb();
     try {
-      // Skip if already clocked in (manually or via geofencing) – the user
-      // explicitly does not want overlapping entries.
+      // Skip if already clocked in manually. Close stale geofence auto-entries
+      // (identified by note prefix 'Auto · ') that were not properly cleaned up
+      // when _kAutoEntryKey was lost due to a service restart.
       final active = await db.query('time_entries',
-          where: 'end_time IS NULL', limit: 1);
+          columns: ['id', 'note'], where: 'end_time IS NULL', limit: 1);
       if (active.isNotEmpty) {
-        await _log('SKIP', 'Bereits eingestempelt – $name übersprungen');
-        _notify(n, 995, 'Bei $name angekommen',
-            'Bereits eingestempelt – Geofencing übersprungen.');
-        return;
+        final existingNote = active.first['note'] as String? ?? '';
+        if (existingNote.startsWith('Auto · ')) {
+          // Stale auto-entry – close it so the new zone gets a fresh clock-in.
+          final staleId = active.first['id'] as String;
+          await db.update(
+            'time_entries',
+            {'end_time': now.toIso8601String(), 'is_synced': 0},
+            where: 'id = ? AND end_time IS NULL',
+            whereArgs: [staleId],
+          );
+          await prefs.remove(_kAutoEntryKey);
+          await _log('AUTO-CLOSE-STALE',
+              'Veralteten Auto-Eintrag geschlossen: $staleId');
+        } else {
+          await _log('SKIP', 'Bereits eingestempelt (manuell) – $name übersprungen');
+          _notify(n, 995, 'Bei $name angekommen',
+              'Bereits eingestempelt – Geofencing übersprungen.');
+          return;
+        }
       }
 
       final dayType = HolidayService.instance.isHoliday(now)
@@ -677,7 +709,7 @@ Future<void> _autoClockOut(FlutterLocalNotificationsPlugin n) async {
       }
       await db.update(
         'time_entries',
-        {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes},
+        {'end_time': now.toIso8601String(), 'break_minutes': breakMinutes, 'is_synced': 0},
         where: 'id = ? AND end_time IS NULL',
         whereArgs: [entryId],
       );
