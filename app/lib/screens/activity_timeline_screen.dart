@@ -102,8 +102,10 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
       MaterialPageRoute(
           builder: (_) => EntryFormScreen(entry: entry, forceNew: true)),
     );
-    // Regenerate after returning – user might have saved the entry
-    if (mounted) await _generateSuggestions();
+    if (mounted) {
+      await context.read<SuggestionProvider>().accept(suggestion.id);
+      await _generateSuggestions();
+    }
   }
 
   void _dismissSuggestion(String id) {
@@ -281,20 +283,29 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
                             const EdgeInsets.fromLTRB(12, 8, 12, 100),
                         children: [
                           // ── Suggestions section ──────────────────────
-                          if (sp.pending.isNotEmpty) ...[
+                          if (sp.pending.isNotEmpty || sp.adopted.isNotEmpty) ...[
                             _SectionHeader(
                               icon: Icons.auto_awesome_outlined,
-                              label:
-                                  'Vorschläge (${sp.pending.length})',
+                              label: sp.pending.isEmpty
+                                  ? 'Vorschläge'
+                                  : 'Vorschläge (${sp.pending.length})',
                               color: cs.primary,
                             ),
                             const SizedBox(height: 4),
                             ...sp.pending.map(
                               (s) => _SuggestionCard(
                                 suggestion: s,
+                                adopted: false,
                                 onAccept: () => _acceptSuggestion(s),
-                                onDismiss: () =>
-                                    _dismissSuggestion(s.id),
+                                onDismiss: () => _dismissSuggestion(s.id),
+                              ),
+                            ),
+                            ...sp.adopted.map(
+                              (s) => _SuggestionCard(
+                                suggestion: s,
+                                adopted: true,
+                                onAccept: null,
+                                onDismiss: null,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -485,11 +496,13 @@ class _ActivityTimelineScreenState extends State<ActivityTimelineScreen> {
 
 class _SuggestionCard extends StatelessWidget {
   final SuggestedEntry suggestion;
-  final VoidCallback onAccept;
-  final VoidCallback onDismiss;
+  final bool adopted;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDismiss;
 
   const _SuggestionCard({
     required this.suggestion,
+    required this.adopted,
     required this.onAccept,
     required this.onDismiss,
   });
@@ -505,105 +518,137 @@ class _SuggestionCard extends StatelessWidget {
             ? Colors.orange
             : Colors.grey;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: cs.secondaryContainer.withOpacity(0.45),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header row ─────────────────────────────────────────────
-            Row(
-              children: [
-                Icon(
-                  suggestion.signals.contains(SignalType.phoneCall)
-                      ? Icons.phone_outlined
-                      : Icons.work_outline,
-                  size: 18,
-                  color: cs.secondary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${tf.format(suggestion.startTime)} – '
-                    '${tf.format(suggestion.endTime)}'
-                    '  ·  ${_fmt(suggestion.duration)}',
-                    style: Theme.of(context).textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: confidenceColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$pct%',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: confidenceColor,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            // ── Sub-info ───────────────────────────────────────────────
-            if (suggestion.note.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, left: 26),
-                child: Text(
-                  suggestion.note,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2, left: 26),
-              child: Row(
+    return Opacity(
+      opacity: adopted ? 0.50 : 1.0,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        color: adopted
+            ? cs.surfaceContainerLow
+            : cs.secondaryContainer.withOpacity(0.45),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header row ───────────────────────────────────────────
+              Row(
                 children: [
-                  _SignalChip(
-                      label: suggestion.workType.label,
-                      icon: Icons.label_outline),
-                  if (suggestion.signals.contains(SignalType.phoneCall))
-                    const _SignalChip(
-                        label: 'Telefonat',
-                        icon: Icons.phone_outlined),
+                  adopted
+                      ? Icon(Icons.check_circle_outline,
+                          size: 18, color: cs.onSurfaceVariant)
+                      : Icon(
+                          suggestion.signals.contains(SignalType.phoneCall)
+                              ? Icons.phone_outlined
+                              : Icons.work_outline,
+                          size: 18,
+                          color: cs.secondary,
+                        ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${tf.format(suggestion.startTime)} – '
+                      '${tf.format(suggestion.endTime)}'
+                      '  ·  ${_fmt(suggestion.duration)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            decoration: adopted
+                                ? TextDecoration.lineThrough
+                                : null,
+                            color: adopted ? cs.onSurfaceVariant : null,
+                          ),
+                    ),
+                  ),
+                  if (adopted)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('Übernommen',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w600)),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: confidenceColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$pct%',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: confidenceColor,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
                 ],
               ),
-            ),
-            // ── Action buttons ─────────────────────────────────────────
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: onDismiss,
-                  icon: const Icon(Icons.close, size: 16),
-                  label: const Text('Verwerfen'),
-                  style: TextButton.styleFrom(
-                    foregroundColor:
-                        Theme.of(context).colorScheme.onSurfaceVariant,
-                    textStyle: const TextStyle(fontSize: 13),
-                    visualDensity: VisualDensity.compact,
+              // ── Sub-info ─────────────────────────────────────────────
+              if (suggestion.note.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 26),
+                  child: Text(
+                    suggestion.note,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: adopted ? cs.onSurfaceVariant : null,
+                        ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: onAccept,
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Bearbeiten & Übernehmen'),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    textStyle: const TextStyle(fontSize: 13),
+              if (!adopted)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 26),
+                  child: Row(
+                    children: [
+                      _SignalChip(
+                          label: suggestion.workType.label,
+                          icon: Icons.label_outline),
+                      if (suggestion.signals.contains(SignalType.phoneCall))
+                        const _SignalChip(
+                            label: 'Telefonat',
+                            icon: Icons.phone_outlined),
+                    ],
                   ),
+                ),
+              // ── Action buttons ───────────────────────────────────────
+              if (!adopted) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: onDismiss,
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Verwerfen'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: cs.onSurfaceVariant,
+                        textStyle: const TextStyle(fontSize: 13),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: onAccept,
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Bearbeiten & Übernehmen'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
