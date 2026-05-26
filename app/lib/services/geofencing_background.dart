@@ -119,8 +119,10 @@ const _kExitConfirmRequired  = 4;    // × 20 s Intervall = ~80 s Mindest-Exitze
 // als "außen" für den Bestätigungs-Zähler.
 const _kExitBufferM          = 80.0;
 // GPS-Fixes mit schlechterer Genauigkeit werden für den Zonen-Check ignoriert.
-// Adaptive Grenze: max(radius × 0.5, 80m) – wird im Code berechnet.
-const _kMaxAccuracyM         = 80.0;
+// 150m: akzeptiert typisches Cell/WiFi-Positioning (100m), filtert nur sehr
+// schlechte Fixes heraus (>150m). Alle Zonen sind ≥150m Radius, Fehler <150m
+// ändert weit entfernte Zonen-Zugehörigkeit nicht.
+const _kMaxAccuracyM         = 150.0;
 
 // ── Background isolate entry point ────────────────────────────────────────────
 
@@ -864,16 +866,24 @@ Future<void> _checkScheduledBackup() async {
         final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
         final lastYearly = prefs.getString('backup_last_yearly') ?? '';
         if (lastYearly != ym) {
-          final ok = await BackupService.instance.scheduledNasBackup(
-            nasUrl: nasUrl,
-            apiKey: apiKey,
-            type: 'yearly',
-          );
-          if (ok) {
-            await prefs.setString('backup_last_yearly', ym);
-            await _log('BACKUP', 'Jährliches Backup erfolgreich: $ym');
-          } else {
-            await _log('BACKUP', 'Jährliches Backup fehlgeschlagen');
+          final lastAttemptStr = prefs.getString('backup_last_yearly_attempt') ?? '';
+          final lastAttempt = DateTime.tryParse(lastAttemptStr);
+          final cooldownOk = lastAttempt == null ||
+              now.difference(lastAttempt).inMinutes >= 30;
+          if (cooldownOk) {
+            await prefs.setString('backup_last_yearly_attempt', now.toIso8601String());
+            final ok = await BackupService.instance.scheduledNasBackup(
+              nasUrl: nasUrl,
+              apiKey: apiKey,
+              type: 'yearly',
+            );
+            if (ok) {
+              await prefs.setString('backup_last_yearly', ym);
+              await prefs.remove('backup_last_yearly_attempt');
+              await _log('BACKUP', 'Jährliches Backup erfolgreich: $ym');
+            } else {
+              await _log('BACKUP', 'Jährliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+            }
           }
         }
       }
@@ -885,36 +895,53 @@ Future<void> _checkScheduledBackup() async {
       final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
       final lastMonthly = prefs.getString('backup_last_monthly') ?? '';
       if (lastMonthly != ym) {
-        final ok = await BackupService.instance.scheduledNasBackup(
-          nasUrl: nasUrl,
-          apiKey: apiKey,
-          type: 'monthly',
-        );
-        if (ok) {
-          await prefs.setString('backup_last_monthly', ym);
-          await _log('BACKUP', 'Monatliches Backup erfolgreich: $ym');
-        } else {
-          await _log('BACKUP', 'Monatliches Backup fehlgeschlagen');
+        final lastAttemptStr = prefs.getString('backup_last_monthly_attempt') ?? '';
+        final lastAttempt = DateTime.tryParse(lastAttemptStr);
+        final cooldownOk = lastAttempt == null ||
+            now.difference(lastAttempt).inMinutes >= 30;
+        if (cooldownOk) {
+          await prefs.setString('backup_last_monthly_attempt', now.toIso8601String());
+          final ok = await BackupService.instance.scheduledNasBackup(
+            nasUrl: nasUrl,
+            apiKey: apiKey,
+            type: 'monthly',
+          );
+          if (ok) {
+            await prefs.setString('backup_last_monthly', ym);
+            await prefs.remove('backup_last_monthly_attempt');
+            await _log('BACKUP', 'Monatliches Backup erfolgreich: $ym');
+          } else {
+            await _log('BACKUP', 'Monatliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+          }
         }
       }
     }
 
     // ── Tägliches Backup (ab 02:00, Catch-up wenn Fenster verpasst)
     // h >= 2: läuft beim nächsten aktiven Minute nach 02:00, nicht nur bei exakt 02:00.
+    // Retry-Cooldown 30 min: verhindert minütliche Wiederholungsversuche bei NAS-Fehler.
     if (h >= 2) {
       final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final lastDaily = prefs.getString('backup_last_daily') ?? '';
       if (lastDaily != today) {
-        final ok = await BackupService.instance.scheduledNasBackup(
-          nasUrl: nasUrl,
-          apiKey: apiKey,
-          type: 'daily',
-        );
-        if (ok) {
-          await prefs.setString('backup_last_daily', today);
-          await _log('BACKUP', 'Tägliches Backup erfolgreich: $today');
-        } else {
-          await _log('BACKUP', 'Tägliches Backup fehlgeschlagen');
+        final lastAttemptStr = prefs.getString('backup_last_daily_attempt') ?? '';
+        final lastAttempt = DateTime.tryParse(lastAttemptStr);
+        final cooldownOk = lastAttempt == null ||
+            now.difference(lastAttempt).inMinutes >= 30;
+        if (cooldownOk) {
+          await prefs.setString('backup_last_daily_attempt', now.toIso8601String());
+          final ok = await BackupService.instance.scheduledNasBackup(
+            nasUrl: nasUrl,
+            apiKey: apiKey,
+            type: 'daily',
+          );
+          if (ok) {
+            await prefs.setString('backup_last_daily', today);
+            await prefs.remove('backup_last_daily_attempt');
+            await _log('BACKUP', 'Tägliches Backup erfolgreich: $today');
+          } else {
+            await _log('BACKUP', 'Tägliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+          }
         }
       }
     }
