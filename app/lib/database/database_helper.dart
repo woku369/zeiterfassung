@@ -460,6 +460,36 @@ class DatabaseHelper {
     return db.update('time_entries', {'is_synced': 0});
   }
 
+  /// Applies § 11 AZG auto-pause (30 min) to historical entries:
+  /// break_minutes = 0, end_time set, duration ≥ 6h, not homeoffice/absence.
+  Future<int> applyAutoPauseToHistorical() async {
+    final db = await database;
+    final rows = await db.query(
+      'time_entries',
+      columns: ['id', 'start_time', 'end_time', 'work_type'],
+      where: "break_minutes = 0 AND end_time IS NOT NULL "
+          "AND work_type NOT IN ('homeoffice','vacation','sick','compensatoryLeave')",
+    );
+    int updated = 0;
+    for (final row in rows) {
+      final start = DateTime.tryParse(row['start_time'] as String? ?? '');
+      final end   = DateTime.tryParse(row['end_time']   as String? ?? '');
+      if (start == null || end == null) continue;
+      var dur = end.difference(start);
+      if (dur.isNegative) dur = dur + const Duration(days: 1);
+      if (dur.inMinutes >= 360) {
+        await db.update(
+          'time_entries',
+          {'break_minutes': 30, 'is_synced': 0},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+        updated++;
+      }
+    }
+    return updated;
+  }
+
   Future<void> deleteEntry(String id) async {
     final db = await database;
     final batch = db.batch();
