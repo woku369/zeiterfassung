@@ -86,8 +86,9 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         val events = usm.queryEvents(dayStartMs, minOf(dayEndMs, System.currentTimeMillis()))
         val pm = context.packageManager
 
-        // Build sessions from FOREGROUND events
-        val sessions = mutableListOf<Map<String, Any>>()
+        // Build raw fragments from FOREGROUND events
+        data class Fragment(val pkg: String, val startMs: Long, val endMs: Long)
+        val fragments = mutableListOf<Fragment>()
         val activeStart = mutableMapOf<String, Long>() // pkg → foreground start ms
 
         val event = UsageEvents.Event()
@@ -97,26 +98,37 @@ class UsageStatsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED,
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                    activeStart[pkg] = event.timeStamp
+                    if (!activeStart.containsKey(pkg)) {
+                        activeStart[pkg] = event.timeStamp
+                    }
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED,
                 UsageEvents.Event.MOVE_TO_BACKGROUND -> {
                     val start = activeStart.remove(pkg) ?: continue
                     val end = event.timeStamp
-                    if (end > start) {
-                        sessions.add(buildSession(pm, pkg, start, end))
-                    }
+                    if (end > start) fragments.add(Fragment(pkg, start, end))
                 }
             }
         }
         // Close any still-open sessions at current time
         val now = System.currentTimeMillis()
         for ((pkg, start) in activeStart) {
-            if (now > start) {
-                sessions.add(buildSession(pm, pkg, start, now))
+            if (now > start) fragments.add(Fragment(pkg, start, now))
+        }
+
+        // Merge fragments from the same app with gap < 30 s (internal activity transitions)
+        fragments.sortWith(compareBy({ it.pkg }, { it.startMs }))
+        val merged = mutableListOf<Fragment>()
+        for (f in fragments) {
+            val last = merged.lastOrNull()
+            if (last != null && last.pkg == f.pkg && f.startMs - last.endMs < 30_000L) {
+                merged[merged.lastIndex] = last.copy(endMs = maxOf(last.endMs, f.endMs))
+            } else {
+                merged.add(f)
             }
         }
-        return sessions
+
+        return merged.map { buildSession(pm, it.pkg, it.startMs, it.endMs) }
     }
 
     // ── Call Log ──────────────────────────────────────────────────────────────
