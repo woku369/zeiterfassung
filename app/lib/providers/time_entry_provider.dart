@@ -35,13 +35,13 @@ class TimeEntryProvider extends ChangeNotifier {
     _selectedMonth = month;
     _entries = await DatabaseHelper.instance
         .getEntriesForMonth(year, month, employerId: _employerId);
-    // Active entry may belong to a different employer (e.g. user switched AG
-    // while clocked in). Always find the globally open entry so the timer
-    // never disappears and clock-out stays reachable.
-    _activeEntry = _entries.where((e) => e.isActive).firstOrNull
-        ?? await DatabaseHelper.instance.getAnyActiveEntry();
     final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
     final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    // Only today's open entries count as "active" (running timer, clock-out button).
+    // Past open entries are shown via staleOpenEntry (orange banner) instead.
+    _activeEntry = _entries.where((e) => e.isActive && !e.date.isBefore(todayDate)).firstOrNull
+        ?? await DatabaseHelper.instance.getTodayActiveEntry(today);
     _staleOpenEntry = await DatabaseHelper.instance.getStaleOpenEntry(today);
     notifyListeners();
   }

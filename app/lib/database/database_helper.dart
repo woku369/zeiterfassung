@@ -487,10 +487,22 @@ class DatabaseHelper {
   }
 
   /// Returns the one open entry (end_time IS NULL) regardless of employer.
+  /// Used by geofencing SKIP check — intentionally cross-employer and cross-day.
   Future<TimeEntry?> getAnyActiveEntry() async {
     final db = await database;
     final rows = await db.query('time_entries',
         where: "end_time IS NULL AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        orderBy: 'start_time DESC',
+        limit: 1);
+    return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
+  }
+
+  /// Returns open entry from today across all employers (for the active timer UI).
+  Future<TimeEntry?> getTodayActiveEntry(String today) async {
+    final db = await database;
+    final rows = await db.query('time_entries',
+        where: "end_time IS NULL AND date = ? AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        whereArgs: [today],
         orderBy: 'start_time DESC',
         limit: 1);
     return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
