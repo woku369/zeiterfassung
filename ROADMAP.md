@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-27 – v1.28 Ist-vs-Effektiv-Tabelle + Offener-Eintrag-Warnung + § 68 fix
+> Letztes Update: 2026-05-27 – v1.29 is_clocking-Flag + NAS-Restart-Button + Stale-Banner-Fixes
 
 ---
 
@@ -25,6 +25,31 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.29 – is_clocking-Flag + NAS-Restart-Button + Stale-Banner-Fixes (DB v19)
+
+- [x] **`is_clocking`-Flag trennt Clock-in-Sessions von manuellen Ereignissen (DB v18→v19):**
+  - `TimeEntry.isClocking` (bool, default false) — `isActive` erfordert jetzt `isClocking = true`
+  - `clockIn()` in Provider setzt `isClocking = true`; Geofencing-Auto-Clock-in setzt `is_clocking = 1`
+  - Geofencing-SKIP-Check prüft nur noch `is_clocking = 1`-Einträge — manuelle Ereignisse blockieren Auto-Clock-in nicht mehr
+  - `activeEntry` (laufender Timer) zeigt nur heutige Einträge mit `isClocking = true`
+  - Manuelle Einträge ohne Endzeit: kein Timer, kein Clock-out-Button, nur orangener Banner wenn Datum vor heute
+  - DB v19-Migration + `server.js` vollständig nachgezogen (Schema, Migration, Upsert, Response)
+
+- [x] **NAS-Backend-Restart-Button in Einstellungen:**
+  - `backend/restart_backend.sh`: detached Script, 2s Delay, killt Port-3000-Prozess, startet Node.js neu
+  - `backend/server.js`: `POST /api/restart` spawnt Script detached, antwortet sofort mit 200
+  - `SyncProvider.restartServer()`: HTTP-Aufruf mit 10s Timeout
+  - `settings_screen.dart _NasRestartCard`: Bestätigungsdialog + SnackBar-Feedback + Lade-Spinner
+  - Einmalig: `chmod +x restart_backend.sh` auf dem NAS
+
+- [x] **Bugfixes v1.29:**
+  - **Notiz beim Ausstempeln überschrieben:** `_ClockOutDialog` hatte leeren `TextEditingController` → Notiz vom Clock-in wurde mit leer überschrieben. Fix: `initialNote`-Parameter + `clockOut()` behält existierende Notiz wenn Dialog leer zurückgibt
+  - **Stale-Banner falsch befüllt:** `activeEntry`-Check (= aktuellster offener Eintrag) statt dedizierter `getStaleOpenEntry()`-Query — bei gleichzeitig aktivem heutigen Eintrag war vergangener offener Eintrag unsichtbar. Fix: `TimeEntryProvider.staleOpenEntry` via eigener DB-Query
+  - **Stale-Banner blieb nach Speichern:** `updateEntry`/`deleteEntry` aktualisierten `_staleOpenEntry` nicht → Banner blieb sichtbar bis zum nächsten `loadMonth`. Fix: Re-Query in beiden Methoden wenn betroffener Eintrag matched
+  - **Vergangene offene Einträge zeigten Timer:** `activeEntry` filternte nicht nach Datum — Homeoffice-Eintrag vom Vortag ohne Endzeit löste „Eingestempelt seit 16h" aus. Fix: `activeEntry` = nur heutige Einträge mit `isClocking = true`
+
+---
 
 ### v1.28 – Zuschläge-Sheet Ist/Effektiv-Tabelle + Offener-Eintrag-Banner + Bugfix
 

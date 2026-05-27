@@ -409,6 +409,9 @@ class HelpScreen extends StatelessWidget {
                 'alle NAS-Einträge neu. Einträge zwischen Backup und Restore '
                 'werden automatisch nachgezogen.',
               ),
+              _SubHeading('NAS-Backend'),
+              _KeyValue(label: 'Neu starten', value: 'Einstellungen → NAS-Backups → „NAS-Backend neu starten" – lädt neue server.js, führt DB-Migrationen aus'),
+              _Hint('Nach App-Updates auf den NAS immer neu starten, damit die neuen Endpunkte und Migrationen aktiv werden.'),
               _SubHeading('Sync-Status'),
               _KeyValue(label: 'Grüner Chip', value: 'Sync erfolgreich – Uhrzeit des letzten Syncs'),
               _KeyValue(label: 'Roter Chip', value: 'Kein Sync seit >2h – manuell über Einstellungen → Jetzt anstoßen'),
