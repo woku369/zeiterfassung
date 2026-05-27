@@ -154,7 +154,21 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: 'Zone betreten', value: 'Auto-Einstempeln (sofern nicht bereits eingestempelt)'),
               _KeyValue(label: 'Zone verlassen', value: '5 Min warten → Auto-Ausstempeln'),
               _KeyValue(label: 'Re-Entry binnen 5 Min', value: 'Karenz wird abgebrochen, kein Clock-out'),
-              _KeyValue(label: 'Manueller Eintrag aktiv', value: 'Wird nie automatisch geschlossen'),
+              _KeyValue(label: 'Manueller Eintrag aktiv', value: 'Wird nie automatisch geschlossen – blockiert das Geofencing nicht'),
+              _SubHeading('Offener Eintrag ohne Endzeit'),
+              _Para(
+                'Wenn ein manuell erstellter Eintrag keine Endzeit hat, '
+                'erscheint auf der Übersicht ein orangefarbenes Banner: '
+                '„Eintrag vom TT.MM.JJJJ hat keine Endzeit – antippen zum '
+                'Bearbeiten." Tippen öffnet den Eintrag direkt. '
+                'Das Geofencing läuft ungestört weiter – laufende '
+                'Auto-Einstempl-Ereignisse werden nicht blockiert.',
+              ),
+              _Hint(
+                'Das Banner erscheint für alle manuellen Einträge ohne '
+                'Endzeit – egal ob von heute oder von einem früheren Tag. '
+                'Eingestempelt-Timer und Clock-out-Button bleiben davon unberührt.',
+              ),
               _KeyValue(label: 'Auto-Pause', value: 'Bei ≥6h eingestempelt (außer Homeoffice) werden automatisch 30 Min Pause eingetragen (§ 11 AZG)'),
               _KeyValue(label: 'Standard-km', value: 'Pro Zone konfigurierbar – wird beim Auto-Einstempeln als Fahrstrecke vorausgefüllt'),
               _Hint(
