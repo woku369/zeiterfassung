@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-25 – v1.26 Geplante NAS-Backups + Sync-Datenintegrität + Force-Resync
+> Letztes Update: 2026-05-27 – v1.27 Auto-Pause + Timeline-Adopted-State + Geofencing/Backup-Bugfixes
 
 ---
 
@@ -25,6 +25,41 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.27 – Auto-Pause § 11 AZG + Timeline-Adopted + Geofencing/Backup-Bugfixes
+
+- [x] **Auto-Pause § 11 AZG beim Speichern:**
+  - `entry_form_screen.dart`: bei Einträgen ≥6h Nettodauer + `break_minutes=0` (kein Homeoffice/Abwesenheit) wird automatisch `break_minutes=30` gesetzt und `autoPauseApplied=true` gemerkt
+  - SnackBar nach dem Speichern: „Auto-Pause § 11 AZG: 30 Min. Pause eingetragen."
+  - Bereits in `geofencing_background.dart` und `home_screen.dart` implementiert (Clock-out-Pfad); Eintragsformular war bisher ausgenommen
+
+- [x] **Fahrzeit/Pause-Chips auf Eintragszeilen:**
+  - `entries_screen.dart → _buildSubtitle()`: tealfarbener Chip „N min Fahrt" + lila Chip „N min Pause" in der Untertitelzeile
+  - Redundanter Plaintext-Suffix für Fahrzeit entfernt (war doppelt)
+
+- [x] **Retroaktive Auto-Pause (Einstellungen → Datenpflege):**
+  - `DatabaseHelper.applyAutoPauseToHistorical()`: SQL-Abfrage aller Einträge mit `break_minutes=0, end_time IS NOT NULL, work_type NOT IN (homeoffice, vacation, sick, compensatoryLeave)`; Dart-seitige Prüfung ≥360 Minuten; Update `break_minutes=30, is_synced=0`
+  - `settings_screen.dart`: neuer `_AutoPauseCard`-Button zwischen `_ForceResyncCard` und `_DedupCard`
+  - Bestätigungsdialog erklärt Logik; nach Anwendung sofortiger Sync; SnackBar mit Anzahl aktualisierter Einträge
+
+- [x] **Übernommene Vorschläge bleiben in Activity-Timeline sichtbar:**
+  - `suggestion_provider.dart`: neues `_accepted`-Set + `accept(id)` + Persistenz via `SharedPreferences fusion_accepted_ids`; `adopted`-Getter gibt übernommene Vorschläge zurück
+  - `activity_timeline_screen.dart`: `_acceptSuggestion()` ruft `SuggestionProvider.accept()` auf; Section rendert `sp.pending` + `sp.adopted` kombiniert
+  - `_SuggestionCard` neuer `adopted`-Parameter: Opacity 0.50, Hintergrundfarbe `surfaceContainerLow`, Häkchen-Icon, Titel durchgestrichen, grüner „Übernommen"-Badge, keine Aktions-Buttons
+  - Calls und Raw-Sessions hatten adopteten State bereits via `ActivityProvider._adoptedCallIds/SessionIds` (v1.18)
+
+- [x] **Bugfixes v1.27:**
+  - **3 Geofencing-Bugs:** Stale Auto-Entry-ID nach SKIP-bedingtem Clock-in-Abbruch → verhinderte Clock-out; `is_synced` bei Auto-Entries nicht auf 0 gesetzt → wurden nie gepusht; Exit-Gap-Detektion zählte auch SKIP-Zyklen mit
+  - **GPS-Stream lautloser Tod + Doze-Mode:** GPS-Stream stirbt nach Doze-Pause ohne Benachrichtigung; Fix: Watchdog-Timer prüft ob Stream seit >5 Min keine Fixes liefert → Neustart; explizites Wakelock für GPS-Ticks
+  - **SKIP-Log:** Diagnose-Log zeigt jetzt bei GPS-SKIP den blockierenden Eintrag (ID, Startzeit, Typ, Notiz) – erleichtert manuelle Fehlersuche
+  - **Falsche EXIT-Notification nach geskipptem Clock-in:** Notification „Verlasse Zone" erschien auch wenn das zugehörige Clock-in übersprungen wurde. Fix: EXIT-Notification nur wenn `geofence_auto_entry_id` aktiv
+  - **Backup Catch-up-Logik:** Geofencing-Service prüfte Backup-Fenster (02:00/01:30/01:00) nur im laufenden Tick → enge 30-s-Fenster wurden verpasst wenn Dienst schlief. Fix: „War die Zeit seit letztem Tick vergangen?" statt „Bin ich genau jetzt im Fenster?"
+  - **Activity-Timeline Aquamail/App-Fragment-Problem:** Android `ACTIVITY_PAUSED`/`ACTIVITY_RESUMED` feuert auch bei internen Activity-Übergängen (z.B. E-Mail-Liste → E-Mail-Detail) → Session wird in Sub-Threshold-Fragmente aufgesplittet. Fix: `UsageStatsPlugin.kt` mergt Fragmente gleicher App mit Gap < 30 s vor Rückgabe an Dart
+  - **GPS-SKIP dauerhaft (Poco X7 Pro im Gebäude):** `_kMaxAccuracyM` war 80.0 m → Zonenprüfung dauerhaft blockiert wenn GPS-Genauigkeit 100 m (Cell/WiFi-Fallback). Fix: Threshold auf 150.0 m erhöht (alle konfigurierten Zonen > 9 km entfernt – ausreichend präzise)
+  - **Backup-Retry-Loop:** Keine Cooldown-Logik nach fehlgeschlagenem Backup → jede Minute erneuter Versuch. Fix: `backup_last_*_attempt`-Key in SharedPreferences; nächster Versuch erst nach 30 Min; Schlüssel wird bei Erfolg entfernt
+  - **§ 68 EStG Freibetrag korrigiert:** `reports_screen.dart _kCeiling` war 360.0 → auf 400.0 geändert (gültig seit 1.1.2024); `help_screen.dart` entsprechend aktualisiert; Skill-Referenzdatei `sonderarbeitszeit-ho-reisen.md` um vollständige § 68-Sektion ergänzt
+
+---
 
 ### v1.26 – Geplante NAS-Backups + Sync-Datenintegrität
 
@@ -105,7 +140,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Sa/So/FT-Marker (Anzahl Einträge je Monat)
 
 - [x] **So/FT-Pauschale-Rechner (nur Gurktaler AG):**
-  - § 68 EStG: So/FT-Zuschläge steuer- & SV-frei bis €360/Monat
+  - § 68 EStG: So/FT-Zuschläge steuer- & SV-frei bis €400/Monat (seit 1.1.2024; davor €360)
   - Monatliche Aufschlüsselung + Deckel-Indikator (✓ / ⚠)
   - Jährlicher Gesamtvorteil DN (LSt + SV) + DG (SV)
   - Neues Feld `monthly_gross` (DB v17) in AG-Einstellungen für €-Berechnung
@@ -179,7 +214,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Aufteilung jedes Eintrags in Normal-/+50%/+100%-Stunden: Sa vor 13h = normal, Sa 13–20h = ×1.5, Sa/Sa nach 20h = ×2.0, So/Feiertag gesamt = ×2.0, Werktag nach 20h = ×2.0
   - Farbkodierung: hellgelb (+50%), hellrosa (+100%), weiß (normal)
   - Monatssummen + Jahressumme für alle Spalten
-  - Argumentation-Sektion (lila): Soll vs. effektiv-gewichtet, Wochen-Äquivalent, Differenz zum 10h-Ziel, km/Fahrzeit-Summen, Hinweis auf § 68 EStG (360 €/Monat steuerfrei DN+DG)
+  - Argumentation-Sektion (lila): Soll vs. effektiv-gewichtet, Wochen-Äquivalent, Differenz zum 10h-Ziel, km/Fahrzeit-Summen, Hinweis auf § 68 EStG (400 €/Monat steuerfrei DN+DG, seit 1.1.2024)
   - Homeoffice-Einträge werden als „normal" geführt (kein Zuschlag per Vereinbarung)
 
 - [x] **Geofencing-Bugfixes v1.22 (3 Root Causes):**
@@ -697,7 +732,7 @@ Zahlen belegt, nicht nur behauptet.
   - Gegenüberstellung: vertraglich 20 % vs. geleistet ~X %
 
 - [x] **Hochrechnung Überstundenpauschale:** *(implementiert in v1.24 – So/FT-Pauschale-Karte)*
-  - Monatliche So/FT-h × Stundensatz, Gegenüberstellung €360-Grenze (§ 68 EStG), DN + DG getrennt
+  - Monatliche So/FT-h × Stundensatz, Gegenüberstellung €400-Grenze (§ 68 EStG, seit 1.1.2024), DN + DG getrennt
 
 - [ ] **Fahrtenleistung an So/FT als Verhandlungsargument (informativ):**
   - **Hintergrund:** Gurk ist vereinbarter Dienstort → Privatfahrten, keine Reisekostenersatzpflicht. Rechtlich akzeptiert.
@@ -778,7 +813,7 @@ app/
                      terminmeister_service (TmAppointment, fetchMonth – optional)
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v15)
+    database/        database_helper (SQLite v18)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -834,7 +869,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.26)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.27)
 
 ---
 
@@ -861,3 +896,5 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | NAS-Prozess-Persistenz | Aktuell via `nohup` + `disown` gestartet (Benutzer Wolfgang). Bei NAS-Neustart muss der Server manuell oder per DSM Task Scheduler neu gestartet werden |
 | Auto Clock-in/out | Funktioniert auch bei geschlossener App (Background-Isolate schreibt direkt in SQLite). 5 Min Karenz beim Verlassen einer Zone gegen GPS-Drift. Auto-Clock-out greift nur bei Einträgen, die selbst per Geofencing erstellt wurden – manuelle Einträge bleiben unangetastet |
 | Geofencing-Watchdog | Schlägt nur Alarm bei auto-erstellten Einträgen, nicht bei manuellen (kein Fehlalarm für legitimes Homeoffice). Schwelle: 30 Min außerhalb aller Zonen. Notification-ID 994 wird ersetzt – kein Spam |
+| GPS-Genauigkeits-Schwelle | `_kMaxAccuracyM = 150.0 m` (v1.27, davor 80 m). Beim Poco X7 Pro im Gebäude liefert das GPS-System Cell/WiFi-Fallback mit ~100 m Genauigkeit. 150 m ist ausreichend, da alle konfigurierten Zonen > 9 km entfernt liegen. |
+| Backup-Retry-Cooldown | Nach fehlgeschlagenem geplanten Backup (täglich/monatlich/jährlich) wird frühestens 30 Min später erneut versucht (`backup_last_*_attempt` in SharedPreferences). Verhindert Retry-Spam bei dauerhaft fehlender NAS-Verbindung. |
