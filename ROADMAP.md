@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-27 – v1.29 is_clocking-Flag + NAS-Restart-Button + Stale-Banner-Fixes
+> Letztes Update: 2026-05-27 – v1.30 Stale-Banner auch für heutige Einträge
 
 ---
 
@@ -26,6 +26,15 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Erledigt
 
+### v1.30 – Bugfix: Stale-Banner auch für heutige Einträge ohne Endzeit
+
+- [x] **`getStaleOpenEntry` zeigt Banner auch für heutige manuelle Einträge:**
+  - Bisherige Query filterte `date < today` → heutige Einträge ohne Endzeit und `is_clocking=0` waren unsichtbar (kein Timer, kein Banner)
+  - Fix: Query auf `end_time IS NULL AND is_clocking = 0` umgestellt (kein Datumsfilter)
+  - Banner erscheint jetzt korrekt für alle manuellen Einträge ohne Endzeit — egal ob gestern oder heute
+
+---
+
 ### v1.29 – is_clocking-Flag + NAS-Restart-Button + Stale-Banner-Fixes (DB v19)
 
 - [x] **`is_clocking`-Flag trennt Clock-in-Sessions von manuellen Ereignissen (DB v18→v19):**
@@ -33,7 +42,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - `clockIn()` in Provider setzt `isClocking = true`; Geofencing-Auto-Clock-in setzt `is_clocking = 1`
   - Geofencing-SKIP-Check prüft nur noch `is_clocking = 1`-Einträge — manuelle Ereignisse blockieren Auto-Clock-in nicht mehr
   - `activeEntry` (laufender Timer) zeigt nur heutige Einträge mit `isClocking = true`
-  - Manuelle Einträge ohne Endzeit: kein Timer, kein Clock-out-Button, nur orangener Banner wenn Datum vor heute
+  - Manuelle Einträge ohne Endzeit: kein Timer, kein Clock-out-Button, orangener Banner (auch für heutige Einträge – v1.30)
   - DB v19-Migration + `server.js` vollständig nachgezogen (Schema, Migration, Upsert, Response)
 
 - [x] **NAS-Backend-Restart-Button in Einstellungen:**
@@ -861,7 +870,7 @@ app/
                      terminmeister_service (TmAppointment, fetchMonth – optional)
     screens/         home, entries, entry_form, reports, settings,
                      locations, imap, help, activity_timeline
-    database/        database_helper (SQLite v18)
+    database/        database_helper (SQLite v19)
   assets/
     tray_icon.ico    16×16 Platzhalter-Icon (App-Blau #1565C0)
   android/
@@ -880,7 +889,10 @@ app/
 backend/
   server.js          Standalone Node.js, kein Build-Schritt
                      Endpunkte: /api/health, /api/sync, /api/backup,
-                                /api/entries (legacy)
+                                /api/backup/scheduled, /api/backup/list,
+                                /api/backup/get, /api/entries (legacy),
+                                /api/restart (spawnt restart_backend.sh detached)
+  restart_backend.sh 2s Delay → kill Port-3000-Prozess → Node.js neu starten
   package.json       Abhängigkeit: better-sqlite3
   start_synology.sh  Synology Task Scheduler Startskript
   backup_synology.sh Tägliches DB-Backup (30 Tage)
@@ -912,12 +924,13 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 - v16: `day_type` auf `time_entries` – retroaktive Sa/So/FT-Kennzeichnung
 - v17: + `monthly_gross REAL` (employers) – Bruttogehalt für Pauschalen-Rechner
 - v18: + `default_km REAL` (tracked_locations) – Standard-Fahrstrecke pro Geofencing-Zone
+- v19: + `is_clocking INTEGER` (time_entries) – trennt echte Clock-in-Sessions von manuellen Ereignissen
 
 **Server-DB:** `employers`, `tracked_locations`, `projects`, `deletion_log`, `entry_project_splits`, `activity_log`, `sync_state` – vollständig via `/api/sync.ts`; zusätzlich `app_settings(key, value, updated_at)` für Settings-Sync (legacy `server.js`).
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.27)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.30)
 
 ---
 
