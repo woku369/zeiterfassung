@@ -109,6 +109,15 @@ class TimeEntryProvider extends ChangeNotifier {
     if (_activeEntry?.id == entry.id) {
       _activeEntry = entry.isActive ? entry : null;
     }
+    if (_staleOpenEntry?.id == entry.id) {
+      if (entry.endTime != null) {
+        final now = DateTime.now();
+        final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        _staleOpenEntry = await DatabaseHelper.instance.getStaleOpenEntry(today);
+      } else {
+        _staleOpenEntry = entry;
+      }
+    }
     notifyListeners();
     _syncTrigger?.call();
   }
@@ -116,6 +125,11 @@ class TimeEntryProvider extends ChangeNotifier {
   Future<void> deleteEntry(String id) async {
     await DatabaseHelper.instance.deleteEntry(id);
     _entries.removeWhere((e) => e.id == id);
+    if (_staleOpenEntry?.id == id) {
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      _staleOpenEntry = await DatabaseHelper.instance.getStaleOpenEntry(today);
+    }
     if (_activeEntry?.id == id) _activeEntry = null;
     notifyListeners();
     _syncTrigger?.call();
