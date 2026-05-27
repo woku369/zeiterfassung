@@ -77,7 +77,7 @@ class TimeEntryProvider extends ChangeNotifier {
     final updated = _activeEntry!.copyWith(
       endTime: now,
       breakMinutes: breakMinutes,
-      note: note,
+      note: note.isNotEmpty ? note : (_activeEntry!.note),
     );
     await DatabaseHelper.instance.updateEntry(updated);
     final idx = _entries.indexWhere((e) => e.id == updated.id);

@@ -184,7 +184,10 @@ class _DashboardTabState extends State<_DashboardTab> {
     }
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _ClockOutDialog(initialBreakMinutes: suggestedBreak),
+      builder: (_) => _ClockOutDialog(
+        initialBreakMinutes: suggestedBreak,
+        initialNote: active?.note ?? '',
+      ),
     );
     if (result == null || !mounted) return;
     await tp.clockOut(
@@ -750,19 +753,21 @@ class _ClockInDialogState extends State<_ClockInDialog> {
 
 class _ClockOutDialog extends StatefulWidget {
   final int initialBreakMinutes;
-  const _ClockOutDialog({this.initialBreakMinutes = 0});
+  final String initialNote;
+  const _ClockOutDialog({this.initialBreakMinutes = 0, this.initialNote = ''});
   @override
   State<_ClockOutDialog> createState() => _ClockOutDialogState();
 }
 
 class _ClockOutDialogState extends State<_ClockOutDialog> {
-  final _noteCtrl = TextEditingController();
+  late final TextEditingController _noteCtrl;
   late int _breakMinutes;
 
   @override
   void initState() {
     super.initState();
     _breakMinutes = widget.initialBreakMinutes;
+    _noteCtrl = TextEditingController(text: widget.initialNote);
   }
 
   @override
