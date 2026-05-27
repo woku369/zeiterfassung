@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-27 – v1.27 Auto-Pause + Timeline-Adopted-State + Geofencing/Backup-Bugfixes
+> Letztes Update: 2026-05-27 – v1.27 Auto-Pause + Timeline-Adopted + Geofencing/Backup-Bugfixes + Backup-Refactoring
 
 ---
 
@@ -58,6 +58,10 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - **GPS-SKIP dauerhaft (Poco X7 Pro im Gebäude):** `_kMaxAccuracyM` war 80.0 m → Zonenprüfung dauerhaft blockiert wenn GPS-Genauigkeit 100 m (Cell/WiFi-Fallback). Fix: Threshold auf 150.0 m erhöht (alle konfigurierten Zonen > 9 km entfernt – ausreichend präzise)
   - **Backup-Retry-Loop:** Keine Cooldown-Logik nach fehlgeschlagenem Backup → jede Minute erneuter Versuch. Fix: `backup_last_*_attempt`-Key in SharedPreferences; nächster Versuch erst nach 30 Min; Schlüssel wird bei Erfolg entfernt
   - **§ 68 EStG Freibetrag korrigiert:** `reports_screen.dart _kCeiling` war 360.0 → auf 400.0 geändert (gültig seit 1.1.2024); `help_screen.dart` entsprechend aktualisiert; Skill-Referenzdatei `sonderarbeitszeit-ho-reisen.md` um vollständige § 68-Sektion ergänzt
+  - **Auto-Clock-in durch offenen Abwesenheitseintrag blockiert:** SKIP-Check prüfte `end_time IS NULL` ohne Typfilter — Urlaubs-/Krankenstand-/ZA-Einträge haben designbedingt kein `end_time` und blockierten jeden Auto-Clock-in dauerhaft. Fix: `work_type NOT IN ('vacation','sick','compensatoryLeave')` in der Query
+  - **Backup-Fehlerursache im Log sichtbar + 30s Timeout:** `scheduledNasBackup` gab nur `bool` zurück; `catch (_)` verschluckte die Fehlerursache vollständig. Refactoring auf `(bool, String?)`: Timeout nach 30 s, HTTP-Statuscode + Body, Exception-Text werden geloggt
+  - **Tägliches Backup an Sync gekoppelt:** `SyncProvider._runDailyBackupIfNeeded()` läuft nach jedem erfolgreichen Sync — zuverlässiger als Zeitfenster (02:00 Uhr) im Geofencing-Service. Monatliches/jährliches Backup bleibt im Geofencing-Service. Täglicher Backup-Block im Geofencing-Service entfernt.
+  - **Auto-Pause-Nachtrags-Button entfernt:** Massenupdate historischer Einträge ohne Einzelkontrolle zu riskant. `_AutoPauseCard` aus Einstellungen und `applyAutoPauseToHistorical()` aus `DatabaseHelper` entfernt. Auto-Pause beim Speichern neuer Einträge bleibt.
 
 ---
 
@@ -887,7 +891,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 | Settings-Sync Timing | LWW basiert auf "Gerät hat Setting zuletzt geändert" – nicht auf Sync-Reihenfolge. Erfordert konsistente Systemuhren auf allen Geräten |
 | Backup-Restore | Setzt `last_sync_at` lokal auf Epoch zurück, damit beim nächsten Sync alle NAS-Daten neu gezogen werden. NAS-Stand gewinnt per LWW – Backup ist nur dann „die Wahrheit", wenn der NAS keine neueren Daten hat |
 | Windows Aktivitäts-Tracking | Win32 FFI eingebaut – funktionsfähig |
-| NAS-Backup | Automatische geplante Backups (täglich×30, monatlich, jährlich) via Geofencing-Foreground-Service. Restore über Einstellungen → NAS-Backups. Manuelles Einzel-Backup (`backup_latest.json`) weiterhin möglich. |
+| NAS-Backup | Tägliches Backup läuft nach jedem erfolgreichen Sync (SyncProvider). Monatliches/jährliches Backup via Geofencing-Foreground-Service. Fehlerursache wird im Geofencing-Log geloggt (HTTP-Status, Timeout, Exception). Restore über Einstellungen → NAS-Backups. |
 | Android Aktivitäts-Tracking | UsageStatsManager: nur App-Name, kein Dokument-Titel; geringere Granularität als Windows |
 | iOS | Nicht geplant – kein Geofencing im Hintergrund, kein Anruf-Tracking |
 | Überstunden-Kalkulation | Bewusst nicht implementiert (keine automatischen Zuschläge). Ausnahme: Vertragsäquivalent für Gurktaler AG im Jahresbericht – informativ, beeinflusst Ist-Stunden nicht |
