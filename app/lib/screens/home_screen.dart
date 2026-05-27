@@ -313,6 +313,8 @@ class _DashboardTabState extends State<_DashboardTab> {
                   );
                 },
               ),
+            if (active != null && active.date.isBefore(today))
+              _OpenEntryBanner(entry: active),
             const SizedBox(height: 4),
             Card(
               color: active != null ? cs.primaryContainer : cs.surfaceContainerLow,
@@ -505,6 +507,56 @@ class _DashboardTabState extends State<_DashboardTab> {
               ...tp.entries.take(5).map((e) => _EntryTile(entry: e, compact: true)),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Offener-Eintrag-Banner ────────────────────────────────────────────────────
+
+class _OpenEntryBanner extends StatelessWidget {
+  final TimeEntry entry;
+  const _OpenEntryBanner({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final df = DateFormat('dd.MM.yyyy', 'de_AT');
+    final dateStr = df.format(entry.date);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: Colors.orange.shade100,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => EntryFormScreen(entry: entry)),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange.shade800, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Eintrag vom $dateStr hat keine Endzeit — antippen zum Bearbeiten',
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.orange.shade700, size: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
