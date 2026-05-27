@@ -615,39 +615,80 @@ class ExportService {
         '${yearDiff10h >= 0 ? '+' : ''}${_fmtH(yearDiff10h)}');
     row++;
 
-    argRow('MONATLICHE SAISONÜBERSICHT', '', isHeader: true);
-    // Group entries by month within fiscal year
+    // ── Monatlicher Ist- vs. Effektivstunden-Vergleich (Tabelle) ─────────────
     final mf2 = DateFormat('MMM yyyy', 'de_AT');
-    final monthlyData = <int, ({double istH, double soFtH, int soFtDays})>{};
+    final monthlyData = <int, ({double istH, double normalH, double s50H, double s100H, double effH})>{};
     for (final e in workEntries) {
-      if (e.workType.isAbsence) continue;
-      final ym = e.date.year * 12 + e.date.month;
-      final prev = monthlyData[ym];
-      final soFt = e.dayType == DayType.saturday ||
-                   e.dayType == DayType.sunday ||
-                   e.dayType == DayType.holiday;
-      monthlyData[ym] = (
-        istH: (prev?.istH ?? 0) + e.totalHours,
-        soFtH: (prev?.soFtH ?? 0) + (soFt ? e.totalHours : 0),
-        soFtDays: (prev?.soFtDays ?? 0) + (soFt && e.totalHours > 0 ? 1 : 0),
+      final bd2  = _surchargeBreakdown(e);
+      final ym2  = e.date.year * 12 + e.date.month;
+      final prev = monthlyData[ym2];
+      monthlyData[ym2] = (
+        istH:    (prev?.istH    ?? 0) + bd2.normalH + bd2.surcharge50H + bd2.surcharge100H,
+        normalH: (prev?.normalH ?? 0) + bd2.normalH,
+        s50H:    (prev?.s50H    ?? 0) + bd2.surcharge50H,
+        s100H:   (prev?.s100H   ?? 0) + bd2.surcharge100H,
+        effH:    (prev?.effH    ?? 0) + bd2.effectiveH,
       );
     }
-    for (final entry in monthlyData.entries.toList()..sort((a, b) => a.key.compareTo(b.key))) {
-      final rawMonth = entry.key % 12;
-      final month3 = rawMonth == 0 ? 12 : rawMonth;
-      final year3 = rawMonth == 0 ? (entry.key ~/ 12) - 1 : entry.key ~/ 12;
-      final mDate = DateTime(year3, month3);
-      final avgWeekly = entry.value.istH / 4.33;
-      argRow(
-        mf2.format(mDate),
-        'Ist: ${_fmtH(entry.value.istH)}  ·  Ø ${avgWeekly.toStringAsFixed(1)}h/W'
-        '${entry.value.soFtDays > 0 ? '  ·  So/FT: ${entry.value.soFtH.toStringAsFixed(1)}h (${entry.value.soFtDays}×)' : ''}',
-      );
+
+    // Table header
+    const mHeaders = [
+      'Monat', 'Ist (h)', 'Normal (h)', '+50% (h)', '+100% (h)',
+      'Effektiv (h)', 'Bonus (h)', 'Faktor ×',
+    ];
+    for (var c = 0; c < mHeaders.length; c++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = TextCellValue(mHeaders[c]);
+      cell.cellStyle = CellStyle(bold: true, backgroundColorHex: _argHeader, fontColorHex: _white);
     }
     row++;
 
-    argRow('+50%-Zuschlag (Std gesamt)', _fmtH(totS50));
-    argRow('+100%-Zuschlag (Std gesamt)', _fmtH(totS100));
+    void writeMonthRow(String label, double ist, double norm, double s50,
+        double s100, double eff, {bool isTotals = false}) {
+      final bonus  = eff - ist;
+      final faktor = ist > 0 ? eff / ist : 0.0;
+      final values = <CellValue>[
+        TextCellValue(label),
+        DoubleCellValue(double.parse(ist.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(norm.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(s50.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(s100.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(eff.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(bonus.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(faktor.toStringAsFixed(2))),
+      ];
+      for (var c = 0; c < values.length; c++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        cell.value = values[c];
+        final ExcelColor bg;
+        if (isTotals) {
+          bg = _blueLight;
+        } else if (c == 6) {
+          bg = _surcharge50; // Bonus-Spalte amber
+        } else if (c == 7) {
+          bg = _surcharge100; // Faktor-Spalte pink
+        } else {
+          bg = _argBg;
+        }
+        cell.cellStyle = CellStyle(bold: isTotals || c == 0, backgroundColorHex: bg);
+      }
+      row++;
+    }
+
+    for (final entry in monthlyData.entries.toList()..sort((a, b) => a.key.compareTo(b.key))) {
+      final rawMonth = entry.key % 12;
+      final month3   = rawMonth == 0 ? 12 : rawMonth;
+      final year3    = rawMonth == 0 ? (entry.key ~/ 12) - 1 : entry.key ~/ 12;
+      writeMonthRow(
+        mf2.format(DateTime(year3, month3)),
+        entry.value.istH, entry.value.normalH,
+        entry.value.s50H, entry.value.s100H, entry.value.effH,
+      );
+    }
+    writeMonthRow('GESAMT', totNH + totS50 + totS100, totNH, totS50, totS100, totEff,
+        isTotals: true);
+    row++;
+
     argRow('km gesamt', '${totKm.toStringAsFixed(1)} km');
     argRow('Fahrzeit gesamt', _fmtH(totTH));
     row++;
