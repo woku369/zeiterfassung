@@ -873,7 +873,7 @@ Future<void> _checkScheduledBackup() async {
               now.difference(lastAttempt).inMinutes >= 30;
           if (cooldownOk) {
             await prefs.setString('backup_last_yearly_attempt', now.toIso8601String());
-            final ok = await BackupService.instance.scheduledNasBackup(
+            final (ok, err) = await BackupService.instance.scheduledNasBackup(
               nasUrl: nasUrl,
               apiKey: apiKey,
               type: 'yearly',
@@ -883,7 +883,7 @@ Future<void> _checkScheduledBackup() async {
               await prefs.remove('backup_last_yearly_attempt');
               await _log('BACKUP', 'Jährliches Backup erfolgreich: $ym');
             } else {
-              await _log('BACKUP', 'Jährliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+              await _log('BACKUP', 'Jährliches Backup fehlgeschlagen ($err) – nächster Versuch in 30 min');
             }
           }
         }
@@ -902,7 +902,7 @@ Future<void> _checkScheduledBackup() async {
             now.difference(lastAttempt).inMinutes >= 30;
         if (cooldownOk) {
           await prefs.setString('backup_last_monthly_attempt', now.toIso8601String());
-          final ok = await BackupService.instance.scheduledNasBackup(
+          final (ok, err) = await BackupService.instance.scheduledNasBackup(
             nasUrl: nasUrl,
             apiKey: apiKey,
             type: 'monthly',
@@ -912,7 +912,7 @@ Future<void> _checkScheduledBackup() async {
             await prefs.remove('backup_last_monthly_attempt');
             await _log('BACKUP', 'Monatliches Backup erfolgreich: $ym');
           } else {
-            await _log('BACKUP', 'Monatliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+            await _log('BACKUP', 'Monatliches Backup fehlgeschlagen ($err) – nächster Versuch in 30 min');
           }
         }
       }
@@ -931,7 +931,7 @@ Future<void> _checkScheduledBackup() async {
             now.difference(lastAttempt).inMinutes >= 30;
         if (cooldownOk) {
           await prefs.setString('backup_last_daily_attempt', now.toIso8601String());
-          final ok = await BackupService.instance.scheduledNasBackup(
+          final (ok, err) = await BackupService.instance.scheduledNasBackup(
             nasUrl: nasUrl,
             apiKey: apiKey,
             type: 'daily',
@@ -941,7 +941,7 @@ Future<void> _checkScheduledBackup() async {
             await prefs.remove('backup_last_daily_attempt');
             await _log('BACKUP', 'Tägliches Backup erfolgreich: $today');
           } else {
-            await _log('BACKUP', 'Tägliches Backup fehlgeschlagen – nächster Versuch in 30 min');
+            await _log('BACKUP', 'Tägliches Backup fehlgeschlagen ($err) – nächster Versuch in 30 min');
           }
         }
       }

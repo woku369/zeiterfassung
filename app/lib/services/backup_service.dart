@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -136,7 +137,8 @@ class BackupService {
 
   /// Erstellt ein vollständiges Backup und sendet es als geplantes Backup
   /// (täglich/monatlich/jährlich) an `/api/backup/scheduled`.
-  Future<bool> scheduledNasBackup({
+  /// Gibt `(ok, errorMsg)` zurück – errorMsg ist null bei Erfolg.
+  Future<(bool, String?)> scheduledNasBackup({
     required String nasUrl,
     String? apiKey,
     required String type,
@@ -146,10 +148,14 @@ class BackupService {
       final body = jsonEncode({'type': type, 'data': payload});
       final uri = Uri.parse('${_normalize(nasUrl)}/api/backup/scheduled');
       final response = await http.post(uri,
-          headers: _headers(apiKey), body: body);
-      return response.statusCode == 200;
-    } catch (_) {
-      return false;
+          headers: _headers(apiKey), body: body)
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode == 200) return (true, null);
+      return (false, 'HTTP ${response.statusCode}: ${response.body}');
+    } on TimeoutException {
+      return (false, 'Timeout nach 30 s');
+    } catch (e) {
+      return (false, e.toString());
     }
   }
 
