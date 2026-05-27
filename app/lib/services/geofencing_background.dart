@@ -642,7 +642,8 @@ Future<bool> _autoClockIn(
       // when _kAutoEntryKey was lost due to a service restart.
       final active = await db.query('time_entries',
           columns: ['id', 'note', 'start_time', 'work_type'],
-          where: 'end_time IS NULL', limit: 1);
+          where: "end_time IS NULL AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+          limit: 1);
       if (active.isNotEmpty) {
         final existingId    = active.first['id']         as String;
         final existingNote  = active.first['note']       as String? ?? '';
