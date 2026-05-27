@@ -58,6 +58,7 @@ db.exec(`
     travel_minutes INTEGER NOT NULL DEFAULT 0,
     employer_id    TEXT,
     is_special_hours INTEGER NOT NULL DEFAULT 0,
+    is_clocking    INTEGER NOT NULL DEFAULT 0,
     is_synced      INTEGER NOT NULL DEFAULT 1,
     created_at     TEXT NOT NULL,
     updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
@@ -118,6 +119,9 @@ try {
   db.exec("ALTER TABLE time_entries ADD COLUMN project_id TEXT");
 } catch (_) { /* Spalte existiert bereits */ }
 try {
+  db.exec("ALTER TABLE time_entries ADD COLUMN is_clocking INTEGER NOT NULL DEFAULT 0");
+} catch (_) { /* Spalte existiert bereits */ }
+try {
   db.exec("ALTER TABLE employers ADD COLUMN vacation_days_per_year INTEGER NOT NULL DEFAULT 25");
 } catch (_) { /* Spalte existiert bereits */ }
 try {
@@ -170,17 +174,18 @@ const stmts = {
     INSERT INTO time_entries
       (id,date,start_time,end_time,break_minutes,work_type,day_type,note,
        distance_km,start_lat,start_lng,end_lat,end_lng,travel_minutes,
-       employer_id,project_id,is_special_hours,is_synced,created_at,updated_at,deleted_at)
+       employer_id,project_id,is_special_hours,is_clocking,is_synced,created_at,updated_at,deleted_at)
     VALUES
       (@id,@date,@start_time,@end_time,@break_minutes,@work_type,@day_type,@note,
        @distance_km,@start_lat,@start_lng,@end_lat,@end_lng,@travel_minutes,
-       @employer_id,@project_id,@is_special_hours,1,@created_at,@updated_at,@deleted_at)
+       @employer_id,@project_id,@is_special_hours,@is_clocking,1,@created_at,@updated_at,@deleted_at)
     ON CONFLICT(id) DO UPDATE SET
       date=excluded.date, start_time=excluded.start_time, end_time=excluded.end_time,
       break_minutes=excluded.break_minutes, work_type=excluded.work_type,
       day_type=excluded.day_type, note=excluded.note, distance_km=excluded.distance_km,
       travel_minutes=excluded.travel_minutes, employer_id=excluded.employer_id,
       project_id=excluded.project_id, is_special_hours=excluded.is_special_hours,
+      is_clocking=excluded.is_clocking,
       updated_at=excluded.updated_at, deleted_at=excluded.deleted_at
     WHERE excluded.updated_at > time_entries.updated_at
   `),
@@ -360,6 +365,7 @@ async function handleRequest(req, res) {
       start_lng: e.start_lng ?? null, end_lat: e.end_lat ?? null, end_lng: e.end_lng ?? null,
       travel_minutes: e.travel_minutes ?? 0, employer_id: e.employer_id ?? null,
       project_id: e.project_id ?? null, is_special_hours: e.is_special_hours ? 1 : 0,
+      is_clocking: e.is_clocking ? 1 : 0,
       created_at: e.created_at, updated_at: ts, deleted_at: e.deleted_at ?? null,
     })));
 
@@ -570,6 +576,7 @@ async function handleRequest(req, res) {
       start_lng: e.start_lng ?? null, end_lat: e.end_lat ?? null, end_lng: e.end_lng ?? null,
       travel_minutes: e.travel_minutes ?? 0, employer_id: e.employer_id ?? null,
       project_id: e.project_id ?? null, is_special_hours: e.is_special_hours ? 1 : 0,
+      is_clocking: e.is_clocking ? 1 : 0,
       created_at: e.created_at, updated_at: ts, deleted_at: null,
     })));
     push(entries);

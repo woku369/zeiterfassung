@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 18,
+      version: 19,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -63,6 +63,7 @@ class DatabaseHelper {
         project_id TEXT,
         is_special_hours INTEGER NOT NULL DEFAULT 0,
         is_synced INTEGER NOT NULL DEFAULT 0,
+        is_clocking INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
     ''');
@@ -158,6 +159,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 18) {
       await db.execute('ALTER TABLE tracked_locations ADD COLUMN default_km REAL');
+    }
+    if (oldVersion < 19) {
+      await db.execute('ALTER TABLE time_entries ADD COLUMN is_clocking INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -491,7 +495,7 @@ class DatabaseHelper {
   Future<TimeEntry?> getAnyActiveEntry() async {
     final db = await database;
     final rows = await db.query('time_entries',
-        where: "end_time IS NULL AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        where: "end_time IS NULL AND is_clocking = 1 AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
         orderBy: 'start_time DESC',
         limit: 1);
     return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
@@ -501,7 +505,7 @@ class DatabaseHelper {
   Future<TimeEntry?> getTodayActiveEntry(String today) async {
     final db = await database;
     final rows = await db.query('time_entries',
-        where: "end_time IS NULL AND date = ? AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        where: "end_time IS NULL AND is_clocking = 1 AND date = ? AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
         whereArgs: [today],
         orderBy: 'start_time DESC',
         limit: 1);

@@ -59,6 +59,7 @@ class TimeEntryProvider extends ChangeNotifier {
       workType: workType,
       dayType: dayType,
       employerId: _employerId,
+      isClocking: true,
       createdAt: now,
     );
     await DatabaseHelper.instance.insertEntry(entry);

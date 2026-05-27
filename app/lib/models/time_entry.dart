@@ -19,6 +19,7 @@ class TimeEntry {
   final String? projectId;
   final bool isSpecialHours;
   final bool isSynced;
+  final bool isClocking;
   final DateTime createdAt;
 
   const TimeEntry({
@@ -40,6 +41,7 @@ class TimeEntry {
     this.projectId,
     this.isSpecialHours = false,
     this.isSynced = false,
+    this.isClocking = false,
     required this.createdAt,
   });
 
@@ -53,7 +55,7 @@ class TimeEntry {
 
   double get totalHours => totalDuration.inMinutes / 60.0;
 
-  bool get isActive => !workType.isAbsence && endTime == null;
+  bool get isActive => !workType.isAbsence && endTime == null && isClocking;
 
   TimeEntry copyWith({
     String? id,
@@ -74,6 +76,7 @@ class TimeEntry {
     String? projectId,
     bool? isSpecialHours,
     bool? isSynced,
+    bool? isClocking,
     DateTime? createdAt,
   }) {
     return TimeEntry(
@@ -95,6 +98,7 @@ class TimeEntry {
       projectId: projectId ?? this.projectId,
       isSpecialHours: isSpecialHours ?? this.isSpecialHours,
       isSynced: isSynced ?? this.isSynced,
+      isClocking: isClocking ?? this.isClocking,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -118,6 +122,7 @@ class TimeEntry {
     'project_id': projectId,
     'is_special_hours': isSpecialHours ? 1 : 0,
     'is_synced': isSynced ? 1 : 0,
+    'is_clocking': isClocking ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
   };
 
@@ -140,6 +145,7 @@ class TimeEntry {
     projectId: m['project_id'] as String?,
     isSpecialHours: (m['is_special_hours'] as int? ?? 0) == 1,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
+    isClocking: (m['is_clocking'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
   );
 
