@@ -918,34 +918,8 @@ Future<void> _checkScheduledBackup() async {
       }
     }
 
-    // ── Tägliches Backup (ab 02:00, Catch-up wenn Fenster verpasst)
-    // h >= 2: läuft beim nächsten aktiven Minute nach 02:00, nicht nur bei exakt 02:00.
-    // Retry-Cooldown 30 min: verhindert minütliche Wiederholungsversuche bei NAS-Fehler.
-    if (h >= 2) {
-      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final lastDaily = prefs.getString('backup_last_daily') ?? '';
-      if (lastDaily != today) {
-        final lastAttemptStr = prefs.getString('backup_last_daily_attempt') ?? '';
-        final lastAttempt = DateTime.tryParse(lastAttemptStr);
-        final cooldownOk = lastAttempt == null ||
-            now.difference(lastAttempt).inMinutes >= 30;
-        if (cooldownOk) {
-          await prefs.setString('backup_last_daily_attempt', now.toIso8601String());
-          final (ok, err) = await BackupService.instance.scheduledNasBackup(
-            nasUrl: nasUrl,
-            apiKey: apiKey,
-            type: 'daily',
-          );
-          if (ok) {
-            await prefs.setString('backup_last_daily', today);
-            await prefs.remove('backup_last_daily_attempt');
-            await _log('BACKUP', 'Tägliches Backup erfolgreich: $today');
-          } else {
-            await _log('BACKUP', 'Tägliches Backup fehlgeschlagen ($err) – nächster Versuch in 30 min');
-          }
-        }
-      }
-    }
+    // Tägliches Backup läuft jetzt via SyncProvider._runDailyBackupIfNeeded()
+    // nach jedem erfolgreichen Sync – zuverlässiger als Zeitfenster hier.
   } catch (e) {
     await _log('BACKUP-ERROR', e.toString());
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sync_service.dart';
+import '../services/backup_service.dart';
 import 'activity_provider.dart';
 
 class SyncProvider extends ChangeNotifier {
@@ -170,6 +171,14 @@ class SyncProvider extends ChangeNotifier {
         await _activityProvider!.applyServerSettings(result.serverSettings!);
       }
 
+      // Tägliches Backup nach erfolgreichem Sync – zuverlässiger als Zeitfenster
+      // im Geofencing-Service, weil Sync ohnedies bei Netz-Verfügbarkeit läuft.
+      if (_lastError == null) {
+        try {
+          await _runDailyBackupIfNeeded();
+        } catch (_) {}
+      }
+
       // Provider neu laden, damit UI die frischen DB-Daten zeigt
       if (_lastError == null && _onSyncComplete != null) {
         try {
@@ -181,6 +190,23 @@ class SyncProvider extends ChangeNotifier {
     } finally {
       _isSyncing = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _runDailyBackupIfNeeded() async {
+    if (!hasNasConfig) return;
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+    if (prefs.getString('backup_last_daily') == today) return;
+    final (ok, _) = await BackupService.instance.scheduledNasBackup(
+      nasUrl: _nasUrl,
+      apiKey: _nasApiKey.isNotEmpty ? _nasApiKey : null,
+      type: 'daily',
+    );
+    if (ok) {
+      await prefs.setString('backup_last_daily', today);
+      await prefs.remove('backup_last_daily_attempt');
     }
   }
 
