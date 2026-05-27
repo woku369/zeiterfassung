@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/sync_service.dart';
 import '../services/backup_service.dart';
@@ -90,6 +91,25 @@ class SyncProvider extends ChangeNotifier {
       baseUrl: _nasUrl,
       apiKey: _nasApiKey.isEmpty ? null : _nasApiKey,
     );
+  }
+
+  /// Startet das NAS-Backend neu via POST /api/restart.
+  /// Gibt null bei Erfolg zurück, sonst eine Fehlermeldung.
+  Future<String?> restartServer() async {
+    if (!hasNasConfig) return 'Keine NAS-URL konfiguriert';
+    try {
+      final base = _nasUrl.trim().replaceAll(RegExp(r'/$'), '');
+      final uri = Uri.parse('$base/api/restart');
+      final headers = _nasApiKey.isEmpty ? <String, String>{} : {'x-api-key': _nasApiKey};
+      final response = await http.post(uri, headers: headers)
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) return null;
+      return 'HTTP ${response.statusCode}';
+    } on TimeoutException {
+      return 'Timeout';
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   /// Immediate sync – called on startup or manual button.

@@ -8,9 +8,10 @@
  *   DATA_DIR  Verzeichnis für SQLite-DB (default: ./data)
  */
 
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http   = require('http');
+const fs     = require('fs');
+const path   = require('path');
+const { spawn } = require('child_process');
 
 // ── Konfiguration ─────────────────────────────────────────────────────────────
 
@@ -588,6 +589,16 @@ async function handleRequest(req, res) {
     const since = url.searchParams.get('since') || '1970-01-01T00:00:00.000Z';
     const rows = stmts.getEntriesSince.all(since);
     return send(res, 200, { entries: rows });
+  }
+
+  // ── POST /api/restart ────────────────────────────────────────────────────────
+  if (path_ === '/api/restart' && method === 'POST') {
+    if (!checkAuth(req)) return send(res, 401, { error: 'Unauthorized' });
+    const script = path.join(__dirname, 'restart_backend.sh');
+    if (!fs.existsSync(script)) return send(res, 500, { error: 'restart_backend.sh nicht gefunden' });
+    const child = spawn('/bin/sh', [script], { detached: true, stdio: 'ignore' });
+    child.unref();
+    return send(res, 200, { ok: true, message: 'Neustart wird ausgeführt…' });
   }
 
   send(res, 404, { error: 'Not found' });

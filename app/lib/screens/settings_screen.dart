@@ -258,6 +258,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ),
+            const SizedBox(height: 8),
+            const _NasRestartCard(),
           ],
 
           // ── Datenpflege ───────────────────────────────────────────────
@@ -1527,6 +1529,58 @@ class _ForceResyncCardState extends State<_ForceResyncCard> {
   }
 }
 
+
+class _NasRestartCard extends StatefulWidget {
+  const _NasRestartCard();
+  @override
+  State<_NasRestartCard> createState() => _NasRestartCardState();
+}
+
+class _NasRestartCardState extends State<_NasRestartCard> {
+  bool _loading = false;
+
+  Future<void> _restart() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('NAS-Backend neu starten?'),
+        content: const Text(
+          'Der Server wird kurz unterbrochen (~3 Sekunden). '
+          'Laufende Syncs werden abgebrochen.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Neu starten')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _loading = true);
+    final err = await context.read<SyncProvider>().restartServer();
+    if (!mounted) return;
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(err == null
+          ? 'Backend wird neu gestartet – in ~5 Sekunden wieder verfügbar'
+          : 'Fehler: $err'),
+      backgroundColor: err == null ? null : Colors.red,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: _loading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.restart_alt),
+        title: const Text('NAS-Backend neu starten'),
+        subtitle: const Text('Lädt neue server.js-Version, führt DB-Migrationen aus'),
+        onTap: _loading ? null : _restart,
+      ),
+    );
+  }
+}
 
 class _DedupCard extends StatefulWidget {
   const _DedupCard();
