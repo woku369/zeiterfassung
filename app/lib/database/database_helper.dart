@@ -516,8 +516,7 @@ class DatabaseHelper {
   Future<TimeEntry?> getStaleOpenEntry(String today) async {
     final db = await database;
     final rows = await db.query('time_entries',
-        where: "end_time IS NULL AND date < ? AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
-        whereArgs: [today],
+        where: "end_time IS NULL AND is_clocking = 0 AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
         orderBy: 'start_time ASC',
         limit: 1);
     return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
