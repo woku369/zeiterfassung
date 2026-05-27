@@ -267,8 +267,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const _DedupCard(),
           const SizedBox(height: 8),
           const _ForceResyncCard(),
-          const SizedBox(height: 8),
-          const _AutoPauseCard(),
 
           // ── Info ──────────────────────────────────────────────────────
           const SizedBox(height: 20),
@@ -1529,83 +1527,6 @@ class _ForceResyncCardState extends State<_ForceResyncCard> {
   }
 }
 
-// ── Datenpflege: Auto-Pause nachrüsten ───────────────────────────────────────
-
-class _AutoPauseCard extends StatefulWidget {
-  const _AutoPauseCard();
-  @override
-  State<_AutoPauseCard> createState() => _AutoPauseCardState();
-}
-
-class _AutoPauseCardState extends State<_AutoPauseCard> {
-  bool _running = false;
-
-  Future<void> _run() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Auto-Pause nachrüsten'),
-        content: const Text(
-          'Alle historischen Einträge mit ≥ 6h Arbeitszeit und 0 min Pause '
-          'erhalten nachträglich 30 min Pause (§ 11 AZG).\n\n'
-          'Homeoffice- und Abwesenheitseinträge werden nicht verändert.\n\n'
-          'Bereits gesetzte Pausen werden nicht überschrieben.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Jetzt ausführen'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    setState(() => _running = true);
-    try {
-      final count = await DatabaseHelper.instance.applyAutoPauseToHistorical();
-      if (!mounted) return;
-      if (count > 0) {
-        await context.read<SyncProvider>().syncNow();
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(count > 0
-              ? '$count Einträge mit 30 min Pause aktualisiert.'
-              : 'Keine Einträge gefunden, die korrigiert werden müssen.'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fehler: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _running = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: _running
-            ? const SizedBox(
-                width: 24, height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2))
-            : const Icon(Icons.pause_circle_outline),
-        title: const Text('Auto-Pause nachrüsten'),
-        subtitle: const Text('§ 11 AZG: 30 min für alle historischen Einträge ≥ 6h'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _running ? null : _run,
-      ),
-    );
-  }
-}
 
 class _DedupCard extends StatefulWidget {
   const _DedupCard();
