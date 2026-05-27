@@ -313,8 +313,8 @@ class _DashboardTabState extends State<_DashboardTab> {
                   );
                 },
               ),
-            if (active != null && active.date.isBefore(today))
-              _OpenEntryBanner(entry: active),
+            if (tp.staleOpenEntry != null)
+              _OpenEntryBanner(entry: tp.staleOpenEntry!),
             const SizedBox(height: 4),
             Card(
               color: active != null ? cs.primaryContainer : cs.surfaceContainerLow,

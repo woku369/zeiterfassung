@@ -496,6 +496,17 @@ class DatabaseHelper {
     return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
   }
 
+  /// Returns the oldest open entry from before today (stale open entry warning).
+  Future<TimeEntry?> getStaleOpenEntry(String today) async {
+    final db = await database;
+    final rows = await db.query('time_entries',
+        where: "end_time IS NULL AND date < ? AND work_type NOT IN ('vacation','sick','compensatoryLeave')",
+        whereArgs: [today],
+        orderBy: 'start_time ASC',
+        limit: 1);
+    return rows.isEmpty ? null : TimeEntry.fromMap(rows.first);
+  }
+
   Future<List<TimeEntry>> getEntriesForDateRange(DateTime from, DateTime to,
       {String? employerId}) async {
     final db = await database;

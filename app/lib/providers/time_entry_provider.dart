@@ -7,6 +7,7 @@ import '../database/database_helper.dart';
 class TimeEntryProvider extends ChangeNotifier {
   List<TimeEntry> _entries = [];
   TimeEntry? _activeEntry;
+  TimeEntry? _staleOpenEntry;
   int _selectedYear = DateTime.now().year;
   int _selectedMonth = DateTime.now().month;
   String? _employerId;
@@ -14,6 +15,8 @@ class TimeEntryProvider extends ChangeNotifier {
 
   List<TimeEntry> get entries => _entries;
   TimeEntry? get activeEntry => _activeEntry;
+  /// Open entry from before today (across all employers). Null when none exists.
+  TimeEntry? get staleOpenEntry => _staleOpenEntry;
   int get selectedYear => _selectedYear;
   int get selectedMonth => _selectedMonth;
   String? get employerId => _employerId;
@@ -37,6 +40,9 @@ class TimeEntryProvider extends ChangeNotifier {
     // never disappears and clock-out stays reachable.
     _activeEntry = _entries.where((e) => e.isActive).firstOrNull
         ?? await DatabaseHelper.instance.getAnyActiveEntry();
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _staleOpenEntry = await DatabaseHelper.instance.getStaleOpenEntry(today);
     notifyListeners();
   }
 
