@@ -395,9 +395,9 @@ class HelpScreen extends StatelessWidget {
               _SubHeading('Geplante NAS-Backups (automatisch)'),
               _Para(
                 'Das Poco X7 Pro erstellt automatisch Backups auf dem NAS '
-                '– der Geofencing-Dienst läuft im Hintergrund und prüft jede Minute die Uhrzeit.',
+                '– das tägliche Backup läuft nach jedem erfolgreichen NAS-Sync (max. 1× pro Tag).',
               ),
-              _KeyValue(label: 'Täglich', value: '02:00 Uhr – letzte 30 werden behalten'),
+              _KeyValue(label: 'Täglich', value: 'Nach dem ersten Sync des Tages – letzte 30 werden behalten'),
               _KeyValue(label: 'Monatlich', value: '01:30 Uhr am 1. des Monats – werden nie gelöscht'),
               _KeyValue(label: 'Jährlich', value: '01:00 Uhr am 1. des Wirtschaftsjahr-Startmonats – werden nie gelöscht'),
               _KeyValue(label: 'Ansehen & Wiederherstellen', value: 'Einstellungen → NAS-Backups (alle Geräte)'),
