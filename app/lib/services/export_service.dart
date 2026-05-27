@@ -693,7 +693,7 @@ class ExportService {
     argRow('Fahrzeit gesamt', _fmtH(totTH));
     row++;
     argRow('Überstundenpauschale steuerfrei (DN+DG)',
-        'bis ~360 €/Monat gem. § 68 EStG');
+        'bis ~400 €/Monat gem. § 68 EStG (ab 1.1.2024)');
 
     // ── Column widths ───────────────────────────────────────────────────────
     sheet.setColumnWidth(0,  14); // Datum

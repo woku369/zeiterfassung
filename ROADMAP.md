@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-27 – v1.27 Auto-Pause + Timeline-Adopted + Geofencing/Backup-Bugfixes + Backup-Refactoring
+> Letztes Update: 2026-05-27 – v1.28 Ist-vs-Effektiv-Tabelle + Offener-Eintrag-Warnung + § 68 fix
 
 ---
 
@@ -25,6 +25,25 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.28 – Zuschläge-Sheet Ist/Effektiv-Tabelle + Offener-Eintrag-Banner + Bugfix
+
+- [x] **Monatlicher Ist- vs. Effektivstunden-Vergleich im Zuschläge-Sheet:**
+  - `export_service.dart`: SAISONÜBERSICHT-Textzeilen ersetzt durch echte 8-spaltige Tabelle
+  - Spalten: Monat | Ist (h) | Normal (h) | +50% (h) | +100% (h) | Effektiv (h) | **Bonus (h)** 🟡 | **Faktor ×** 🔴
+  - Bonus-Spalte (amber) zeigt Zuschlag-Mehrwert; Faktor-Spalte (pink) zeigt z.B. 1,67× bei 30 → 50 h
+  - GESAMT-Zeile am Ende (fett, blau hinterlegt); redundante `+50%/+100% gesamt`-argRows entfernt
+
+- [x] **Warnung bei offenem Eintrag ohne Endzeit (vergangenes Datum):**
+  - `home_screen.dart`: orangefarbener `_OpenEntryBanner` erscheint zwischen Geofence-Chips und Hauptkarte
+  - Bedingung: `activeEntry != null && activeEntry.date.isBefore(today)`
+  - Tap öffnet `EntryFormScreen` direkt mit dem betroffenen Eintrag → fehlende Endzeit nachtragen
+  - Heute gestartete aktive Einträge (laufende Besprechung) lösen den Banner nicht aus
+
+- [x] **Bugfixes v1.28:**
+  - **§ 68 EStG Wert in export_service.dart:** `argRow` hatte noch `360 €` statt `400 €` (ab 1.1.2024); mit korrektem Datum ergänzt
+
+---
 
 ### v1.27 – Auto-Pause § 11 AZG + Timeline-Adopted + Geofencing/Backup-Bugfixes
 
