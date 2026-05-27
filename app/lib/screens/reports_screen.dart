@@ -1482,7 +1482,7 @@ class _PauschaleCard extends StatelessWidget {
   final double weeklyHours;
   final double? monthlyGross;
 
-  static const double _kCeiling = 360.0;   // § 68 EStG max steuerfrei/Monat
+  static const double _kCeiling = 400.0;   // § 68 Abs. 1 EStG – seit 1.1.2024 (davor 360 €)
   static const double _kDnSv    = 0.1812;  // DN-SV-Satz ~18.12%
   static const double _kDgSv    = 0.2148;  // DG-SV-Satz ~21.48%
 

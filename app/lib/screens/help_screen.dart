@@ -671,14 +671,15 @@ class HelpScreen extends StatelessWidget {
               _KeyValue(label: '3✶', value: 'Anzahl Sa/So/FT-Einträge in diesem Monat'),
               _SubHeading('So/FT-Pauschale – Potenzial (nur Gurktaler AG)'),
               _Para(
-                '§ 68 EStG: Sonntags- und Feiertagszuschläge sind bis zu €360/Monat '
-                'steuer- und SV-frei – für Dienstnehmer UND Dienstgeber ein Vorteil. '
+                '§ 68 EStG: Sonntags- und Feiertagszuschläge sind bis zu €400/Monat '
+                'steuer- und SV-frei (seit 1.1.2024; davor €360) – für Dienstnehmer '
+                'UND Dienstgeber ein Vorteil. '
                 'Die Karte zeigt monatliche So/FT-Stunden, steuerfreien Anteil und den '
                 'geschätzten jährlichen Gesamtvorteil.',
               ),
               _KeyValue(label: 'Voraussetzung', value: 'Bruttogehalt/Monat in AG-Einstellungen eintragen – wird via NAS auf alle Geräte synchronisiert'),
-              _KeyValue(label: '€XXX ✓', value: 'Zuschlag vollständig steuerfrei (unter €360-Deckel)'),
-              _KeyValue(label: '€360 ⚠', value: 'Deckel erreicht – Überschuss steuerpflichtig'),
+              _KeyValue(label: '€XXX ✓', value: 'Zuschlag vollständig steuerfrei (unter €400-Deckel)'),
+              _KeyValue(label: '€400 ⚠', value: 'Deckel erreicht – Überschuss steuerpflichtig'),
               _KeyValue(label: 'Ø steuerfrei/Monat', value: 'Jahresdurchschnitt – empfohlene Höhe für die Pauschalvereinbarung'),
               _KeyValue(label: 'Empfohlene Pauschale', value: 'Prominente Anzeige des Ø-Werts als Verhandlungsbasis, mit §68-Limit-Hinweis'),
               _Hint('Die Pauschale muss im Dienstvertrag vereinbart werden – die Karte liefert das Verhandlungsargument.'),
