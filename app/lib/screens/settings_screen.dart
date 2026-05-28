@@ -27,6 +27,8 @@ import 'bluetooth_trip_screen.dart';
 import 'activity_timeline_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../services/geofencing_background.dart'
+    show geofenceLogPath, geofenceLogDates, kGeofenceLogPrefix;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -1328,38 +1330,6 @@ class _BackupCardState extends State<_BackupCard> {
 class _GeofenceLogCard extends StatelessWidget {
   const _GeofenceLogCard();
 
-  Future<String> _logPath() async =>
-      p.join(await getDatabasesPath(), 'geofence_log.txt');
-
-  Future<String> _readLog() async {
-    final file = File(await _logPath());
-    if (!await file.exists()) return '(noch keine Einträge)';
-    final lines = await file.readAsLines();
-    // Letzte 300 Zeilen anzeigen
-    final show = lines.length > 300 ? lines.sublist(lines.length - 300) : lines;
-    return show.join('\n');
-  }
-
-  Future<void> _clearLog(BuildContext context) async {
-    final file = File(await _logPath());
-    if (await file.exists()) await file.delete();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log gelöscht')),
-      );
-    }
-  }
-
-  void _showLog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => _GeofenceLogDialog(
-        logContent: _readLog(),
-        onClear: () => _clearLog(context),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -1368,35 +1338,69 @@ class _GeofenceLogCard extends StatelessWidget {
         title: const Text('Geofencing-Log'),
         subtitle: const Text('GPS-Positionen, Zonen-Events, Clock-in/out'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => _showLog(context),
+        onTap: () => showDialog(
+          context: context,
+          builder: (_) => const _GeofenceLogDialog(),
+        ),
       ),
     );
   }
 }
 
 class _GeofenceLogDialog extends StatefulWidget {
-  final Future<String> logContent;
-  final VoidCallback onClear;
-  const _GeofenceLogDialog({required this.logContent, required this.onClear});
+  const _GeofenceLogDialog();
 
   @override
   State<_GeofenceLogDialog> createState() => _GeofenceLogDialogState();
 }
 
 class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
-  late Future<String> _future;
+  List<DateTime> _dates = [];
+  int _idx = 0; // 0 = newest
+  late Future<String> _content;
   final _scroll = ScrollController();
+  bool _datesLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.logContent;
+    _loadDates();
+  }
+
+  Future<void> _loadDates() async {
+    final dates = await geofenceLogDates();
+    if (!mounted) return;
+    setState(() {
+      _dates = dates.isNotEmpty ? dates : [DateTime.now()];
+      _datesLoaded = true;
+    });
+    _loadContent();
+  }
+
+  void _loadContent() {
+    final date = _dates[_idx];
+    setState(() {
+      _content = _readLog(date);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent);
-      }
+      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
     });
   }
+
+  Future<String> _readLog(DateTime date) async {
+    final file = File(await geofenceLogPath(date: date));
+    if (!await file.exists()) return '(keine Einträge für diesen Tag)';
+    return await file.readAsString();
+  }
+
+  Future<void> _clearCurrentLog() async {
+    final file = File(await geofenceLogPath(date: _dates[_idx]));
+    if (await file.exists()) await file.delete();
+    _loadContent();
+  }
+
+  String _formatDate(DateTime d) =>
+      DateFormat('EE, dd.MM.yyyy', 'de_AT').format(d);
 
   @override
   void dispose() {
@@ -1406,14 +1410,47 @@ class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_datesLoaded) {
+      return const AlertDialog(
+        content: SizedBox(
+          height: 80,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
     return AlertDialog(
-      title: const Text('Geofencing-Log'),
-      contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      title: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            tooltip: 'Älter',
+            onPressed: _idx < _dates.length - 1
+                ? () { setState(() => _idx++); _loadContent(); }
+                : null,
+          ),
+          Expanded(
+            child: Text(
+              _formatDate(_dates[_idx]),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            tooltip: 'Neuer',
+            onPressed: _idx > 0
+                ? () { setState(() => _idx--); _loadContent(); }
+                : null,
+          ),
+        ],
+      ),
+      titlePadding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+      contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       content: SizedBox(
         width: double.maxFinite,
         height: MediaQuery.of(context).size.height * 0.65,
         child: FutureBuilder<String>(
-          future: _future,
+          future: _content,
           builder: (_, snap) {
             if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -1431,12 +1468,13 @@ class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
           },
         ),
       ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
         TextButton.icon(
           icon: const Icon(Icons.copy, size: 16),
           label: const Text('Kopieren'),
           onPressed: () async {
-            final text = await widget.logContent;
+            final text = await _content;
             await Clipboard.setData(ClipboardData(text: text));
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1445,17 +1483,26 @@ class _GeofenceLogDialogState extends State<_GeofenceLogDialog> {
             }
           },
         ),
-        TextButton.icon(
-          icon: const Icon(Icons.delete_outline, size: 16),
-          label: const Text('Löschen'),
-          onPressed: () {
-            widget.onClear();
-            Navigator.pop(context);
-          },
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Schließen'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.delete_outline, size: 16),
+              label: const Text('Löschen'),
+              onPressed: () async {
+                await _clearCurrentLog();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Log ${_formatDate(_dates[_idx])} gelöscht')),
+                  );
+                }
+              },
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Schließen'),
+            ),
+          ],
         ),
       ],
     );

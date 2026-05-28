@@ -45,7 +45,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
             padding: const EdgeInsets.only(right: 8),
             child: _TrackingChip(
               active: _tracking,
-              onTap: () => _toggleTracking(lp.activeLocations),
+              onTap: () => _toggleTracking(lp.locations),
             ),
           ),
         ],
@@ -62,7 +62,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
                 onToggle: () async {
                   await lp.toggleActive(lp.locations[i]);
                   if (_tracking) {
-                    GeofencingService.instance.updateLocations(lp.activeLocations);
+                    GeofencingService.instance.updateLocations(lp.locations);
                   }
                 },
               ),
@@ -105,7 +105,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
       ));
     }
     if (_tracking) {
-      GeofencingService.instance.updateLocations(lp.activeLocations);
+      GeofencingService.instance.updateLocations(lp.locations);
     }
   }
 

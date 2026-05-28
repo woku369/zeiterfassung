@@ -128,14 +128,14 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
     await lp.load();
     await tp.refresh();
     if (GeofencingService.instance.isTracking) {
-      GeofencingService.instance.updateLocations(lp.activeLocations);
+      GeofencingService.instance.updateLocations(lp.locations);
     }
     // Auto-start geofencing on fresh install (key never set = null).
     if (Platform.isAndroid && !GeofencingService.instance.isTracking) {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getBool('geofencing_active') == null &&
           lp.activeLocations.isNotEmpty) {
-        await GeofencingService.instance.startTracking(lp.activeLocations);
+        await GeofencingService.instance.startTracking(lp.locations);
       }
     }
   }

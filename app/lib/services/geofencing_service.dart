@@ -98,6 +98,7 @@ class GeofencingService {
         'employerId': l.employerId,
         'workType': l.workType.name,
         'defaultKm': l.defaultKm,
+        'isActive': l.isActive,
       }).toList(),
     });
   }

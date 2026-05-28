@@ -15,27 +15,58 @@ import 'holiday_service.dart';
 
 // ── Geofence-Log ─────────────────────────────────────────────────────────────
 
-const kGeofenceLogFilename = 'geofence_log.txt';
-const _kMaxLogLines = 2000;
+const kGeofenceLogPrefix = 'geofence_log_';
 
-Future<String> geofenceLogPath() async =>
-    p.join(await getDatabasesPath(), kGeofenceLogFilename);
+String _logFilename(DateTime d) =>
+    '$kGeofenceLogPrefix${d.toIso8601String().substring(0, 10)}.txt';
+
+/// Returns the log file path for [date] (defaults to today).
+Future<String> geofenceLogPath({DateTime? date}) async =>
+    p.join(await getDatabasesPath(), _logFilename(date ?? DateTime.now()));
+
+/// Returns available log dates, newest first (up to 7 days).
+Future<List<DateTime>> geofenceLogDates() async {
+  try {
+    final dir = Directory(await getDatabasesPath());
+    final entities = await dir.list().toList();
+    final dates = <DateTime>[];
+    for (final e in entities) {
+      final name = p.basename(e.path);
+      if (name.startsWith(kGeofenceLogPrefix) && name.endsWith('.txt')) {
+        final dateStr = name.substring(kGeofenceLogPrefix.length, name.length - 4);
+        final d = DateTime.tryParse(dateStr);
+        if (d != null) dates.add(d);
+      }
+    }
+    dates.sort((a, b) => b.compareTo(a));
+    return dates;
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<void> _cleanupOldLogs() async {
+  try {
+    final dir = Directory(await getDatabasesPath());
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    final entities = await dir.list().toList();
+    for (final e in entities) {
+      final name = p.basename(e.path);
+      if (name.startsWith(kGeofenceLogPrefix) && name.endsWith('.txt')) {
+        final dateStr = name.substring(kGeofenceLogPrefix.length, name.length - 4);
+        final d = DateTime.tryParse(dateStr);
+        if (d != null && d.isBefore(cutoff)) await e.delete();
+      }
+    }
+  } catch (_) {}
+}
 
 Future<void> _log(String tag, String msg) async {
   try {
     final path = await geofenceLogPath();
     final ts = DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ');
-    final line = '$ts  [$tag]  $msg\n';
-    final file = File(path);
-    await file.writeAsString(line, mode: FileMode.append, flush: true);
-    // Trim to last _kMaxLogLines lines
-    final content = await file.readAsString();
-    final lines = content.split('\n').where((l) => l.isNotEmpty).toList();
-    if (lines.length > _kMaxLogLines) {
-      await file.writeAsString(
-        '${lines.skip(lines.length - _kMaxLogLines).join('\n')}\n',
-      );
-    }
+    await File(path).writeAsString('$ts  [$tag]  $msg\n',
+        mode: FileMode.append, flush: true);
   } catch (_) {}
 }
 
@@ -146,8 +177,10 @@ Future<void> _onStart(ServiceInstance service) async {
     final saved = prefs.getString(_kInsideZonesKey) ?? '';
     if (saved.isNotEmpty) inside.addAll(saved.split(','));
   }
-  var locations = <Map<String, dynamic>>[];
+  var locations = <Map<String, dynamic>>[];    // active zones only (for detection)
+  var allLocations = <Map<String, dynamic>>[]; // all zones incl. inactive (for logging)
   final timers = <String, Timer>{}; // locationId → pending clock-out timer
+  unawaited(_cleanupOldLogs());
   DateTime? outsideZonesSince = DateTime.now();
 
   // ── Trip tracking state ────────────────────────────────────────────────────
@@ -211,10 +244,15 @@ Future<void> _onStart(ServiceInstance service) async {
     final incoming = List<Map<String, dynamic>>.from(
       (data['locations'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
     );
-    final newIds = incoming.map((l) => l['id'] as String).toSet();
+    allLocations = incoming;
+    final activeIncoming = incoming.where((l) => l['isActive'] as bool? ?? true).toList();
+    final newIds = activeIncoming.map((l) => l['id'] as String).toSet();
     inside.removeWhere((id) => !newIds.contains(id));
-    locations = incoming;
-    _log('INIT', 'Zonen geladen: ${incoming.map((l) => l['name']).join(', ')}');
+    locations = activeIncoming;
+    final inactive = incoming.where((l) => !(l['isActive'] as bool? ?? true)).map((l) => l['name']).join(', ');
+    _log('INIT',
+        'Aktiv: ${activeIncoming.map((l) => l['name']).join(', ')}'
+        '${inactive.isNotEmpty ? '  Inaktiv: $inactive' : ''}');
   });
 
   service.on('setTripTracking').listen((data) {
@@ -342,12 +380,16 @@ Future<void> _onStart(ServiceInstance service) async {
         locations.isNotEmpty) {
       _lastGpsLog = now;
       final nearbyParts = <String>[];
-      for (final loc in locations) {
+      for (final loc in allLocations) {
         final d = _haversine(pos.latitude, pos.longitude,
             (loc['latitude'] as num).toDouble(),
             (loc['longitude'] as num).toDouble());
         final r = (loc['radiusMeters'] as num).toDouble();
-        nearbyParts.add('${loc['name']}=${d.toStringAsFixed(0)}m/${r.toStringAsFixed(0)}m');
+        final active = loc['isActive'] as bool? ?? true;
+        nearbyParts.add(
+          '${loc['name']}=${d.toStringAsFixed(0)}m/${r.toStringAsFixed(0)}m'
+          '${active ? '' : '[inaktiv]'}',
+        );
       }
       await _log('GPS',
           'lat=${pos.latitude.toStringAsFixed(6)} '
