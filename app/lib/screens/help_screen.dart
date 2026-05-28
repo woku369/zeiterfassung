@@ -222,9 +222,22 @@ class HelpScreen extends StatelessWidget {
                 'Erfassung → Diagnose-Log. Zeigt alle Clock-in/out-Ereignisse '
                 'des Hintergrund-Dienstes mit Zeitstempel.',
               ),
+              _KeyValue(
+                label: 'Tagesrotation',
+                value: 'Pro Tag eine separate Logdatei – Pfeile ← / → wechseln zwischen verfügbaren Tagen',
+              ),
+              _KeyValue(
+                label: 'Aufbewahrung',
+                value: 'Letzten 7 Tage werden behalten, ältere Logs automatisch gelöscht',
+              ),
+              _KeyValue(
+                label: 'Inaktive Zonen',
+                value: 'Deaktivierte Standorte erscheinen mit [inaktiv]-Marker – so sieht man den Startpunkt auch ohne Trigger',
+              ),
               _Hint(
-                'Log enthält: Zone betreten/verlassen, Clock-in/out-Ergebnisse, '
-                'Karenz-Timer-Ereignisse und Fehler. Kann mit „Löschen" geleert werden.',
+                'Log enthält: GPS-Fixes mit Zonendistanz, Zone betreten/verlassen, '
+                'Clock-in/out-Ergebnisse, Karenz-Timer und Fehler. '
+                'Löschen-Button löscht nur den aktuell angezeigten Tag.',
               ),
             ],
           ),
@@ -384,7 +397,7 @@ class HelpScreen extends StatelessWidget {
             children: const [
               _Para(
                 'Einstellungen → Datenpflege: Werkzeuge um doppelte Einträge '
-                'zu finden und zu bereinigen.',
+                'zu finden und Sync-Probleme zu beheben.',
               ),
               _SubHeading('Mehrfacheinträge bereinigen'),
               _KeyValue(label: 'Öffnen', value: 'Einstellungen → Datenpflege → „Mehrfacheinträge suchen"'),
@@ -395,6 +408,27 @@ class HelpScreen extends StatelessWidget {
                 'Gelöschte Einträge werden im Deletion-Log gespeichert und '
                 'beim nächsten Sync auf alle verbundenen Geräte propagiert – '
                 'Datenpflege muss also nur auf einem Gerät durchgeführt werden.',
+              ),
+              _SubHeading('NAS-Geister bereinigen'),
+              _Para(
+                'Wenn auf dem NAS Einträge erscheinen die lokal längst gelöscht '
+                'wurden, hilft „NAS-Geister bereinigen": Schickt alle jemals '
+                'lokal gespeicherten Löschungen ans NAS – einmalige Bereinigung.',
+              ),
+              _KeyValue(label: 'Öffnen', value: 'Einstellungen → Datenpflege → „NAS-Geister bereinigen"'),
+              _KeyValue(label: 'Wann nötig', value: 'NAS zeigt Einträge die lokal gelöscht wurden (z. B. nach langem Sync-Ausfall)'),
+              _KeyValue(label: 'Sicherheit', value: 'Nur vorhandene Löschungen werden übertragen – keine neuen Löschungen'),
+              _SubHeading('Gerät auf NAS-Stand zurücksetzen'),
+              _Para(
+                'Setzt alle lokalen Zeiteinträge zurück und zieht den vollständigen '
+                'Datenbestand vom NAS. Nützlich nach einem Gerätewechsel oder wenn '
+                'lokale Daten nicht mehr mit dem NAS übereinstimmen.',
+              ),
+              _KeyValue(label: 'Öffnen', value: 'Einstellungen → Datenpflege → „Gerät auf NAS-Stand zurücksetzen"'),
+              _Hint(
+                'Alle lokalen Einträge werden gelöscht und durch den NAS-Stand ersetzt. '
+                'Nicht synchronisierte lokale Änderungen gehen verloren. '
+                'Nur auf dem Gerät ausführen das bereinigt werden soll.',
               ),
             ],
           ),

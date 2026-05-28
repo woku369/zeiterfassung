@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-27 – v1.30 Stale-Banner auch für heutige Einträge
+> Letztes Update: 2026-05-28 – v1.31 Sync-Bugfixes + tägliche GPS-Logs + inaktive Zonen
 
 ---
 
@@ -25,6 +25,44 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.31 – Sync-Bugfixes (LWW + Deletion) + GPS-Log tagesweise + inaktive Zonen
+
+- [x] **LWW (Last-Write-Wins) für Sync – lokale Edits werden nicht mehr überschrieben:**
+  - `insertOrUpdateEntries()`: Vorher `ConflictAlgorithm.replace` ohne Zeitstempel-Vergleich → ältere NAS-Version überschrieb lokale Edits
+  - Fix: `updated_at`-Vergleich vor dem Einfügen – NAS-Version wird nur übernommen wenn sie neuer als die lokale ist
+  - `updateEntry()` stempelt jetzt `updated_at = now` und setzt `is_synced = 0`
+  - `TimeEntry` hat neues nullable Feld `updatedAt`; `toMap()` schreibt es nur wenn nicht null (SQLite DEFAULT greift bei Insert)
+
+- [x] **Deletion-Sync: NAS ignorierte gelöschte Einträge nicht mehr (Geister-Einträge):**
+  - `backend/server.js`: `getEntriesSince` filtert jetzt `WHERE deleted_at IS NULL` → gelöschte Einträge werden nicht mehr zurückgeschickt
+  - `softDeleteEntry`: setzt `deleted_at` + `updated_at` statt hard-delete
+  - `getDeletedIdsSince`: liefert seit dem letzten Sync gelöschte IDs → werden in der Sync-Response zurückgeschickt
+  - `/api/sync`: verarbeitet `deleted_ids` aus Client-Request (soft-delete auf NAS)
+  - Empfangene `deleted_ids` aus Server-Response werden lokal via `applyRemoteDeletions()` angewendet
+
+- [x] **NAS-Geister bereinigen (einmalige Bereinigung historischer Löschungen):**
+  - `DatabaseHelper.getAllDeletions()`: alle je lokal protokollierten Löschungen ohne Datumsfilter
+  - `SyncService.pushAllDeletions()`: schickt alle historischen Löschungen in einer Sync-Anfrage ans NAS
+  - `settings_screen.dart _PushAllDeletionsCard`: Button „NAS-Geister bereinigen" in Datenpflege (nur wenn NAS konfiguriert)
+
+- [x] **Gerät auf NAS-Stand zurücksetzen:**
+  - `DatabaseHelper.clearAllEntries()` + `resetSyncState()` (last_sync_at → Epoch)
+  - `SyncService.prepareFullPullFromNas()`: kombiniert beide Schritte; Aufrufer macht danach syncNow()
+  - `settings_screen.dart _FullPullFromNasCard`: Bestätigungsdialog (roter Button) + sofortiger Sync danach
+
+- [x] **GPS-Log tagesweise (keine ewig wachsende Datei mehr):**
+  - `geofence_log.txt` → `geofence_log_YYYY-MM-DD.txt` (eine Datei pro Tag)
+  - Logs älter als 7 Tage werden beim Service-Start automatisch gelöscht
+  - `geofenceLogDates()`: listet verfügbare Tage (für Log-Dialog)
+  - Log-Dialog: Datum-Navigation mit ← / →; Löschen gilt nur für den angezeigten Tag
+
+- [x] **Inaktive Zonen im GPS-Log sichtbar:**
+  - Service erhält alle Standorte (inkl. `isActive=false`) mit `isActive`-Flag
+  - Inaktive Zonen erscheinen im GPS-Log mit `[inaktiv]`-Suffix (z.B. `Home=245m/150m[inaktiv]`)
+  - Zone-Erkennung (Clock-in/out) weiterhin nur für aktive Zonen
+
+---
 
 ### v1.30 – Bugfix: Stale-Banner auch für heutige Einträge ohne Endzeit
 
