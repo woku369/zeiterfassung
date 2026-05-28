@@ -455,7 +455,9 @@ class DatabaseHelper {
   Future<void> updateEntry(TimeEntry e) async {
     final db = await database;
     // Always reset is_synced so the change gets pushed to NAS on next sync.
-    final map = e.toMap()..['is_synced'] = 0;
+    // Stamp updated_at so LWW in insertOrUpdateEntries can detect local edits.
+    final now = DateTime.now().toIso8601String();
+    final map = e.toMap()..['is_synced'] = 0..['updated_at'] = now;
     await db.update('time_entries', map, where: 'id = ?', whereArgs: [e.id]);
   }
 
@@ -570,18 +572,28 @@ class DatabaseHelper {
   Future<void> insertOrUpdateEntries(List<TimeEntry> entries) async {
     final db = await database;
 
-    // Split: entries with end_time can always be replaced (they're immutable).
-    // Entries without end_time (still "active" on server) must not overwrite a
-    // locally-closed entry — that would resurrect a stale open entry when the
-    // clock-out was never pushed to NAS (e.g. network failure on Android).
-    final closed  = entries.where((e) => e.endTime != null).toList();
-    final open    = entries.where((e) => e.endTime == null).toList();
+    // Split: entries with end_time are "closed"; open entries must not
+    // overwrite a locally-closed entry (would resurrect stale open entry on
+    // network failure during clock-out).
+    final closed = entries.where((e) => e.endTime != null).toList();
+    final open   = entries.where((e) => e.endTime == null).toList();
 
-    final batch = db.batch();
+    // LWW for closed entries: only replace if the incoming version is at least
+    // as recent as the local one. This prevents a stale version from another
+    // device from overwriting a local edit that was already pushed to NAS but
+    // hasn't been acknowledged by this device yet.
     for (final e in closed) {
-      batch.insert('time_entries', e.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      if (e.updatedAt != null) {
+        final existing = await db.query('time_entries',
+            columns: ['updated_at'], where: 'id = ?', whereArgs: [e.id], limit: 1);
+        if (existing.isNotEmpty) {
+          final localTs = existing.first['updated_at'] as String? ?? '';
+          if (e.updatedAt!.toIso8601String().compareTo(localTs) < 0) continue;
+        }
+      }
+      await db.insert('time_entries', e.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    await batch.commit(noResult: true);
 
     for (final e in open) {
       final existing = await db.query('time_entries',

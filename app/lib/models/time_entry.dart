@@ -21,6 +21,8 @@ class TimeEntry {
   final bool isSynced;
   final bool isClocking;
   final DateTime createdAt;
+  // Populated from DB/NAS; null for freshly-constructed entries (DB sets DEFAULT).
+  final DateTime? updatedAt;
 
   const TimeEntry({
     required this.id,
@@ -43,6 +45,7 @@ class TimeEntry {
     this.isSynced = false,
     this.isClocking = false,
     required this.createdAt,
+    this.updatedAt,
   });
 
   Duration get totalDuration {
@@ -78,6 +81,7 @@ class TimeEntry {
     bool? isSynced,
     bool? isClocking,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return TimeEntry(
       id: id ?? this.id,
@@ -100,6 +104,7 @@ class TimeEntry {
       isSynced: isSynced ?? this.isSynced,
       isClocking: isClocking ?? this.isClocking,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -124,6 +129,8 @@ class TimeEntry {
     'is_synced': isSynced ? 1 : 0,
     'is_clocking': isClocking ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
+    // Omit updated_at when null so SQLite DEFAULT (datetime('now')) kicks in.
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
   };
 
   factory TimeEntry.fromMap(Map<String, dynamic> m) => TimeEntry(
@@ -147,6 +154,7 @@ class TimeEntry {
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     isClocking: (m['is_clocking'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
+    updatedAt: m['updated_at'] != null ? DateTime.tryParse(m['updated_at'] as String) : null,
   );
 
   Map<String, dynamic> toJson() => toMap()
