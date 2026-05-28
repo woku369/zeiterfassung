@@ -269,6 +269,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const _DedupCard(),
           const SizedBox(height: 8),
           const _ForceResyncCard(),
+          if (context.watch<SyncProvider>().hasNasConfig) ...[
+            const SizedBox(height: 8),
+            const _PushAllDeletionsCard(),
+            const SizedBox(height: 8),
+            const _FullPullFromNasCard(),
+          ],
 
           // ── Info ──────────────────────────────────────────────────────
           const SizedBox(height: 20),
@@ -1529,6 +1535,157 @@ class _ForceResyncCardState extends State<_ForceResyncCard> {
   }
 }
 
+
+// ── NAS Geister-Bereinigung ───────────────────────────────────────────────────
+
+class _PushAllDeletionsCard extends StatefulWidget {
+  const _PushAllDeletionsCard();
+  @override
+  State<_PushAllDeletionsCard> createState() => _PushAllDeletionsCardState();
+}
+
+class _PushAllDeletionsCardState extends State<_PushAllDeletionsCard> {
+  bool _running = false;
+
+  Future<void> _run() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('NAS-Geister bereinigen'),
+        content: const Text(
+          'Alle auf diesem Gerät protokollierten Löschungen werden ans NAS '
+          'übertragen.\n\n'
+          'Dadurch werden Einträge, die früher gelöscht wurden, aber noch '
+          'auf dem NAS vorhanden sind, entfernt.\n\n'
+          'Nur auf dem Gerät ausführen, das die korrekten Löschungen kennt '
+          '(normalerweise das Handy).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Bereinigen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _running = true);
+    try {
+      final sp = context.read<SyncProvider>();
+      final result = await SyncService.instance.pushAllDeletions(
+        baseUrl: sp.nasUrl,
+        apiKey: sp.nasApiKey.isEmpty ? null : sp.nasApiKey,
+      );
+      if (!mounted) return;
+      if (result.errors.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+            result.pushed > 0
+                ? '${result.pushed} Löschungen ans NAS übertragen. '
+                  'Bitte jetzt auf anderen Geräten synchronisieren.'
+                : 'Keine historischen Löschungen gefunden.',
+          )),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: ${result.errors.join(', ')}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: _running
+            ? const SizedBox(width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.delete_sweep_outlined),
+        title: const Text('NAS-Geister bereinigen'),
+        subtitle: const Text('Gelöschte Einträge vom NAS entfernen'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _running ? null : _run,
+      ),
+    );
+  }
+}
+
+// ── Gerät auf NAS-Stand zurücksetzen ─────────────────────────────────────────
+
+class _FullPullFromNasCard extends StatefulWidget {
+  const _FullPullFromNasCard();
+  @override
+  State<_FullPullFromNasCard> createState() => _FullPullFromNasCardState();
+}
+
+class _FullPullFromNasCardState extends State<_FullPullFromNasCard> {
+  bool _running = false;
+
+  Future<void> _run() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gerät auf NAS-Stand zurücksetzen'),
+        content: const Text(
+          'Alle lokalen Zeiteinträge werden gelöscht und vollständig '
+          'vom NAS neu geladen.\n\n'
+          'Das behebt Diskrepanzen, wenn dieses Gerät Daten enthält, '
+          'die nicht mehr auf dem NAS sind.\n\n'
+          'Nicht synchronisierte lokale Einträge gehen verloren!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Zurücksetzen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _running = true);
+    try {
+      final sp = context.read<SyncProvider>();
+      await SyncService.instance.prepareFullPullFromNas();
+      if (!mounted) return;
+      await sp.syncNow();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gerät wurde auf NAS-Stand zurückgesetzt.')),
+      );
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: _running
+            ? const SizedBox(width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.cloud_download_outlined),
+        title: const Text('Gerät auf NAS-Stand zurücksetzen'),
+        subtitle: const Text('Lokale Daten löschen und vollständig neu laden'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _running ? null : _run,
+      ),
+    );
+  }
+}
 
 class _NasRestartCard extends StatefulWidget {
   const _NasRestartCard();

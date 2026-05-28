@@ -208,6 +208,53 @@ class SyncService {
     return result;
   }
 
+  /// Schickt ALLE historischen Löschungen ans NAS (einmalige Bereinigung).
+  /// Damit werden Geister-Einträge auf dem NAS entfernt, die durch den fehlenden
+  /// Deletion-Sync entstanden sind (deleted_ids wurde früher vom NAS ignoriert).
+  Future<SyncResult> pushAllDeletions({
+    required String baseUrl,
+    String? apiKey,
+  }) async {
+    final db = DatabaseHelper.instance;
+    final url = _normalize(baseUrl);
+    final headers = _headers(apiKey);
+    final allDeletedIds = await db.getAllDeletions();
+    if (allDeletedIds.isEmpty) {
+      return SyncResult(pushed: 0, pulled: 0);
+    }
+    try {
+      final lastSync = await db.getSyncState('last_sync_at') ?? '1970-01-01T00:00:00.000Z';
+      final resp = await http.post(
+        Uri.parse('$url/api/sync'),
+        headers: headers,
+        body: jsonEncode({
+          'last_sync': lastSync,
+          'entries': [],
+          'employers': [],
+          'locations': [],
+          'projects': [],
+          'deleted_ids': allDeletedIds,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      if (resp.statusCode == 200) {
+        return SyncResult(pushed: allDeletedIds.length, pulled: 0);
+      }
+      return SyncResult(pushed: 0, pulled: 0, errors: ['HTTP ${resp.statusCode}']);
+    } catch (e) {
+      return SyncResult(pushed: 0, pulled: 0, errors: ['$e']);
+    }
+  }
+
+  /// Bereitet dieses Gerät für einen vollständigen Reload vom NAS vor:
+  /// löscht alle lokalen Einträge und setzt last_sync_at auf Epoch zurück.
+  /// Der Aufrufer muss danach SyncProvider.syncNow() aufrufen, damit
+  /// der NAS alle Daten schickt und die UI korrekt neu geladen wird.
+  Future<void> prepareFullPullFromNas() async {
+    final db = DatabaseHelper.instance;
+    await db.clearAllEntries();
+    await db.resetSyncState();
+  }
+
   Future<bool> testConnection({required String baseUrl, String? apiKey}) async {
     final url = _normalize(baseUrl);
     try {

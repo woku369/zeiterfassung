@@ -400,6 +400,24 @@ class DatabaseHelper {
     return rows.map((r) => r['id'] as String).toList();
   }
 
+  /// Alle jemals lokal protokollierten Löschungen – für einmalige NAS-Bereinigung.
+  Future<List<String>> getAllDeletions() async {
+    final db = await database;
+    final rows = await db.query('deletion_log', columns: ['id']);
+    return rows.map((r) => r['id'] as String).toList();
+  }
+
+  /// Setzt last_sync_at zurück auf Epoch → nächster Sync holt ALLES vom NAS.
+  Future<void> resetSyncState() async {
+    await setSyncState('last_sync_at', '1970-01-01T00:00:00.000Z');
+  }
+
+  /// Löscht alle lokalen Zeiteinträge (für vollständigen Reload vom NAS).
+  Future<void> clearAllEntries() async {
+    final db = await database;
+    await db.delete('time_entries');
+  }
+
   /// Wendet vom Server empfangene Löschungen lokal an.
   Future<void> applyRemoteDeletions(List<String> ids) async {
     if (ids.isEmpty) return;

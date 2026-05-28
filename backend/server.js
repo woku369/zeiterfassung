@@ -192,7 +192,13 @@ const stmts = {
   `),
 
   getEntriesSince: db.prepare(
-    `SELECT * FROM time_entries WHERE updated_at > ? ORDER BY updated_at`
+    `SELECT * FROM time_entries WHERE updated_at > ? AND deleted_at IS NULL ORDER BY updated_at`
+  ),
+  getDeletedIdsSince: db.prepare(
+    `SELECT id FROM time_entries WHERE deleted_at IS NOT NULL AND updated_at > ? ORDER BY updated_at`
+  ),
+  softDeleteEntry: db.prepare(
+    `UPDATE time_entries SET deleted_at = ?, updated_at = ? WHERE id = ?`
   ),
 
   // employers
@@ -406,6 +412,15 @@ async function handleRequest(req, res) {
     if (body.imap?.length)      pushImap(body.imap);
     if (body.projects?.length)  pushProjects(body.projects);
 
+    // Löschungen vom Client anwenden: soft-delete auf NAS, damit andere Geräte
+    // beim nächsten Sync ebenfalls löschen können.
+    if (Array.isArray(body.deleted_ids) && body.deleted_ids.length > 0) {
+      const applyDeletions = db.transaction(ids => {
+        for (const id of ids) stmts.softDeleteEntry.run(ts, ts, id);
+      });
+      applyDeletions(body.deleted_ids);
+    }
+
     // Serverseitige Deduplizierung nach jedem Sync-Push.
     deduplicateLocations(ts);
     deduplicateEmployers(ts);
@@ -435,6 +450,8 @@ async function handleRequest(req, res) {
       if (row.updated_at) settings[`${row.key}_updated_at`] = row.updated_at;
     }
 
+    const deletedIds = stmts.getDeletedIdsSince.all(since).map(r => r.id);
+
     return send(res, 200, {
       ok: true,
       server_ts: ts,
@@ -443,6 +460,7 @@ async function handleRequest(req, res) {
       locations: stmts.getLocationsSince.all(since),
       imap:      stmts.getImapSince.all(since),
       projects:  stmts.getProjectsSince.all(since),
+      deleted_ids: deletedIds,
       settings,
     });
   }
