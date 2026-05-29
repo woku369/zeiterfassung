@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-29 – v1.31 abgeschlossen (DB v20 Hotfix + Deployment)
+> Letztes Update: 2026-05-29 – v1.32 Zuschlagstabelle + automatische Zuschläge + Security
 
 ---
 
@@ -25,6 +25,28 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.32 – Zuschlagstabelle + automatische Zuschläge + Security-Bereinigung
+
+- [x] **Zuschlagstabelle im Jahresbericht:**
+  - Separate Karte unter der Haupttabelle, nur sichtbar wenn WJ Zuschläge enthält
+  - Spalten: Ist | Äquiv. | Zuschlag (Äquiv − Ist, amber hervorgehoben)
+  - Gesamtzeile summiert das Wirtschaftsjahr
+  - Monate ohne Zuschlag zeigen `–`
+
+- [x] **Zuschläge automatisch nach Wochentag (kein `isSpecialHours`-Flag mehr):**
+  - Vorher: Zuschläge nur wenn Eintrag manuell als „Sonderarbeitszeit" markiert → Importdaten und viele manuelle Einträge ohne Flag blieben zuschlagsfrei
+  - Fix: `isSpecialHours`-Bedingung aus `SurchargeService` entfernt
+  - Homeoffice weiterhin explizit ausgenommen (alle Wochentage zuschlagsfrei)
+  - Gilt rückwirkend für alle Einträge inkl. Importdaten aus den Vorjahren
+
+- [x] **Security-Bereinigung (Public Repo):**
+  - `help_screen.dart`: NAS-IP `100.121.103.107` + API-Key durch Platzhalter ersetzt
+  - `push_to_nas.py`: hardcodierte IP + Key entfernt
+  - `backend/start_synology.sh` + `restart_backend.sh`: neuer API-Key
+  - `.claude/commands/nas-restart.md` + `flutter-nas-sync-arch.md` aus git-Tracking entfernt (`.gitignore`)
+
+---
 
 ### v1.31 – Sync-Bugfixes (LWW + Deletion) + GPS-Log tagesweise + inaktive Zonen + DB v20
 
