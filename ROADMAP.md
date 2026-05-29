@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-28 – v1.31 Sync-Bugfixes + tägliche GPS-Logs + inaktive Zonen
+> Letztes Update: 2026-05-29 – v1.31 abgeschlossen (DB v20 Hotfix + Deployment)
 
 ---
 
@@ -26,7 +26,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Erledigt
 
-### v1.31 – Sync-Bugfixes (LWW + Deletion) + GPS-Log tagesweise + inaktive Zonen
+### v1.31 – Sync-Bugfixes (LWW + Deletion) + GPS-Log tagesweise + inaktive Zonen + DB v20
 
 - [x] **LWW (Last-Write-Wins) für Sync – lokale Edits werden nicht mehr überschrieben:**
   - `insertOrUpdateEntries()`: Vorher `ConflictAlgorithm.replace` ohne Zeitstempel-Vergleich → ältere NAS-Version überschrieb lokale Edits
@@ -61,6 +61,17 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Service erhält alle Standorte (inkl. `isActive=false`) mit `isActive`-Flag
   - Inaktive Zonen erscheinen im GPS-Log mit `[inaktiv]`-Suffix (z.B. `Home=245m/150m[inaktiv]`)
   - Zone-Erkennung (Clock-in/out) weiterhin nur für aktive Zonen
+
+- [x] **Hotfix DB v20 – `updated_at`-Migration für `time_entries` (Deployment-Bugfix):**
+  - `time_entries` hatte `updated_at` im CREATE TABLE für Neuinstallationen, aber keine ALTER TABLE Migration für bestehende DBs
+  - Alle Geräte mit bestehender DB (Windows, Phones) schlugen beim ersten Sync nach v1.31-Update mit `no such column: updated_at` fehl
+  - Fix: `_upgrade()` Stufe 20 ergänzt mit `ALTER TABLE time_entries ADD COLUMN updated_at`
+  - Deployment-Reihenfolge dokumentiert: NAS-Backend zuerst deployen, dann App installieren
+
+- [x] **Windows Single-Instance-Guard (bereits implementiert, durch Deployment bestätigt):**
+  - Named Mutex `ZeiterfassungSingleInstance` via Win32-API (FFI) verhindert Mehrfachinstanzen
+  - Zweite Instanz beendet sich sofort mit `exit(0)` – kein zweites Fenster
+  - Ursache der historischen 6 Instanzen: alte Builds ohne Guard + Tray-App beendet sich per X nicht
 
 ---
 
