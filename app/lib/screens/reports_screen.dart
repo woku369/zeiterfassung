@@ -858,6 +858,15 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                   ),
                 ),
               const SizedBox(height: 12),
+              // ── Zuschlagstabelle ─────────────────────────────────────
+              if (_showEquivalent)
+                _SurchargeTable(
+                  monthLabels: _buildMonthLabels(),
+                  monthHours: _monthHours,
+                  monthEquivalent: _monthEquivalent,
+                  isFutureFlags: _buildIsFutureFlags(),
+                ),
+              const SizedBox(height: 12),
               // ── Abwesenheitsübersicht ────────────────────────────────
               Card(
                 child: Padding(
@@ -956,6 +965,18 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       ));
     }
     return rows;
+  }
+
+  List<String> _buildMonthLabels() {
+    final mf = DateFormat('MMM', 'de_AT');
+    return List.generate(12,
+        (i) => mf.format(DateTime(_fyStart.year, _fyStart.month + i)));
+  }
+
+  List<bool> _buildIsFutureFlags() {
+    final now = DateTime.now();
+    return List.generate(12,
+        (i) => DateTime(_fyStart.year, _fyStart.month + i).isAfter(now));
   }
 
   List<double> _buildMonthSolls(double weeklyHours) {
@@ -1157,6 +1178,143 @@ class _TotalRow extends StatelessWidget {
                 style: style.copyWith(color: diffColor),
                 textAlign: TextAlign.right)),
         const Expanded(child: SizedBox()),
+      ]),
+    );
+  }
+}
+
+class _SurchargeTable extends StatelessWidget {
+  final List<String> monthLabels;
+  final List<double> monthHours;
+  final List<double> monthEquivalent;
+  final List<bool> isFutureFlags;
+
+  const _SurchargeTable({
+    required this.monthLabels,
+    required this.monthHours,
+    required this.monthEquivalent,
+    required this.isFutureFlags,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAnySurcharge = monthHours
+        .asMap()
+        .entries
+        .any((e) => monthEquivalent[e.key] > e.value + 0.01);
+    if (!hasAnySurcharge) return const SizedBox.shrink();
+
+    final labelStyle = TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6));
+
+    double totalIst = 0, totalEq = 0;
+    for (var i = 0; i < 12; i++) {
+      if (!isFutureFlags[i]) {
+        totalIst += monthHours[i];
+        totalEq  += monthEquivalent[i];
+      }
+    }
+    final totalSurcharge = totalEq - totalIst;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(children: [
+              const SizedBox(width: 40),
+              Expanded(child: Text('Ist', style: labelStyle, textAlign: TextAlign.right)),
+              Expanded(child: Text('Äquiv.', style: labelStyle, textAlign: TextAlign.right)),
+              Expanded(
+                child: Text('Zuschlag', style: labelStyle.copyWith(color: Colors.amber.shade600),
+                    textAlign: TextAlign.right),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          for (var i = 0; i < 12; i++)
+            _buildSurchargeRow(context, i),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(children: [
+              const SizedBox(
+                  width: 40,
+                  child: Text('Ges.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+              Expanded(
+                child: Text(_fmtH(totalIst),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.right),
+              ),
+              Expanded(
+                child: Text(_fmtH(totalEq),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.right),
+              ),
+              Expanded(
+                child: Text('+${_fmtH(totalSurcharge)}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: totalSurcharge > 0.01 ? Colors.amber.shade600 : null),
+                    textAlign: TextAlign.right),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildSurchargeRow(BuildContext context, int i) {
+    final ist      = monthHours[i];
+    final eq       = monthEquivalent[i];
+    final surcharge = eq - ist;
+    final isFuture = isFutureFlags[i];
+    final hasSurcharge = surcharge > 0.01;
+    final textColor = isFuture
+        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.35)
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(children: [
+        SizedBox(
+          width: 40,
+          child: Text(monthLabels[i],
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: textColor)),
+        ),
+        Expanded(
+          child: Text(ist > 0 || !isFuture ? _fmtH(ist) : '–',
+              style: TextStyle(fontSize: 12, color: textColor),
+              textAlign: TextAlign.right),
+        ),
+        Expanded(
+          child: Text(
+            hasSurcharge ? _fmtH(eq) : (isFuture ? '–' : _fmtH(ist)),
+            style: TextStyle(
+                fontSize: 12,
+                color: textColor,
+                fontWeight: hasSurcharge ? FontWeight.w600 : null),
+            textAlign: TextAlign.right,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            hasSurcharge ? '+${_fmtH(surcharge)}' : (isFuture ? '–' : '–'),
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: hasSurcharge ? FontWeight.w600 : null,
+                color: hasSurcharge ? Colors.amber.shade600 : textColor),
+            textAlign: TextAlign.right,
+          ),
+        ),
       ]),
     );
   }
