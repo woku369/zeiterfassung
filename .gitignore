@@ -3,3 +3,7 @@ builds/
 
 # Lokale Entwicklungskonfiguration (Zugangsdaten – nie committen)
 app/lib/dev_config.dart
+
+# Claude Code session-spezifische Kommandos (können Zugangsdaten enthalten)
+.claude/commands/nas-restart.md
+.claude/commands/flutter-nas-sync-arch.md

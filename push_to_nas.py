@@ -9,7 +9,7 @@ Aufruf:
     python push_to_nas.py "C:\\Users\\wolfg\\...\\zeiterfassung.db"
 
     Optional mit anderem NAS-Ziel:
-    python push_to_nas.py "<db-pfad>" --url http://100.121.103.107:3000 --key ZE-Gurktaler-2026
+    python push_to_nas.py "<db-pfad>" --url http://<NAS-IP>:3000 --key <API-KEY>
 """
 
 import sqlite3
@@ -22,8 +22,8 @@ import os
 
 # ── Standardkonfiguration ─────────────────────────────────────────────────────
 
-DEFAULT_URL = "http://100.121.103.107:3000"
-DEFAULT_KEY = "ZE-Gurktaler-2026"
+DEFAULT_URL = "http://localhost:3000"
+DEFAULT_KEY = ""
 
 # ── Argument-Parser ───────────────────────────────────────────────────────────
 

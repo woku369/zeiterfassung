@@ -73,11 +73,11 @@ class HelpScreen extends StatelessWidget {
                 'sh /volume1/Gurktaler/zeiterfassung/backend/start_synology.sh',
               ),
               _SubHeading('Verbindung testen'),
-              _Code('curl -H "x-api-key: ZE-Gurktaler-2026" \\\n  http://100.121.103.107:3000/api/health'),
+              _Code('curl -H "x-api-key: <API-KEY>" \\\n  http://<NAS-IP>:3000/api/health'),
               _SubHeading('In der App konfigurieren'),
               _Step(number: '1', text: 'Einstellungen → NAS-Verbindung (ganz oben, vor Arbeitgebern)'),
-              _Step(number: '2', text: 'URL: http://100.121.103.107:3000'),
-              _Step(number: '3', text: 'API-Key: ZE-Gurktaler-2026'),
+              _Step(number: '2', text: 'URL: http://<NAS-IP>:3000'),
+              _Step(number: '3', text: 'API-Key: (aus start_synology.sh)'),
               _Step(number: '4', text: '"Verbindung testen" bestätigt die Erreichbarkeit'),
               _Hint(
                 'NAS-Konfiguration ist unabhängig von Arbeitgebern – '

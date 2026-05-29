@@ -20,7 +20,7 @@ fi
 NODE=/var/packages/Node.js_v20/target/usr/local/bin/node
 APP_DIR=/volume1/Gurktaler/zeiterfassung/backend
 
-export API_KEY="ZE-Gurktaler-2026"
+export API_KEY="EIh0y6qnBzL6oLWBP4Schl3O6U2oMxAv"
 export DATA_DIR="$APP_DIR/data"
 export PORT=3000
 
