@@ -248,6 +248,83 @@ class _MonthTabState extends State<_MonthTab> {
         backgroundColor: Theme.of(context).colorScheme.error));
   }
 
+  void _showEntriesForType(
+      BuildContext context, WorkType type, List<TimeEntry> entries) {
+    final filtered = entries
+        .where((e) => e.workType == type)
+        .toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final df = DateFormat('EE dd.MM.', 'de_AT');
+    final tf = DateFormat('HH:mm');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, controller) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Text(type.label,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text('${filtered.length} Einträge · ${_fmtH(filtered.fold(0.0, (s, e) => s + e.totalHours))}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.6))),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('Keine Einträge'))
+                  : ListView.separated(
+                      controller: controller,
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 16),
+                      itemBuilder: (_, i) {
+                        final e = filtered[i];
+                        return ListTile(
+                          dense: true,
+                          leading: Text(df.format(e.startTime),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
+                          title: Text(
+                            '${tf.format(e.startTime)} – ${e.endTime != null ? tf.format(e.endTime!) : '?'}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: e.note != null && e.note!.isNotEmpty
+                              ? Text(e.note!,
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis)
+                              : null,
+                          trailing: Text(_fmtH(e.totalHours),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tp = context.watch<TimeEntryProvider>();
@@ -345,8 +422,11 @@ class _MonthTabState extends State<_MonthTab> {
                   Text('Nach Tätigkeitsart',
                       style: Theme.of(context).textTheme.titleMedium),
                   const Divider(),
-                  ...byType.entries
-                      .map((kv) => _SummaryRow(kv.key.label, _fmtH(kv.value))),
+                  ...byType.entries.map((kv) => _TappableSummaryRow(
+                    label: kv.key.label,
+                    value: _fmtH(kv.value),
+                    onTap: () => _showEntriesForType(context, kv.key, entries),
+                  )),
                 ],
               ),
             ),
@@ -1456,6 +1536,43 @@ class _SummaryRow extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TappableSummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  final Color? color;
+  const _TappableSummaryRow(
+      {required this.label, required this.value, required this.onTap, this.color});
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(children: [
+              Text(label),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right,
+                  size: 14,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.35)),
+            ]),
+            Text(value,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: color)),
+          ],
+        ),
       ),
     );
   }
