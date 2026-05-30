@@ -907,6 +907,7 @@ Zahlen belegt, nicht nur behauptet.
 - [ ] Timeline: Blöcke manuell zusammenführen (mehrere kurze Sitzungen gleicher App)
 
 ### Langfristig / Ideen
+- [ ] **NAS-Geister bereinigen: Zähler nach erfolgreichem Push auf 0 setzen** – aktuell zeigt der Button beim zweiten Aufruf dieselbe Anzahl, da `getAllDeletions()` immer alle historischen Löschungen zurückgibt. Fix: letzten Push-Timestamp in SharedPreferences speichern, nur neuere Löschungen zählen.
 - [ ] **Kalender-Integration:** Google Calendar / Exchange-Termine als Zeiteinträge importieren
 - [ ] Offline-Indikator: Anzeige wenn keine NAS-Verbindung
 - [ ] E-Mail-Zeitstempel als automatische Aktivitätshinweise im Dashboard anzeigen
