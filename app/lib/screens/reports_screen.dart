@@ -626,6 +626,83 @@ class _ProjectBreakdownCard extends StatelessWidget {
   final Employer? employer;
   const _ProjectBreakdownCard({required this.entries, required this.employer});
 
+  void _showEntriesForProject(
+      BuildContext context, String projectName, List<({TimeEntry entry, double hours})> items) {
+    final sorted = [...items]..sort((a, b) => a.entry.startTime.compareTo(b.entry.startTime));
+    final total = sorted.fold(0.0, (s, x) => s + x.hours);
+    final df = DateFormat('EE dd.MM.', 'de_AT');
+    final tf = DateFormat('HH:mm');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, controller) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Text(projectName,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text(
+                    '${sorted.length} Einträge · ${_fmtH(total)}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6)),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: sorted.isEmpty
+                  ? const Center(child: Text('Keine Einträge'))
+                  : ListView.separated(
+                      controller: controller,
+                      itemCount: sorted.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 16),
+                      itemBuilder: (_, i) {
+                        final x = sorted[i];
+                        return ListTile(
+                          dense: true,
+                          leading: Text(df.format(x.entry.startTime),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500)),
+                          title: Text(
+                            '${tf.format(x.entry.startTime)} – ${x.entry.endTime != null ? tf.format(x.entry.endTime!) : '?'}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: x.entry.note != null && x.entry.note!.isNotEmpty
+                              ? Text(x.entry.note!,
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis)
+                              : null,
+                          trailing: Text(_fmtH(x.hours),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600)),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (employer == null) return const SizedBox.shrink();
@@ -642,6 +719,7 @@ class _ProjectBreakdownCard extends StatelessWidget {
       builder: (context, snap) {
         final allSplits = snap.data ?? {};
         final byProject = <String, double>{};
+        final projectEntries = <String, List<({TimeEntry entry, double hours})>>{};
         double unassigned = 0;
 
         for (final e in entries) {
@@ -650,15 +728,17 @@ class _ProjectBreakdownCard extends StatelessWidget {
           if (splits != null && splits.isNotEmpty) {
             for (final s in splits) {
               final pid = s.projectId;
-              final min = s.minutes;
+              final h = s.minutes / 60.0;
               if (projects.any((p) => p.id == pid)) {
-                byProject[pid] = (byProject[pid] ?? 0) + min / 60.0;
+                byProject[pid] = (byProject[pid] ?? 0) + h;
+                (projectEntries[pid] ??= []).add((entry: e, hours: h));
               }
             }
           } else if (e.projectId != null &&
               projects.any((p) => p.id == e.projectId)) {
-            byProject[e.projectId!] =
-                (byProject[e.projectId!] ?? 0) + e.totalHours;
+            final pid = e.projectId!;
+            byProject[pid] = (byProject[pid] ?? 0) + e.totalHours;
+            (projectEntries[pid] ??= []).add((entry: e, hours: e.totalHours));
           } else {
             unassigned += e.totalHours;
           }
@@ -676,7 +756,12 @@ class _ProjectBreakdownCard extends StatelessWidget {
                 const Divider(),
                 ...projects
                     .where((p) => byProject.containsKey(p.id))
-                    .map((p) => _SummaryRow(p.name, _fmtH(byProject[p.id]!))),
+                    .map((p) => _TappableSummaryRow(
+                          label: p.name,
+                          value: _fmtH(byProject[p.id]!),
+                          onTap: () => _showEntriesForProject(
+                              context, p.name, projectEntries[p.id] ?? []),
+                        )),
                 if (unassigned > 0)
                   _SummaryRow('Kein Projekt', _fmtH(unassigned),
                       color: Colors.grey.shade500),
