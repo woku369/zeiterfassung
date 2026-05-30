@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-29 – v1.32 Zuschlagstabelle + automatische Zuschläge + Security
+> Letztes Update: 2026-05-30 – v1.32 abgeschlossen + Tätigkeitsart-Drilldown
 
 ---
 
@@ -26,7 +26,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ## Erledigt
 
-### v1.32 – Zuschlagstabelle + automatische Zuschläge + Security-Bereinigung
+### v1.32 – Zuschlagstabelle + automatische Zuschläge + Security + Tätigkeitsart-Drilldown
 
 - [x] **Zuschlagstabelle im Jahresbericht:**
   - Separate Karte unter der Haupttabelle, nur sichtbar wenn WJ Zuschläge enthält
@@ -45,6 +45,12 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - `push_to_nas.py`: hardcodierte IP + Key entfernt
   - `backend/start_synology.sh` + `restart_backend.sh`: neuer API-Key
   - `.claude/commands/nas-restart.md` + `flutter-nas-sync-arch.md` aus git-Tracking entfernt (`.gitignore`)
+
+- [x] **Tätigkeitsart im Monatsbericht antippbar (Drilldown):**
+  - Zeilen in „Nach Tätigkeitsart" sind jetzt tappbar (kleiner `›`-Pfeil als Hinweis)
+  - Tap öffnet DraggableScrollableSheet mit allen Einträgen dieser Kategorie
+  - Anzeige: Datum, Uhrzeit (von–bis), Dauer, Notiz; sortiert nach Datum
+  - Header zeigt Anzahl Einträge + Gesamtdauer der Kategorie
 
 ---
 
