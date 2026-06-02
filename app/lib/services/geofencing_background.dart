@@ -159,6 +159,19 @@ const _kMaxAccuracyM         = 150.0;
 
 @pragma('vm:entry-point')
 Future<void> _onStart(ServiceInstance service) async {
+  runZonedGuarded(
+    () async {
+    await _onStartInner(service);
+    },
+    (e, st) async {
+      await _log('CRASH',
+          '$e  |  ${st.toString().split('\n').take(5).join(' | ')}');
+    },
+  );
+}
+
+@pragma('vm:entry-point')
+Future<void> _onStartInner(ServiceInstance service) async {
   final notifications = FlutterLocalNotificationsPlugin();
   await notifications.initialize(
     const InitializationSettings(
@@ -339,6 +352,7 @@ Future<void> _onStart(ServiceInstance service) async {
   DateTime? _prevTime;
 
   _posHandler = (pos) async {
+    try {
     final now = DateTime.now();
 
     // Effective speed in m/s: prefer GPS Doppler, fall back to position-derived.
@@ -658,6 +672,10 @@ Future<void> _onStart(ServiceInstance service) async {
           distKm: _tripDistKm, notifications: notifications);
       }
       await prefs.remove(_kOpenTripKey);
+    }
+    } catch (e, st) {
+      await _log('CRASH',
+          'GPS-Handler: $e  |  ${st.toString().split('\n').take(5).join(' | ')}');
     }
   };
 
