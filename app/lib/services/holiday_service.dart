@@ -63,6 +63,30 @@ class HolidayService {
       ..sort();
   }
 
+  /// Returns the total Soll-credit fraction for weekday holidays in [month]/[year].
+  /// Full statutory holidays = 1.0 each.
+  /// 24. Dezember (Handels-KV: Arbeitsende 13:00) = 0.5.
+  double weekdayHolidayFractionInMonth(int year, int month) {
+    double total = holidaysInMonth(year, month)
+        .where((d) => d.weekday >= DateTime.monday && d.weekday <= DateTime.friday)
+        .fold(0.0, (s, _) => s + 1.0);
+    if (month == 12) {
+      final dec24 = DateTime(year, 12, 24);
+      if (dec24.weekday >= DateTime.monday && dec24.weekday <= DateTime.friday) {
+        total += 0.5;
+      }
+    }
+    return total;
+  }
+
+  /// Formats a holiday fraction as a human-readable string, e.g. "2", "½", "1½".
+  static String formatFraction(double f) {
+    final full = f.floor();
+    final hasHalf = (f - full) >= 0.4;
+    if (full == 0) return hasHalf ? '½' : '0';
+    return hasHalf ? '$full½' : '$full';
+  }
+
   // Gauß'sche Osterformel (anonymer Gregor)
   DateTime _easterDate(int year) {
     final a = year % 19;
