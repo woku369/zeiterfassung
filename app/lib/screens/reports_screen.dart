@@ -337,7 +337,13 @@ class _MonthTabState extends State<_MonthTab> {
     final zaDays = entries.where((e) => e.workType == WorkType.compensatoryLeave).length;
     final absenceDays = vacationDays + sickDays + zaDays;
     final absenceReduction = absenceDays * (weeklyTarget / 5);
-    final monthTarget = (weeklyTarget * 4.33 - absenceReduction).clamp(0.0, weeklyTarget * 4.33);
+    final holidayDays = HolidayService.instance
+        .holidaysInMonth(tp.selectedYear, tp.selectedMonth)
+        .where((d) => d.weekday >= 1 && d.weekday <= 5)
+        .length;
+    final holidayReduction = holidayDays * (weeklyTarget / 5);
+    final monthTarget = (weeklyTarget * 4.33 - absenceReduction - holidayReduction)
+        .clamp(0.0, weeklyTarget * 4.33);
     final diff = monthHours - monthTarget;
     final byType = <WorkType, double>{};
     for (final e in entries) {
@@ -386,10 +392,14 @@ class _MonthTabState extends State<_MonthTab> {
                 const Divider(),
                 _SummaryRow('Ist-Stunden', _fmtH(monthHours)),
                 _SummaryRow(
-                  absenceDays > 0 ? 'Soll (bereinigt)' : 'Soll-Stunden',
+                  (absenceDays > 0 || holidayDays > 0) ? 'Soll (bereinigt)' : 'Soll-Stunden',
                   _fmtH(monthTarget),
-                  subtext: absenceDays > 0
-                      ? '${_fmtH(weeklyTarget * 4.33)} − ${_fmtH(absenceReduction)} Abw.'
+                  subtext: (absenceDays > 0 || holidayDays > 0)
+                      ? '${_fmtH(weeklyTarget * 4.33)} − ${_fmtH(absenceReduction + holidayReduction)}'
+                          ' (${[
+                              if (absenceDays > 0) '$absenceDays Abw.',
+                              if (holidayDays > 0) '$holidayDays FT',
+                            ].join(', ')})'
                       : null,
                 ),
                 _SummaryRow(
@@ -408,6 +418,7 @@ class _MonthTabState extends State<_MonthTab> {
                 if (vacationDays > 0) _SummaryRow('Urlaubstage', '$vacationDays', color: Colors.blue.shade600),
                 if (sickDays > 0) _SummaryRow('Krankenstandstage', '$sickDays', color: Colors.orange.shade700),
                 if (zaDays > 0) _SummaryRow('Zeitausgleich', '$zaDays', color: Colors.green.shade700),
+                if (holidayDays > 0) _SummaryRow('Feiertage (Gutschrift)', '$holidayDays', color: Colors.purple.shade400),
               ],
             ),
           ),
@@ -795,6 +806,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
   final List<double> _monthSpecialHours = List.filled(12, 0.0);
   // Month index → absence days (Urlaub + KS + ZA) for Soll reduction.
   final List<int> _monthAbsenceDays = List.filled(12, 0);
+  // Month index → weekday public holidays for Soll reduction.
+  final List<int> _monthHolidayDays = List.filled(12, 0);
   bool _showEquivalent = false;
   int _vacationDays = 0;
   int _sickDays = 0;
@@ -838,6 +851,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       _monthHours[i] = 0.0;
       _monthEquivalent[i] = 0.0;
       _monthAbsenceDays[i] = 0;
+      _monthHolidayDays[i] = 0;
       _monthSpecialDays[i]  = 0;
       _monthSpecialHours[i] = 0.0;
     }
@@ -870,6 +884,13 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       if (e.workType == WorkType.vacation) _vacationDays++;
       if (e.workType == WorkType.sick) _sickDays++;
       if (e.workType == WorkType.compensatoryLeave) _compensatoryDays++;
+    }
+    for (var i = 0; i < 12; i++) {
+      final md = DateTime(_fyStart.year, _fyStart.month + i);
+      _monthHolidayDays[i] = HolidayService.instance
+          .holidaysInMonth(md.year, md.month)
+          .where((d) => d.weekday >= 1 && d.weekday <= 5)
+          .length;
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -1110,7 +1131,8 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
       final monthDate = DateTime(_fyStart.year, _fyStart.month + i);
       final rawSoll = weeklyHours * 4.33;
       final absenceReduction = _monthAbsenceDays[i] * absenceHoursPerDay;
-      final soll = (rawSoll - absenceReduction).clamp(0.0, rawSoll);
+      final holidayReduction = _monthHolidayDays[i] * absenceHoursPerDay;
+      final soll = (rawSoll - absenceReduction - holidayReduction).clamp(0.0, rawSoll);
       final ist = _monthHours[i];
       final diff = ist - soll;
       cumDiff += diff;
@@ -1121,6 +1143,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         label: mf.format(monthDate),
         soll: soll,
         absenceDays: _monthAbsenceDays[i],
+        holidayDays: _monthHolidayDays[i],
         ist: ist,
         equivalent: _monthEquivalent[i],
         showEquivalent: _showEquivalent,
@@ -1148,7 +1171,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
     final absenceHoursPerDay = weeklyHours / 5;
     return List.generate(12, (i) {
       final rawSoll = weeklyHours * 4.33;
-      final reduction = _monthAbsenceDays[i] * absenceHoursPerDay;
+      final reduction = (_monthAbsenceDays[i] + _monthHolidayDays[i]) * absenceHoursPerDay;
       return (rawSoll - reduction).clamp(0.0, rawSoll);
     });
   }
@@ -1184,6 +1207,7 @@ class _MonthRow extends StatelessWidget {
   final String label;
   final double soll;
   final int absenceDays;
+  final int holidayDays;
   final double ist;
   final double equivalent;
   final bool showEquivalent;
@@ -1195,6 +1219,7 @@ class _MonthRow extends StatelessWidget {
     required this.label,
     required this.soll,
     this.absenceDays = 0,
+    this.holidayDays = 0,
     required this.ist,
     this.equivalent = 0,
     this.showEquivalent = false,
@@ -1235,14 +1260,19 @@ class _MonthRow extends StatelessWidget {
                     color: textColor))),
         Expanded(
             child: Tooltip(
-              message: absenceDays > 0
-                  ? '$absenceDays Abwesenheitstag${absenceDays > 1 ? 'e' : ''} abgezogen'
+              message: (absenceDays > 0 || holidayDays > 0)
+                  ? [
+                      if (absenceDays > 0)
+                        '$absenceDays Abwesenheitstag${absenceDays > 1 ? 'e' : ''}',
+                      if (holidayDays > 0)
+                        '$holidayDays Feiertag${holidayDays > 1 ? 'e' : ''}',
+                    ].join(' + ') + ' abgezogen'
                   : '',
               child: Text(
-                absenceDays > 0 ? '${_fmtH(soll)}*' : _fmtH(soll),
+                (absenceDays > 0 || holidayDays > 0) ? '${_fmtH(soll)}*' : _fmtH(soll),
                 style: TextStyle(
                     fontSize: 12,
-                    color: absenceDays > 0
+                    color: (absenceDays > 0 || holidayDays > 0)
                         ? (isFuture
                             ? textColor
                             : Theme.of(context).colorScheme.primary.withOpacity(0.8))
