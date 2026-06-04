@@ -1,115 +1,88 @@
 # /nas-restart – NAS-Backend neu starten
 
-Führt den Nutzer Schritt für Schritt durch den Neustart des
-Zeiterfassung-Backends auf dem Synology NAS DS124.
+Startet das Zeiterfassung-Backend auf dem Synology NAS DS124 neu.
 
 ---
 
 ## Kontext
 
-- **NAS:** DS124-RockingK · IP `192.168.0.9` · User `Wolfgang`
+- **NAS:** DS124-RockingK · LAN `192.168.0.9` · Tailscale `100.121.103.107` · User `Wolfgang`
 - **App-Verzeichnis:** `/volume1/Gurktaler/zeiterfassung/backend`
 - **Node.js:** `/var/packages/Node.js_v20/target/usr/local/bin/node`
 - **Port:** 3000
-- **Umgebungsvariablen:** `API_KEY=ZE-Gurktaler-2026`, `DATA_DIR=.../data`
-- **Kein Docker**, kein pm2 – reiner Node.js-Prozess, gestartet über
-  Synology Aufgabenplaner beim Systemstart
+- **API-Key:** `ZE-2026` (gesetzt in `start_synology.sh` und beim manuellen Start)
+- **Kein Docker**, kein pm2 – reiner Node.js-Prozess
 
 ## Bekannte Fallen
 
-- `pgrep` ist auf Synology nicht vorhanden → `pgrep -f server.js` schlägt fehl
-- `ps` ohne `sudo` zeigt nur eigene Prozesse → root-Prozesse unsichtbar
-- `kill` ohne sudo schlägt fehl wenn der Prozess root gehört
-- Port 3000 kann noch belegt sein obwohl `ps` keinen Node-Prozess zeigt
-  → immer via `netstat` prüfen und mit `sudo` killen
+- Aufgabenplaner startet Server als `admin` → `pkill` ohne sudo schlägt fehl
+- `sudo` über SSH braucht TTY → `ssh -t` verwenden
+- Mehrere Node-Prozesse möglich → alle killen bevor neu starten
+- `ss` nicht verfügbar auf Synology → `netstat` verwenden
 
 ---
 
 ## Prozedur
 
-Gib dem Nutzer die folgenden Schritte der Reihe nach aus.
-Warte nach jedem Schritt auf die Ausgabe des Nutzers bevor du weitermachst.
-
-### Schritt 1 – SSH-Verbindung öffnen
+### Schritt 1 – Alle Node-Prozesse beenden (braucht sudo)
 
 ```powershell
-ssh Wolfgang@192.168.0.9
+ssh -t Wolfgang@192.168.0.9 "sudo pkill -f 'node server.js'"
 ```
 
-Passwort eingeben wenn gefragt.
+Zweimal Passwort eingeben: erst SSH-Passwort, dann sudo-Passwort (= NAS-Passwort).
+Kein Output = Erfolg. Verbindung schließt sich automatisch.
 
 ---
 
-### Schritt 2 – Alten Prozess beenden
+### Schritt 2 – Server neu starten
 
-```bash
-sudo kill $(sudo netstat -tlnp | grep 3000 | awk '{print $7}' | cut -d/ -f1)
-```
-
-**Erwartete Ausgaben:**
-- Kein Output → Prozess wurde beendet ✓
-- `kill: usage: ...` → Port war bereits frei, kein Prozess lief (auch OK)
-- Passwort-Prompt → sudo-Passwort eingeben (= NAS-Passwort)
-
----
-
-### Schritt 3 – In App-Verzeichnis wechseln und Umgebung setzen
-
-```bash
-cd /volume1/Gurktaler/zeiterfassung/backend
-NODE=/var/packages/Node.js_v20/target/usr/local/bin/node
-export API_KEY="ZE-Gurktaler-2026"
-export DATA_DIR=/volume1/Gurktaler/zeiterfassung/backend/data
-export PORT=3000
-```
-
-Kein Output erwartet.
-
----
-
-### Schritt 4 – Server starten
-
-```bash
-$NODE server.js >> server.log 2>&1 &
-```
-
-**Erwartete Ausgabe:** `[1] 12345` (PID-Nummer, beliebig)
-
----
-
-### Schritt 5 – Start bestätigen
-
-```bash
-sleep 2 && tail -5 server.log
+```powershell
+ssh Wolfgang@192.168.0.9 "export API_KEY='ZE-2026' DATA_DIR=/volume1/Gurktaler/zeiterfassung/backend/data PORT=3000 && cd /volume1/Gurktaler/zeiterfassung/backend && nohup /var/packages/Node.js_v20/target/usr/local/bin/node server.js >> server.log 2>&1 & sleep 3 && tail -3 /volume1/Gurktaler/zeiterfassung/backend/server.log"
 ```
 
 **Erwartete Ausgabe (Erfolg):**
 ```
-DB ready: /volume1/Gurktaler/zeiterfassung/backend/data/zeiterfassung.db
 Zeiterfassung Backend läuft auf Port 3000
 API_KEY: *** (gesetzt)
 DATA_DIR: /volume1/Gurktaler/zeiterfassung/backend/data
 ```
 
-**Bei Fehler `EADDRINUSE` (Port 3000 noch belegt):**
-→ Zurück zu Schritt 2, Port ist noch nicht freigegeben. Kurz warten und wiederholen.
+---
 
-**Bei sonstigem Fehler:**
-→ Vollständiges Log anzeigen: `tail -30 server.log`
+### Schritt 3 – Sync in der App auslösen
+
+Einstellungen → Synchronisation → Jetzt synchronisieren.
+Bei 401-Fehler: API-Key in App-Einstellungen auf `ZE-2026` prüfen.
 
 ---
 
-### Schritt 6 – SSH-Verbindung schließen
+## Diagnose bei Problemen
 
-```bash
-exit
+**Server antwortet nicht:**
+```powershell
+ssh Wolfgang@192.168.0.9 "netstat -tlnp 2>/dev/null | grep 3000"
+```
+
+**Tailscale-Verbindung prüfen:**
+```powershell
+ssh Wolfgang@192.168.0.9 "/var/packages/Tailscale/target/bin/tailscale ping 100.105.240.22"
+```
+
+**Laufende Node-Prozesse anzeigen:**
+```powershell
+ssh Wolfgang@192.168.0.9 "ps aux | grep 'node server' | grep -v grep"
+```
+
+**Server-Log (letzte 10 Zeilen):**
+```powershell
+ssh Wolfgang@192.168.0.9 "tail -10 /volume1/Gurktaler/zeiterfassung/backend/server.log"
 ```
 
 ---
 
 ## Wann ist ein Neustart nötig?
 
-- Nach jeder Änderung an `server.js` (kein Hot-Reload)
-- Nach `git pull` das `backend/server.js` aktualisiert hat
-- Wenn der Server abgestürzt ist (App meldet Sync-Fehler, NAS nicht erreichbar)
-- Nicht nötig nach reinen App-Builds (Flutter-Code läuft auf dem Gerät, nicht am NAS)
+- Nach Änderungen an `backend/server.js`
+- Wenn die App Sync-Fehler meldet und Tailscale läuft
+- **Nicht nötig** nach reinen App-Builds (Flutter läuft auf dem Gerät)
