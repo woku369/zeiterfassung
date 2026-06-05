@@ -170,15 +170,23 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     }
     final tp = context.read<TimeEntryProvider>();
-    // For the legacy project_id field: keep single-project compat.
-    final validSplits = _isSurchargeEmployer
-        ? _splits.where((d) => d.projectId != null && (int.tryParse(d.ctrl.text) ?? 0) > 0).toList()
+    // Splits with a project selected (regardless of minutes – single-project marker).
+    final splitsWithProject = _isSurchargeEmployer
+        ? _splits.where((d) => d.projectId != null).toList()
         : <_SplitDraft>[];
+    // Splits that also carry minutes → actual time breakdown.
+    final validSplits = splitsWithProject
+        .where((d) => (int.tryParse(d.ctrl.text) ?? 0) > 0)
+        .toList();
+    // Always persist project_id on the entry so the reports legacy-fallback works
+    // when no per-split minutes are entered (simple "this whole entry = Project X").
     final legacyProjectId = !_isSurchargeEmployer
         ? null
-        : validSplits.length == 1
-            ? validSplits.first.projectId
-            : null;
+        : splitsWithProject.length == 1
+            ? splitsWithProject.first.projectId
+            : validSplits.length == 1
+                ? validSplits.first.projectId
+                : null;
 
     final entryId = _isNew ? const Uuid().v4() : widget.entry!.id;
     final entry = TimeEntry(
