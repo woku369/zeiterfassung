@@ -170,23 +170,39 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       if (end.isBefore(start)) end = end.add(const Duration(days: 1));
     }
     final tp = context.read<TimeEntryProvider>();
-    // Splits with a project selected (regardless of minutes – single-project marker).
+
+    // ── Project split calculation ───────────────────────────────────────────
+    // Splits with a project selected (may have 0 minutes → "catch-all").
     final splitsWithProject = _isSurchargeEmployer
         ? _splits.where((d) => d.projectId != null).toList()
         : <_SplitDraft>[];
-    // Splits that also carry minutes → actual time breakdown.
-    final validSplits = splitsWithProject
+    // Net entry minutes (null when no end time set).
+    final entryNet = _entryMinutes;
+    // Splits with explicit minutes.
+    final withMinutes = splitsWithProject
         .where((d) => (int.tryParse(d.ctrl.text) ?? 0) > 0)
         .toList();
-    // Always persist project_id on the entry so the reports legacy-fallback works
-    // when no per-split minutes are entered (simple "this whole entry = Project X").
+    // Splits without explicit minutes ("catch-all").
+    final catchAlls = splitsWithProject
+        .where((d) => (int.tryParse(d.ctrl.text) ?? 0) == 0)
+        .toList();
+    final sumExplicit =
+        withMinutes.fold(0, (s, d) => s + int.parse(d.ctrl.text));
+    // Remainder for the single catch-all slot (may be 0 if over-allocated).
+    final catchAllMin = (catchAlls.length == 1 && entryNet != null)
+        ? (entryNet - sumExplicit).clamp(0, 999999) as int
+        : null;
+
+    // legacy project_id: set when exactly one project is assigned so the
+    // reports fallback (e.totalHours) works for open/no-end-time entries.
     final legacyProjectId = !_isSurchargeEmployer
         ? null
         : splitsWithProject.length == 1
             ? splitsWithProject.first.projectId
-            : validSplits.length == 1
-                ? validSplits.first.projectId
+            : withMinutes.length == 1 && catchAlls.isEmpty
+                ? withMinutes.first.projectId
                 : null;
+    // ───────────────────────────────────────────────────────────────────────
 
     final entryId = _isNew ? const Uuid().v4() : widget.entry!.id;
     final entry = TimeEntry(
@@ -224,13 +240,22 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
 
     // Save project splits
     if (_isSurchargeEmployer) {
-      final splitModels = validSplits
-          .map((d) => EntryProjectSplit.create(
-                entryId: entryId,
-                projectId: d.projectId!,
-                minutes: int.parse(d.ctrl.text),
-              ))
-          .toList();
+      final splitModels = <EntryProjectSplit>[
+        // Explicit splits: use entered minutes as-is.
+        ...withMinutes.map((d) => EntryProjectSplit.create(
+              entryId: entryId,
+              projectId: d.projectId!,
+              minutes: int.parse(d.ctrl.text),
+            )),
+        // Single catch-all: receives remainder (total − explicit).
+        // Skipped when no end time or remainder = 0.
+        if (catchAllMin != null && catchAllMin > 0)
+          EntryProjectSplit.create(
+            entryId: entryId,
+            projectId: catchAlls.first.projectId!,
+            minutes: catchAllMin,
+          ),
+      ];
       await DatabaseHelper.instance.saveSplitsForEntry(entryId, splitModels);
     }
 
@@ -532,6 +557,11 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     final totalMin = _entryMinutes;
     final allocMin = _allocatedMinutes;
     final restMin = totalMin != null ? (totalMin - allocMin) : null;
+    // Identify the single catch-all slot (no minutes → gets the remainder).
+    final catchAllCount = _splits.where((d) => (int.tryParse(d.ctrl.text) ?? 0) == 0).length;
+    final catchAllRemainder = (catchAllCount == 1 && restMin != null)
+        ? restMin.clamp(0, 999999) as int
+        : null;
 
     return [
       Container(
@@ -614,6 +644,17 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
                         textAlign: TextAlign.center,
                         decoration: InputDecoration(
                           labelText: 'Min.',
+                          // Show remainder hint for the single catch-all slot.
+                          hintText: (catchAllCount == 1 &&
+                                  (int.tryParse(draft.ctrl.text) ?? 0) == 0 &&
+                                  catchAllRemainder != null)
+                              ? '${catchAllRemainder}m'
+                              : null,
+                          hintStyle: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.orange.shade300
+                                  : Colors.orange.shade700),
                           border: const OutlineInputBorder(),
                           fillColor: Theme.of(context).colorScheme.surface,
                           filled: true,
