@@ -326,9 +326,6 @@ async function handleRequest(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
   if (method === 'OPTIONS') return send(res, 204, {});
 
-  // Auth
-  if (!checkAuth(req)) return send(res, 401, { error: 'Unauthorized' });
-
   // ── GET /api/health ────────────────────────────────────────────────────────
   if (path_ === '/api/health' && method === 'GET') {
     const counts = {
@@ -338,6 +335,9 @@ async function handleRequest(req, res) {
     };
     return send(res, 200, { ok: true, ...counts, ts: now() });
   }
+
+  // Auth
+  if (!checkAuth(req)) return send(res, 401, { error: 'Unauthorized' });
 
   // ── POST /api/sync ─────────────────────────────────────────────────────────
   // Bidirektionaler Full-Sync: Client schickt lokale Änderungen,
