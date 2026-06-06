@@ -361,6 +361,7 @@ async function handleRequest(req, res) {
     const pushEmployers = db.transaction(items => items.forEach(e => stmts.upsertEmployer.run({
       id: e.id, name: e.name, weekly_hours: e.weekly_hours ?? 40,
       fiscal_year_start_month: e.fiscal_year_start_month ?? 4,
+      vacation_days_per_year: e.vacation_days_per_year ?? 25,
       nas_url: e.nas_url ?? null, nas_api_key: e.nas_api_key ?? null,
       updated_at: e.updated_at ?? ts, deleted_at: e.deleted_at ?? null,
     })));
