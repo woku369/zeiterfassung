@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "synology-nas": {
+      "source": "atom2ueki/mcp-server-synology",
+      "sourceType": "github",
+      "skillPath": "skills/synology-nas/SKILL.md",
+      "computedHash": "9bb4b0c0dc0c1d6a8c152c0802f7e66c2d93e11b282215bddbba65880672604d"
+    }
+  }
+}
