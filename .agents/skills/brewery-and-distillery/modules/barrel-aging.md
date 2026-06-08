@@ -882,6 +882,108 @@ Vorgehen:
 
 ---
 
+### Methodenvergleich: Kirschholzausbau im Destillat vs. im Fertigprodukt
+
+**Kontext**: Zirbenbrand, Fertigprodukt 20 % ABV / 50 g/L Zucker. Das Zirbendestillat (65 % ABV) macht 10 % des Gesamtvolumens aus und wird erst beim finalen Mischen eingebracht.
+
+Die Frage: Kirschholz in das **Zirbendestillat vor dem Mischen** (65 % ABV), oder in das **fertig ausgemischte Produkt** (20 % ABV)?
+
+---
+
+#### Methode A — Ausbau im Zirbendestillat (65 % ABV, vor dem Mischen)
+
+**Was passiert beim Mischen**:
+Das kirschholzgelagerte Destillat (65 % ABV) wird 1:9 mit der Restbasis verdünnt. Dabei fallen zwei Dinge auf:
+
+1. **Farbverdünnung**: Die Farbintensität des Destillats wird auf ~10 % reduziert. Um im Fertigprodukt ein warmes Rosé-Gold zu erzielen, muss im Destillat eine entsprechend intensive, tiefe Farbe entwickelt werden — was bei 65 % ABV gut erreichbar ist.
+
+2. **Tannin-Ausfällung**: Beim starken Verdünnen (65 % → ~20 % ABV) fällt ein Teil der gelösten Tannine und Phenole aus. Das ist **vorteilhaft**: Die adstringentesten, wasserunlöslichen Tanninfraktionen scheiden sich ab; was in Lösung bleibt, ist das weiche, integrierte Phenolspektrum. Ergebnis: weniger Bitterkeit/Adstringenz im Endprodukt als bei direktem Ausbau bei 20 % ABV.
+
+**Rechnung für das Fertigprodukt** (Beispiel 10 L Endvolumen):
+
+```
+Zirbendestillat: 1,0 L (10 % des Endvolumens) bei 65 % ABV
+Restbasis:       9,0 L bei ca. 13,3 % ABV  →  Endmix: 20 % ABV
+
+Kirschholz im Destillat:
+  Ziel-Farbintensität im Fertigprodukt: "mittleres Rosé-Gold" (Skala 3/5)
+  Benötigte Intensität im Destillat: ~3× Zielwert (Verdünnungsfaktor 10, aber
+  Tanninausfällung und Viskositätseffekt im Fertigprodukt verstärken Farbeindruck etwas)
+
+  Empfohlene Dosis im Destillat: 3–5 g/L → 3–5 g auf 1 Liter
+  Toasting: Medium
+  Kontaktzeit: 2–4 Wochen (kürzere Zeit = helleres, frischeres Profil)
+```
+
+**Vorteile von Methode A**:
+- Kontrolliertes, vorhersehbares Umfeld (65 % ABV = Standardverhalten)
+- Kein mikrobiologisches Risiko
+- Fehler betreffen nur 1 Liter Destillat, nicht das Gesamtprodukt
+- Farbe und Tannine lassen sich präzise im kleinen Volumen entwickeln und prüfen
+- Tanninausfällung beim Mischen wirkt als natürlicher „Weichzeichner"
+- Zirbenaromatik (Bornylacetat, Pinen) wird durch Kirschholz-Benzaldehyd flankiert, nicht überlagert — beide wirken aromatisch ergänzend
+
+**Nachteile / Risiken von Methode A**:
+- **Haze-Risiko beim Mischen**: Schnelle Verdünnung von 65 % auf 20 % kann eine leichte Trübung durch ausgefällte Phenole erzeugen. Lösung: nach dem Mischen 24–48 h kalt stehen lassen (5–10 °C), dann dekantieren oder durch grobes Papierfilter ziehen. Alternativ: Destillat auf 40 % verdünnen, 24 h kühlen, klären, dann erst auf Zielbasis mischen.
+- Farbe erst im fertigen Mix sichtbar — einmaliger Testlauf empfehlenswert
+
+---
+
+#### Methode B — Ausbau im Fertigprodukt (20 % ABV)
+
+**Was passiert**:
+Das bereits gemischte, gezuckerte Produkt (20 % ABV, 50 g/L Zucker) kommt direkt mit Kirschholzwürfeln in Kontakt.
+
+**Vorteile von Methode B**:
+- Farbe und Extraktionsfortschritt direkt im Zielbehälter sichtbar
+- Kein Umrechnungsaufwand
+- Zucker dämpft Tanninwahrnehmung in situ
+
+**Nachteile von Methode B bei diesem Produkt**:
+
+| Problem | Ursache | Auswirkung |
+|---------|---------|-----------|
+| Hohe Tanninextraktion | 80 % Wasseranteil bei 20 % ABV | Schnelle Überextraktion, Bitterkeitsrisiko |
+| Langsame Farbentwicklung | Niedrige Alkohollöslichkeit der Phenolpigmente | Längere Kontaktzeit nötig, mehr Zeitfenster für Fehler |
+| 50 g/L Zucker puffert nur schwach | Niedrige Zuckermenge (nicht 150–200 g/L) | Wenig Schutz gegen Bitterkeit verglichen mit süßen Likören |
+| Mikrobiologisches Risiko | 20 % ABV an der Grenze | Erhöhter Aufwand für Holzsanitierung |
+| Fehler am Gesamtvolumen | Ausbau direkt im fertigen Batch | Kein „Testlauf möglich" |
+
+**Fazit Methode B**: Bei diesem Produkt (nur 50 g/L Zucker, also wenig Bitterkeits-Puffer) ist die Überextraktionsgefahr bei 20 % ABV real. Der niedrige Zuckergehalt schützt kaum.
+
+---
+
+#### Empfehlung
+
+**Methode A ist für diesen Zirbenbrand klar vorzuziehen.**
+
+Die 10 %-Fraktion des Zirbendestillats (65 % ABV) ist der ideale Träger für den Kirschholzausbau:
+- Kontrollierbares Umfeld
+- Fehlerrisiko auf kleinem Volumen begrenzt
+- Tanninausfällung beim Mischen wirkt als eingebaute „Feinkorrektur"
+- Die Zirbenaromatik wird durch Cherry-Benzaldehyd ergänzt, nicht übertönt
+
+**Praktisches Vorgehen**:
+
+```
+1. Zirbendestillat (1 L / 65 % ABV) in Glas- oder Edelstahlgefäß
+2. Kirschholzwürfel Medium-Toast: 3–4 g (= 3–4 g/L)
+3. Luftdicht verschlossen, dunkel lagern
+4. Kostung/Farbprüfung Tag 7, 14, 21
+5. Holz herausnehmen wenn Farbe im Destillat: tiefes Bernstein-Rosa bis kräftiges Amber
+   (im Fertigprodukt wird daraus ein helles bis mittleres Rosé-Gold)
+6. Destillat auf 40 % ABV vorwässern (mit 33 mL Wasser auf 100 mL Destillat)
+7. 24 h kalt stellen (5–8 °C) → Phenolfällung abwarten
+8. Dekantieren oder durch Kaffeefilter ziehen (Farbe bleibt, Trübung geht)
+9. Destillat in Restbasis einmischen, Zucker einrühren, ABV kontrollieren
+10. 48 h Ruhe nach dem Mischen vor finaler Kostung
+```
+
+**Farbkontrolle vor dem Mischen** (Schnelltest):
+1 mL des kirschausgebauten Destillats in 9 mL des ungefärbten Basisprodukts mischen → direkte Vorschau der Endfarbe ohne den ganzen Batch zu riskieren.
+
+---
+
 ## Barrel Care and Storage
 
 ### Storing Empty Barrels
