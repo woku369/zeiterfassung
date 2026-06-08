@@ -650,11 +650,97 @@ Kostung:
 
 ---
 
+## Holzausbau bei Likören und zuckerhaltigen Produkten (20–35 % ABV)
+
+Fertig ausgemischte Liköre und zuckerhaltige Geiste verhalten sich beim Holzausbau grundlegend anders als hochprozentige Destillate. Wer Protokolle 1:1 von einem 50%-igen Rohbrand auf einen 25%-igen Likör überträgt, riskiert Überextraktion, Trübung und mikrobielle Probleme.
+
+### Warum sich die Dynamik ändert
+
+**1. Tannin-Löslichkeit und Extraktion**
+
+Wasser löst Tannine effizienter als Ethanol. Bei niedrigem ABV steigt der Wasseranteil stark an — die Extraktionsrate für kondensierte Tannine und Ellagitannine ist deshalb bei 25 % ABV höher als bei 50 % ABV. Das Ergebnis: Gleiche Holzmenge, gleiche Kontaktzeit → **mehr Tannin, mehr Adstringenz** im Likör als im Destillat.
+
+**2. Zucker puffert Astringenz — aber nicht unbegrenzt**
+
+Zucker (Saccharose, Glukose, Fruktose) bildet schwache Komplexe mit Tanninen und verringert die Wahrnehmungsschwelle für Adstringenz spürbar:
+- 100 g/L Zucker: leichte Pufferung (~20–30 % weniger wahrgenommene Adstringenz)
+- 200 g/L Zucker: deutliche Pufferung (~40–50 %)
+
+Das gibt mehr Spielraum, ersetzt aber keine präzise Dosierung — bei Überextraktion ist die Bitterkeit auch durch Zucker nicht mehr zu maskieren.
+
+**3. Farbextraktion verlangsamt sich**
+
+Phenolische Farbpigmente (z.B. aus Kirschholz) sind partiell alkohollöslich. Bei 20–30 % ABV:
+- Farbextraktion langsamer und weniger intensiv als bei >45 % ABV
+- Endfarbe bei gleicher Dosis blasser
+- Kontaktzeit muss verlängert werden, um ähnliche Farbtiefe zu erreichen
+
+Als Ausgleich: Zucker verändert die optische Wahrnehmung der Farbe — ein 25%-iger, gezuckerter Likör wirkt mit der gleichen Pigmentmenge **dunkler und satter** als ein klares Destillat, da die Viskosität das Licht stärker bricht.
+
+**4. Mikrobielle Stabilität**
+
+20–30 % ABV liegt an der Grenze der mikrobiellen Sicherheit. Holz — selbst getoastetes — kann Sporenbildner, Schimmelpilze, Essigsäurebakterien und Hefen beherbergen, die bei diesen Alkoholgehalten überleben und Fehlaromen produzieren.
+
+**Pflichtmaßnahmen bei <35 % ABV**:
+- Holzwürfel/Stäbe vor Verwendung kurz in kochendes Wasser (90–100 °C, 5 Minuten) tauchen oder mit 70%-igem Alkohol abspülen und abtropfen lassen
+- Gefäße luftdicht verschlossen halten
+- Regelmäßige Sichtkontrolle auf Trübung und Geruchsveränderung
+- Kontaktzeiten kurz halten und danach abfüllen (nicht über Monate offen lagern)
+
+**5. Esterifikation und Mellowing-Effizienz**
+
+Bei niedrigem ABV laufen Esterifikationsreaktionen langsamer ab. Der Mellowing-Effekt durch chemische Umwandlung (Tannin-Aldehyd-Bindung, Ester-Bildung) ist reduziert. Hauptwirkmechanismus bei Likören ist deshalb primär die **Adsorption** von Fehlaromen und die **sensorische Pufferung** durch Tannine — ergänzt durch Zucker.
+
+---
+
+### Dosierungstabelle für Liköre (20–35 % ABV, 80–200 g/L Zucker)
+
+Grundregel: Dosen gegenüber Hochprozentigem **halbieren**, Kontaktzeiten **kürzen**.
+
+| Holz | Dosis (g/L) | Kontaktzeit | Erstverkostung | Risiko |
+|------|------------|-------------|----------------|--------|
+| **Kirsche** Medium-Toast | 0,5–1,5 | 1–3 Wochen | Tag 7 | Gering — bevorzugtes Holz für Liköre |
+| **Apfel** Light-Toast | 1,0–2,0 | 2–4 Wochen | Tag 10 | Sehr gering |
+| **Birne** Light-Toast | 1,5–3,0 | 3–5 Wochen | Tag 14 | Sehr gering |
+| **Walnuss** Medium-Toast | **0,2–0,5** | **3–7 Tage** | **Tag 3** | Hoch — Juglon + Zucker verstärken Bitterwahrnehmung |
+| **Eiche** Light-Toast | 0,5–1,0 | 1–3 Wochen | Tag 7 | Gering bei korrekter Dosis |
+
+**Walnuss bei Likören**: Äußerste Vorsicht. Juglone ist zwar bitter-puffernd durch Zucker, aber die Kombination aus hoher Tanninlöslichkeit (niedriger ABV) und Juglone erzeugt schnell eine medizinisch-bittere Note die nicht mehr korrigierbar ist. Wenn überhaupt, nur als 3-Tage-Kurzkontakt in minimaler Dosis.
+
+---
+
+### Besonderheiten bei hohem Zuckergehalt (>150 g/L)
+
+- **Viskosität**: Dickflüssige Produkte haben reduzierten Kontakt zwischen Holzoberfläche und Flüssigkeit — **regelmäßiges Schwenken** (1× täglich) oder ein loser Rührstab verbessert die Extraktion
+- **Karamellisierungsartefakte**: Zucker und Hitze aus dem Toasting-Prozess können bei langer Kontaktzeit Maillard-ähnliche Reaktionen auslösen → leichte Brotteig/Karamell-Note; kann erwünscht oder unerwünscht sein
+- **Süße-Holz-Balance nach Ausbau prüfen**: Tannine dämpfen Süßewahrnehmung; ein Produkt, das vor dem Holzausbau gut ausbalanciert war, kann danach trockener wirken → ggf. Süße nachkorrigieren
+- **Filtration nach Holzausbau**: Bei gezuckerten Produkten empfehlenswert (grobes Sieb genügt für Holzpartikel; Tiefenfiltration würde Farbstoffe reduzieren)
+
+---
+
+### Entscheidungsmatrix: Hochprozentig vs. Likör
+
+| Parameter | Destillat (>45 % ABV) | Likör (20–35 % ABV, gezuckert) |
+|-----------|----------------------|-------------------------------|
+| Tannin-Extraktion | Moderat | Hoch (mehr Wasser) |
+| Astringenzrisiko | Mittel | Hoch — aber durch Zucker gepuffert |
+| Farbextraktion (Kirsche) | Schnell, intensiv | Langsam, weniger saturiert |
+| Farbwahrnehmung | Klar | Tiefer/satter wegen Viskosität |
+| Mellowing-Mechanismus | Chemisch + Adsorption | Primär Adsorption + Pufferung |
+| Mikrobielle Stabilität | Sicher | Kritisch — Sterilisation Pflicht |
+| Empfohlene Dosis (Kirsche) | 1,5–2,5 g/L | 0,5–1,5 g/L |
+| Empfohlene Kontaktzeit | 3–6 Wochen | 1–3 Wochen |
+| Post-Holz-Korrektur | Selten nötig | Süßebalance prüfen |
+
+---
+
 ## Fallstudie: Zirbengeist-Rettung mit Kirschholz und Zirbendestillat
 
 ### Ausgangssituation und Diagnose
 
-**Produkt**: Bestandsprodukt Zirbengeist — klar, leicht gesüßt (Likör-Tendenz), leicht bitter, kaum Zirbenaromatik.
+**Produkt**: Bestandsprodukt Zirbengeist — klar, leicht gesüßt (Likör-Tendenz, ca. 20–35 % ABV, Restzucker vorhanden), leicht bitter, kaum Zirbenaromatik.
+
+**Produktkategorie**: Gezuckertes Niedrigprozentiges → Dosierung und Kontaktzeiten nach den Likör-Richtlinien (siehe Sektion oben), nicht nach Hochprozentig-Protokoll.
 
 **Problemdiagnose**:
 
