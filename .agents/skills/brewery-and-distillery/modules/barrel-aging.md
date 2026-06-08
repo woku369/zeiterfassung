@@ -522,6 +522,34 @@ Holz wirkt auf allen vier Ebenen:
 
 **Passt zu**: Obstbrand (Kirsche, Pflaume), Whiskey, weißem Rum, Grappa.
 
+#### Farbgebung durch Kirschholz
+
+Kirschholz ist unter den hier besprochenen Obsthölzern das einzige, das in Destillaten und Likören eine **visuell deutliche, natürliche Farbe** einbringt. Die Ursache liegt im pigmentreichen Kernholz.
+
+**Farbgebende Verbindungen**:
+- **Phlobaphene**: Oxidationsprodukte kondensierter Tannine; rötlich-braune Pigmente; hauptverantwortlich für den Farbton
+- **Quercetin und Kämpferol-Derivate**: Gelblich-orange Flavonoide aus der Zellwandstruktur; verstärken den Goldton
+- **Prunasin-verwandte Phenolglykoside**: Zusätzliche Farbträger im Kirschkernholz
+
+**Farbverlauf nach Toasting und Kontaktzeit**:
+
+| Toast-Stufe | Farbe nach 2 Wochen | Farbe nach 4 Wochen | Charakter |
+|------------|--------------------|--------------------|-----------|
+| Light | Blass rosa-golden | Rosé bis helles Lachs | Frisch, zart |
+| Medium | Goldenes Rosé | Warmes Bernstein-Rosa | Ausgewogen, edel |
+| Heavy | Tiefes Bernstein | Dunkelbraun-amber | Wenig Kirsch-typisch |
+
+**Empfehlung für natürliche Färbung**: **Medium-Toast** — gibt den charakteristischen warm-rosafarbenen bis bernsteinfarbenen Ton ohne den holzig-rauchigen Charakter der Heavy-Toast-Variante.
+
+**ABV-Einfluss auf Farbextraktion**:
+- >50 % ABV: Schnelle, intensive Farbextraktion (1–2 Wochen für sichtbares Ergebnis)
+- 40–50 % ABV: Moderate Extraktion, gleichmäßiger Verlauf
+- <40 % ABV: Langsame Extraktion; Farbe weniger saturiert
+
+**Farbstabilität**: Die Pigmente aus Kirschholz sind in hochprozentigem Destillat (>40 % ABV) weitgehend licht- und oxidationsstabil — kein Ausbleichen wie bei Anthocyanen aus Früchten. Dunkle Lagerung ist dennoch empfehlenswert.
+
+**Keine Fixierung nötig**: Anders als pflanzliche Farbextrakte oder Fruchtsäfte braucht Kirschholz-Farbe keine Stabilisatoren. Das Destillat selbst ist das Lösungsmittel und Konservierungsmittel.
+
 ---
 
 #### Apfel (Apfelholzwürfel / -stäbe)
@@ -619,6 +647,152 @@ Kostung:
 | Gleiche Kontaktzeit bei verschiedenen Hölzern | Überextraktion bei Kirsche, Unterextraktion bei Birne | Hölzer getrennt oder gestaffelt herausnehmen |
 | Kein Toasting der Würfel | Rohe Gerbsäure, grüne/bittere Fehlaromen | Ausschließlich getoastete Würfel kaufen oder kurz im Ofen (160 °C, 20 min) rösten |
 | Zu niedriger ABV (<38 %) | Schlechte Tannin-Löslichkeit, Mikrobenstabilität unsicher | Auf min. 40 % verdünnen nach Destillation |
+
+---
+
+## Fallstudie: Zirbengeist-Rettung mit Kirschholz und Zirbendestillat
+
+### Ausgangssituation und Diagnose
+
+**Produkt**: Bestandsprodukt Zirbengeist — klar, leicht gesüßt (Likör-Tendenz), leicht bitter, kaum Zirbenaromatik.
+
+**Problemdiagnose**:
+
+| Fehler | Wahrscheinliche Ursache |
+|--------|------------------------|
+| Schwache Zirben-Aromatik | Flüchtige Terpenverbindungen (Bornylacetat, α-Pinen) durch Lagerung oder Verarbeitung verloren; oder Ausgangsmaterial (Nadeln/Zapfen) zu wenig konzentriert maceriert |
+| Leichte Bitterkeit | Oxidierte Monoterpene und Phenolverbindungen aus der Zirbe; ggf. Bitterstoffe aus Zapfenbestandteilen (Harze) |
+| Fehlende Farbe | Keine Fassreifung, kein Holzausbau; klares Destillat oder wässriger Kaltauszug |
+| Süße-Tendenz | Zugabe von Zucker/Glukosesirup zur Maskierung von Fehlaromen — löst Grundproblem nicht |
+
+**Aromatisches Zirben-Profil (Ziel)**:
+Die charakteristischen Verbindungen von *Pinus cembra*:
+- **Bornylacetat** (Hauptträger): Frisch-harzig, kampferartig-fruchtig, „Zirbe-typisch"
+- **α-Pinen, β-Pinen**: Waldluft, Harzduft, terpentinartig (muss dosiert sein, sonst lösungsmittelartig)
+- **Limonen**: Zitrusartige Frische
+- **Camphen**: Würzig, warm
+
+Das Ziel ist ein produkt das nach Bornylacetat riecht — nicht nach rohem Terpentin.
+
+---
+
+### Interventionsstrategie
+
+**Zwei-Säulen-Ansatz**:
+
+1. **Zirbendestillat** → Terpenrestaurierung (Aroma)
+2. **Kirschholzwürfel (Medium-Toast)** → Farbe + Mellowing der Bitterkeit + aromatischer Brücke
+
+Beide Interventionen ergänzen sich: Kirschholz-Benzaldehyd bridget zur harzigen Zirbe; die tannische Bindung der Kirsche reduziert gleichzeitig die Bitterstoffe aus dem Ausgangsmaterial.
+
+---
+
+### Versuchsreihe: Matrixaufbau
+
+**Ansatz**: Kleinansätze je 200 mL aus dem Bestandsprodukt.
+
+**Variablen**:
+- **A**: Kirschholzwürfel-Dosis (3 Stufen)
+- **B**: Zirbendestillat-Zusatz (3 Stufen)
+
+#### Matrix (9 Proben + 1 Kontrolle)
+
+| Probe | Kirschholz (g/L) | Zirbendestillat (Vol-%) | Erwartetes Profil |
+|-------|-----------------|------------------------|-------------------|
+| K0 | 0 | 0 | Referenz — unverändertes Bestandsprodukt |
+| A1B0 | 1,0 | 0 | Nur Mellowing + Farbe |
+| A2B0 | 2,0 | 0 | Stärkeres Mellowing + Farbe |
+| A3B0 | 3,0 | 0 | Max. Farbausbau, Bitterreduktion |
+| A0B1 | 0 | 2 % | Nur Aromaverstärkung |
+| A0B2 | 0 | 5 % | Moderate Aromaverstärkung |
+| A0B3 | 0 | 10 % | Intensive Aromaverstärkung |
+| A2B1 | 2,0 | 2 % | Ausgewogen: Farbe + leichte Aromatik |
+| A2B2 | 2,0 | 5 % | **Hauptkandidat** |
+| A2B3 | 2,0 | 10 % | Aromatisch dominiert |
+
+**Herstellung Zirbendestillat** (falls nicht vorhanden):
+- Frische Zirbennadeln/-zapfen in Neutralalkohol (60–70 % ABV) 2–3 Wochen kalt macerieren
+- Anschließend destillieren (einfache Destillation, Vorlauf verwerfen)
+- Ergebnis: klares, hocharomatisches Konzentrat mit stark terpenhaltiger Note
+- Alternativ: kommerzielles Zirbenöl-Destillat (Lebensmittelqualität) in Spuren (0,1–0,5 g/L) — wesentlich höher konzentriert, Dosierung entsprechend anpassen
+
+---
+
+### Durchführung
+
+**Vorbereitung**:
+- 10 × 200 mL Glasgefäße (Einmachgläser mit Deckel)
+- Kirschholzwürfel Medium-Toast: abwiegen und je Probe berechnen (200 mL × g/L-Faktor ÷ 1000)
+- Zirbendestillat: mit Spritze oder Pipette zudosieren
+
+**Kostungsintervalle**:
+- **Tag 7**: Erste Farb- und Geruchsprüfung (noch kein Endurteil)
+- **Tag 14**: Hauptkostung — Bitterkeit, Farbentwicklung, Zirben-Intensität, Balance
+- **Tag 28**: Finalkostung, Holz aus allen Proben entnehmen, Bewertung
+
+**Bewertungsmatrix (Kostungsprotokoll)**:
+
+| Kriterium | Skala | Anmerkung |
+|-----------|-------|-----------|
+| Farbe (visuell) | 0–5 | 0 = klar, 5 = tiefes Bernstein-Rosé |
+| Zirben-Intensität (Nase) | 0–5 | Zielbild: frisch-harzig, Bornylacetat |
+| Zirben-Authentizität (Nase) | 0–5 | Duftet es nach Zirbe oder nach Terpentin? |
+| Bitterkeit (Gaumen) | 0–5 | 0 = keine, 5 = unangenehm stark |
+| Gesamtbalance | 0–5 | Süße / Holz / Zirbe / Bitterkeit im Gleichgewicht? |
+| Abgang | 0–5 | Sauber, warm, lang — oder kratzig? |
+
+---
+
+### Erwartete Ergebnisse und Entscheidungsbaum
+
+```
+Probe A2B2 (2 g/L Kirsche + 5 % Zirbendestillat) nach 14 Tagen:
+
+Farbe gut + Aroma gut + Bitterkeit reduziert?
+  → Gewinner → auf Vollansatz hochrechnen
+
+Farbe gut, aber Aroma zu schwach?
+  → Zirbendestillat auf 8–10 % erhöhen (A2B3-Richtung)
+
+Aroma gut, aber zu bitter?
+  → Kirschholz-Kontaktzeit kürzen (Holz nach 10 Tagen raus)
+  → Oder: Kirschdosis auf 1 g/L reduzieren (A1Bx)
+
+Farbe zu intensiv / zu dunkel?
+  → Light-Toast statt Medium probieren
+  → Dosis auf 1–1,5 g/L reduzieren
+
+Zirbenaroma terpentinartig/lösungsmittelartig?
+  → Zirbendestillat-Qualität prüfen — Vorlauf kontaminiert das Konzentrat
+  → Dosis auf 2 % reduzieren, längere Integration abwarten
+```
+
+---
+
+### Scaling-Protokoll (nach Versuchsreihe)
+
+Gewinner-Formel auf Vollansatz hochrechnen:
+
+```
+Beispiel: Bestandsprodukt 10 Liter, Gewinner war A2B2
+
+Kirschholz:
+  2 g/L × 10 L = 20 g Würfel (Medium-Toast)
+
+Zirbendestillat:
+  5 Vol-% × 10 L = 500 mL Zirbendestillat zudosieren
+
+Vorgehen:
+  1. Zirbendestillat einrühren
+  2. Kirschholzwürfel zugeben
+  3. Gefäß verschlossen, dunkel lagern
+  4. Tag 7: Farbe prüfen (visuell)
+  5. Tag 14: Kostung; Holz bei Zielerreichung entnehmen
+  6. Ggf. bis Tag 21 verlängern
+  7. Abfüllen ohne Filtration (Filtration würde Farbstoffe reduzieren)
+```
+
+**Hinweis ABV nach Zirbendestillat-Zusatz**: 500 mL Zugabe auf 10 L Basis erhöhen Gesamtvolumen auf 10,5 L. ABV leicht verändert — wenn der Destillat-Träger höherprozentig war, steigt ABV leicht. Nachrechnen und ggf. mit Wasser auf Ziel-ABV einstellen, **bevor** das Holz eingebracht wird (Wasserverdünnung ändert Farbextraktion).
 
 ---
 
