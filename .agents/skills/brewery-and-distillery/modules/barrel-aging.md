@@ -461,6 +461,167 @@ Evaluate at 2-week intervals. Remove the non-oak component first if balance tips
 
 ---
 
+## Mellowing mit Holzwürfeln und -stäben (Accelerated Maturation)
+
+Mellowing bezeichnet den Prozess, mit dem ein frischer, scharfer Rohbrand oder junger Geist seinen „Spirit-Bite" verliert — die stechende Schärfe, die Fuseligkeit, den brennenden Abgang. Barrels leisten das über Jahre; Holzwürfel und Stäbe beschleunigen denselben Prozess auf Wochen.
+
+### Warum Rohbrand scharf schmeckt — und was Holz dagegen tut
+
+Vier Hauptursachen für „Spritigkeit":
+
+1. **Fuselalkohle** (Propanol, Butanol, Amylalkohol): Bei der Destillation entstanden, schmecken sie brennend, lösungsmittelartig, beißend.
+2. **Acetaldehyd und andere Aldehyde**: Stechend, fruchtig-scharf, unreif.
+3. **Freie Fettsäuren**: Fettig, ranzig, kratzig im Abgang.
+4. **Rohe Ethanolschärfe**: Unmodifiziertes Ethanol ohne Ester- oder Tannin-Pufferung.
+
+Holz wirkt auf allen vier Ebenen:
+
+| Mechanismus | Was passiert | Ergebnis |
+|------------|-------------|---------|
+| **Tannin-Aldehyd-Bindung** | Ellagitannine und kondensierte Tannine reagieren mit Acetaldehyd und Furfural; Bindungsprodukte sind organoleptisch weich | Aldehyd-Schärfe verschwindet |
+| **Esterifikation** | Holzsäuren + Fuselalkohle → Ester (langsam, aber nachweisbar) | Fuselcharakter wird fruchtiger/weicher |
+| **Adsorption** | Getoastete/gekohlte Holzoberfläche adsorbiert polare Verbindungen inkl. Fuselalkohle | Direkte physikalische Reduktion von Fuseln |
+| **Mikro-Oxygenierung** | Sauerstoff aus dem porösen Holz oxidiert Ethanol → Acetaldehyd → Essigsäure → Ester | Runder, komplexer, weniger „roh" |
+| **Polymerisierung** | Phenole verbinden sich zu längerkettigen Molekülen mit weicherem Mundgefühl | Strukturelle Glättung |
+
+**Wichtig**: Kein Holz „entfernt" Alkohol — der ABV bleibt konstant. Mellowing verändert die Wahrnehmung von Alkohol durch chemische und organoleptische Modifikation des Umfelds.
+
+---
+
+### Würfel vs. Stäbe: Wann welches Format?
+
+| Eigenschaft | Würfel (10–15 mm) | Stäbe / Dominos (20–30 × 60–100 mm) |
+|------------|-------------------|--------------------------------------|
+| **Oberfläche/Volumen** | Sehr hoch | Mittel |
+| **Extraktionsgeschwindigkeit** | Schnell (2–4 Wochen messbar) | Langsamer (4–10 Wochen) |
+| **Kontrolle** | Einfach: Handvoll entnehmen zum Kosten | Weniger feinjustierbar |
+| **Risiko der Überextraktion** | Höher bei langer Kontaktzeit | Geringer — gibt Puffer |
+| **Mellowing-Effizienz** | Hoch bei kurzen Zeiträumen | Gleichmäßiger Verlauf über Zeit |
+| **Empfehlung für** | Schneller Test, Experimentieren | Geplante Langzeitreifung |
+
+**Faustregel**: Für Mellowing von Rohbrand (3–8 Wochen) → **Würfel**. Für kontinuierliche Nachreifung eines bereits voragerten Destillats (8–16 Wochen) → **Stäbe**.
+
+---
+
+### Mellowing-Protokoll: Die vier Holzsorten
+
+#### Kirsche (Kirschholzwürfel / -stäbe)
+
+**Stärken beim Mellowing**: Benzaldehyd überlagert Aldehyd-Schärfe aromatisch; niedrige Tannine glätten, ohne zu adstringieren. Ideal für mittelstarke Brände (40–50 % ABV).
+
+| Parameter | Empfehlung |
+|-----------|-----------|
+| Format | Würfel (Medium-Toast) |
+| Dosis | 1,5–2,5 g/L |
+| Kontaktzeit | 3–6 Wochen |
+| Zwischenkostung | Woche 2, Woche 4, Woche 6 |
+| Ziel-ABV-Bereich | 40–55 % |
+| Kombination | + 0,5–1 g/L leichte Eichenwürfel für tannin-Rückgrat |
+
+**Verlauf**: Woche 2 — Aldehydschärfe merklich reduziert, Marzipan-Note beginnt; Woche 4 — runder Abgang, Kirsche integriert; Woche 6 — Gefahr der Überextraktion (Bitterkeit). Lieber früher herausnehmen.
+
+**Passt zu**: Obstbrand (Kirsche, Pflaume), Whiskey, weißem Rum, Grappa.
+
+---
+
+#### Apfel (Apfelholzwürfel / -stäbe)
+
+**Stärken beim Mellowing**: Sehr sanft. Kein dominanter Aromastempel — Fuselreduktion durch Adsorption und Esterifikation, ohne das Grundbild zu verändern. Das „Neutral-Mellowing" unter den Obsthölzern.
+
+| Parameter | Empfehlung |
+|-----------|-----------|
+| Format | Würfel (Light- bis Medium-Toast) |
+| Dosis | 2–3 g/L |
+| Kontaktzeit | 4–8 Wochen |
+| Zwischenkostung | Woche 2, Woche 5, Woche 8 |
+| Ziel-ABV-Bereich | 38–60 % |
+| Kombination | Gut solo; oder + Birnenholz 1:1 für floralere Note |
+
+**Verlauf**: Sanfter als Kirsche — Woche 4 erste wahrnehmbare Glättung, Woche 6–8 deutliches Mellowing. Überextraktionsrisiko niedrig: Apfelholz gibt kaum bittere Verbindungen ab.
+
+**Passt zu**: Calvados-Stil, Apfelbrand, Cidre-Geist, Korn, Neutral-Destillat, Sake-Destillat.
+
+---
+
+#### Birne (Birnenholzwürfel / -stäbe)
+
+**Stärken beim Mellowing**: Das delikateste der vier Hölzer. Kaum Tanninbeitrag → ideal wenn Struktur nicht erwünscht (leichte Geiste, florale Profile). Mellowing primär über Adsorption und Mikro-O₂, wenig über Tannin-Bindung.
+
+| Parameter | Empfehlung |
+|-----------|-----------|
+| Format | Würfel (Light-Toast) |
+| Dosis | 3–5 g/L (höher als andere, da niedriger Extrakt) |
+| Kontaktzeit | 6–10 Wochen |
+| Zwischenkostung | Woche 3, Woche 6, Woche 9 |
+| Ziel-ABV-Bereich | 38–50 % |
+| Kombination | + 1 g/L Kirschholz für aromatischen Akzent |
+
+**Verlauf**: Langsam und linear. Keine dramatischen Geschmackssprünge — eher kontinuierliche Glättung. Für Trinker, die am Ende „Ich weiß nicht genau warum, aber es schmeckt runder" sagen sollen.
+
+**Passt zu**: Williams-Birnengeist, Perry-Destillat, Pisco-Stil, Weißbier-Destillat, Obstler.
+
+---
+
+#### Walnuss (Walnussholzwürfel / -stäbe)
+
+**Stärken beim Mellowing**: Hohe Ellagitannine binden Aldehyde sehr effizient — schnellste Aldehyd-Reduktion der vier Hölzer. **Aber**: Juglon bringt Bitterkeit, die schwer wieder herauszubekommen ist. Walnuss ist das schärfste Werkzeug hier — präzise dosieren.
+
+| Parameter | Empfehlung |
+|-----------|-----------|
+| Format | Würfel (Medium-Toast — senkt Juglonaktivität) |
+| Dosis | **0,5–1 g/L** (nicht überschreiten) |
+| Kontaktzeit | **1–3 Wochen** (wöchentlich kosten!) |
+| Zwischenkostung | Tag 7, Tag 14, Tag 21 |
+| Ziel-ABV-Bereich | 45–65 % (höherer Alkohol puffert Bitterkeit besser) |
+| Kombination | Nie solo als alleiniges Mellowing-Holz — immer mit Eiche oder Kirsche |
+
+**Verlauf**: Woche 1 — Aldehyde merklich reduziert, kein Fehlaroma. Woche 2 — Erdig-nussige Note erkennbar, Abgang weicher. Woche 3 — Bitterkeit beginnt zu dominieren → **Herausnehmen**. Bei Überschreitung: Bitter lässt sich nur durch Verdünnung oder Blending korrigieren.
+
+**Passt zu**: Getorfter Whiskey, dunkler Rum, Amaro-Basis, Williamsbirne (kleine Menge für Struktur).
+
+---
+
+### Kombiniertes Mellowing-Protokoll (Praxisbeispiel)
+
+Beispiel: 5 Liter frischer Obstbrand, 52 % ABV, typisch scharf/fuselig.
+
+**Ansatz**:
+```
+Phase 1 (Woche 1–2):
+  Walnuss-Würfel  0,8 g/L  →  4 g gesamt
+  → Schnelle Aldehyd-Bindung
+
+Phase 2 (ab Woche 2, nach Entnahme Walnuss):
+  Kirsch-Würfel   2,0 g/L  → 10 g gesamt
+  Apfel-Würfel    1,5 g/L  →  7,5 g gesamt
+  → Aromatische Glättung, Fuselabbau, Esterbildung
+
+Kostung:
+  Tag 7:   Walnuss-Effekt evaluieren, ggf. früher herausnehmen
+  Tag 14:  Walnuss raus, Kirsche + Apfel rein
+  Tag 28:  Erste Vollkostung Phase 2
+  Tag 42:  Entscheidung: weiter oder abfüllen
+```
+
+**Zielparameter (Nasenprobe)**:
+- Kein stechender Acetaldehydgeruch mehr
+- Ethanol tritt in den Hintergrund (riecht weniger „nackt")
+- Frucht/Holznoten integriert, nicht dominant
+
+---
+
+### Häufige Fehler beim Holz-Mellowing
+
+| Fehler | Konsequenz | Lösung |
+|--------|-----------|--------|
+| Zu hohe Dosis Walnuss | Irreversible Bitterkeit | Start mit 0,5 g/L, steigern nach Kostung |
+| Holz zu früh in aktive Gärung | Juglon/Tannine hemmen Hefe | Nur nach Gärungsende zugeben |
+| Gleiche Kontaktzeit bei verschiedenen Hölzern | Überextraktion bei Kirsche, Unterextraktion bei Birne | Hölzer getrennt oder gestaffelt herausnehmen |
+| Kein Toasting der Würfel | Rohe Gerbsäure, grüne/bittere Fehlaromen | Ausschließlich getoastete Würfel kaufen oder kurz im Ofen (160 °C, 20 min) rösten |
+| Zu niedriger ABV (<38 %) | Schlechte Tannin-Löslichkeit, Mikrobenstabilität unsicher | Auf min. 40 % verdünnen nach Destillation |
+
+---
+
 ## Barrel Care and Storage
 
 ### Storing Empty Barrels
