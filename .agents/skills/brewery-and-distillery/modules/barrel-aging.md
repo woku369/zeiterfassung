@@ -332,6 +332,135 @@ MOX mimics barrel oxygen ingress for wines in tank with oak alternatives.
 
 ---
 
+## Alternative Wood Species (Non-Oak)
+
+While oak dominates commercial barrel aging, several other wood species are used in craft brewing, distilling, and winemaking. Each brings a distinct chemical profile and requires different handling. None are direct substitutes for oak — treat them as flavor tools in their own right.
+
+### Overview Comparison
+
+| Wood | Tannin Level | Key Flavor Notes | Primary Use Cases |
+|------|-------------|-----------------|-------------------|
+| **Cherry** | Low–Medium | Almond, marzipan, dried cherry, subtle smoke | Beer, whiskey finishing, fruit brandy |
+| **Apple** | Low | Baked apple, vanilla, sweet spice, honey | Cider aging, apple brandy, beer |
+| **Pear** | Very Low | Delicate floral, pear blossom, subtle sweetness | Pear brandy (Williams), cider, light ale |
+| **Walnut** | High | Bitter walnut, earthy, dark spice, leather | Spirits finishing (short contact only), nut liqueurs |
+
+---
+
+### Cherry Wood (Kirschholz)
+
+**Species**: Primarily *Prunus avium* (wild/sweet cherry) and *Prunus serotina* (black cherry, North America)
+
+**Chemical profile**:
+- **Benzaldehyde**: The dominant volatile — delivers the characteristic almond/marzipan note. Formed from amygdalin degradation during wood drying and toasting.
+- **p-Anisaldehyde**: Contributes sweet, anise-like, floral dimension.
+- **Coumarin**: Vanilla-adjacent, sweet, hay-like note (low concentration).
+- **Tannins**: Condensed tannins lower than oak; softer mouthfeel, less astringency.
+- **Phenolic acids**: Lower ellagitannin content than oak; extraction is gentler.
+
+**Flavor contribution**: Almond, marzipan, dried cherry, faint sweet smoke. Bridges well to malt character (toffee, caramel) and high-proof spirits. Medium-toast enhances benzaldehyde; heavy-toast introduces smoke and suppresses fruit notes.
+
+**Practical notes**:
+- Available as cubes, spirals, and chips from specialty suppliers
+- Dose rate: 1–2 g/L (beer/wine), 1.5–3 g/L (spirits finishing)
+- Contact time: 2–4 weeks for beer; 4–8 weeks for spirits
+- Toast level: Medium recommended as starting point
+- Works well in: barleywine, imperial stout, dark rum finishing, fruit brandy, cherry Hefeweizen
+- Japanese craft distillers (notably Venture Whisky / Ichiro's Malt) have used cherry barrels alongside Mizunara for distinctive domestic expression
+
+**Caution**: Amygdalin in raw, unprocessed cherry wood can yield trace hydrogen cyanide during fermentation — this risk is negligible in properly kiln-dried and toasted commercial wood products, but avoid using fresh/green cherry branches.
+
+---
+
+### Apple Wood (Apfelholz)
+
+**Species**: *Malus domestica* and wild apple (*Malus sylvestris*)
+
+**Chemical profile**:
+- **Vanillin**: Present but lower than oak; gentle vanilla background.
+- **Malic acid derivatives**: Apple wood retains associations with malic acid metabolism; contributes soft, rounded acidity impression.
+- **Furfural**: Moderate levels from hemicellulose; caramel, bread crust notes.
+- **Phenolics**: Low ellagitannin and condensed tannin content — very soft extraction.
+- **Volatile esters**: Contribute light fruity, floral top notes.
+
+**Flavor contribution**: Baked apple, honey, soft vanilla, sweet spice. Delicate and easily overwhelmed by strong base spirits — best suited to lighter styles or as finishing addition.
+
+**Practical notes**:
+- Dose rate: 1–2 g/L
+- Contact time: 2–6 weeks (taste frequently — integration is quick)
+- Toast level: Light to Medium; heavy toast strips fruit character and adds generic smoke
+- Works well in: cider (obviously), apple brandy / Calvados-style spirits, farmhouse ales, golden ales, witbier, light lagers
+- Traditional Norman and Breton producers occasionally age cider in apple wood vessels; effect is subtle and cumulative
+- American craft cideries increasingly experiment with apple wood alternatives for "estate" character
+
+**Note on cider**: Apple wood aging of cider can introduce a circular "apple on apple" quality that either integrates beautifully or reads as flat. Evaluate after 2 weeks before committing to longer contact.
+
+---
+
+### Pear Wood (Birnenholz)
+
+**Species**: *Pyrus communis* (common pear), *Pyrus pyrifolia* (Asian pear)
+
+**Chemical profile**:
+- Among the most delicate of fruit woods — tannin and phenolic extraction is very low.
+- **Floral esters**: Geraniol, linalool-adjacent compounds; jasmine, pear blossom impressions.
+- **Furfural/5-HMF**: Moderate; contributes light caramel/marzipan.
+- **Vanillin**: Trace levels; barely perceptible vanilla.
+- **Tannins**: Minimal — essentially no structural tannin contribution. Does not replace oak tannin in wine.
+
+**Flavor contribution**: Pear blossom, light floral, subtle sweetness, mild caramel. Extremely gentle — noticeable primarily in neutral or lightly flavored base products.
+
+**Practical notes**:
+- Dose rate: 2–4 g/L (higher than oak alternatives to achieve perceptible effect)
+- Contact time: 4–10 weeks
+- Toast level: Light; heavier toasting quickly dominates and masks the delicate pear character
+- Works well in: Williams/Bartlett pear brandy (Williamine-style), perry, Belgian saison, delicate white wines
+- Williams Christ pear brandy from Alsace and Switzerland is occasionally rested in pear wood vessels — the effect is primarily textural softening rather than flavor addition
+- Low tannin means pear wood cannot substitute for oak in tannin-dependent structures (red wine aging, tannic whiskey maturation)
+
+---
+
+### Walnut Wood (Walnussholz)
+
+**Species**: *Juglans regia* (European/Persian walnut), *Juglans nigra* (black walnut, North America)
+
+**Chemical profile**:
+- **Juglone** (5-hydroxy-1,4-naphthoquinone): The defining compound of walnut wood. Bitter, astringent, slightly medicinal. Antimicrobial properties. *Juglans nigra* contains significantly more juglone than *J. regia* — use European walnut for aging applications.
+- **Ellagitannins**: High content — comparable to or exceeding oak. Strong astringency potential.
+- **Plumbagin**: Minor naphthoquinone; bitter, harsh.
+- **Vanillin / syringaldehyde**: Present after toasting; standard lignin-degradation products.
+- **Walnut-specific phenolics**: Contribute earthy, dark, leather, nutty, and forest-floor notes.
+
+**Flavor contribution**: Bitter walnut, dark earthiness, leather, dried spice, forest floor. At high doses or long contact: harsh bitterness and astringency. At low doses and short contact: complexity and depth, particularly in dark spirits.
+
+**Practical notes**:
+- **Use sparingly** — walnut is the most aggressive alternative wood listed here
+- Dose rate: 0.5–1.5 g/L (start at the lower end)
+- Contact time: 1–3 weeks only; re-taste every 7 days
+- Toast level: Medium to Medium-Plus — toasting converts some juglone precursors and softens harshness; light toast is not recommended
+- Use *Juglans regia* (European walnut) over *Juglans nigra* wherever possible
+- Works well in: peated whisky finishing (complements smoky/earthy profile), dark rum, amaro base spirits, walnut liqueur production (nocino), imperial stout
+- Traditional use: Nocino (Italian green walnut liqueur) uses unripe walnut husks/shells, not wood — a distinct product. Some small Italian and French producers age grappa or eau-de-vie with brief walnut wood contact for bitterness balance.
+
+**Phytotoxicity note**: Juglone is toxic to many plants. This has no relevance to human consumption at the concentrations found in properly used wood products — it contributes bitterness, not danger. However, it is responsible for walnut wood's antimicrobial properties, which can slow or inhibit fermentation if used during active yeast activity. **Add walnut wood only after primary fermentation is complete.**
+
+---
+
+### Blending Non-Oak Woods with Oak
+
+Non-oak woods rarely replace oak entirely; they work best as a complement:
+
+| Combination | Ratio (non-oak : oak) | Effect |
+|-------------|----------------------|--------|
+| Cherry + French oak | 1:2 | Marzipan over vanilla/spice base |
+| Apple + neutral oak | 1:1 | Soft fruit + structural tannin |
+| Pear + light oak | 1:2 | Floral lift without oak dominance |
+| Walnut + American oak | 1:4 | Earthy bitterness over coconut/vanilla |
+
+Evaluate at 2-week intervals. Remove the non-oak component first if balance tips toward bitterness or astringency — oak extraction continues after the alternative wood is removed.
+
+---
+
 ## Barrel Care and Storage
 
 ### Storing Empty Barrels
@@ -453,6 +582,10 @@ Retired wine barrels can be:
 - Spillman, P.J., et al. (1997). Accumulation of Vanillin during Barrel-Aging of White, Red, and Model Wines. *J. Agric. Food Chem.*, 45, 2584-2589.
 - Vivas, N., & Glories, Y. (1993). Studies on oxidation-reduction potential in wines.
 - Clark Smith. (2013). *Postmodern Winemaking*. University of California Press. (See also wine-science.md)
+- Bousquet, J., et al. (2009). Chemical characterization of cherry (*Prunus avium*) wood extracts. *Food Chemistry*, 113, 445–452.
+- Fernández de Simón, B., et al. (2014). Ellagitannin content and toasted oak wood: Impact on wine. *LWT - Food Science and Technology*.
+- Lequin, S., et al. (2012). Alternative wood species for barrel aging: Sensory and chemical comparison. *Am. J. Enol. Vitic.*, 63(4).
+- Singleton, V.L. (1995). Maturation of wines and spirits: Comparisons, facts, and hypotheses. *Am. J. Enol. Vitic.*, 46(1), 98–115.
 
 See also:
 - [modules/wine-science.md](wine-science.md) — Oak functions, Brett management, SO₂
