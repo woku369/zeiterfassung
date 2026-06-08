@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "brewery-and-distillery": {
+      "source": "PersephoneKarnstein/brewing-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "c30fe4c20009409994175d52e47b4bb1010d1252f4adde972fa723b29532f365"
+    },
     "synology-nas": {
       "source": "atom2ueki/mcp-server-synology",
       "sourceType": "github",

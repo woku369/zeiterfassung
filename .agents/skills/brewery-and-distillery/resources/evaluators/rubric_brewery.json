@@ -1,0 +1,311 @@
+{
+  "criteria": [
+    {
+      "name": "Fermentation Science & Rationale",
+      "description": "Is the guidance grounded in fermentation science with clear explanations of why techniques work?",
+      "scoring": {
+        "1": "No scientific rationale provided. Instructions are rote steps without explanation. No understanding of yeast biology, temperature effects, or sugar conversion.",
+        "3": "Basic science mentioned. Some explanations for techniques (e.g., 'ferment cool for clean flavor'). Could go deeper into mechanisms (why yeast produces esters at high temps, how enzymes convert starch).",
+        "5": "Comprehensive scientific grounding: yeast metabolism explained, enzyme activity windows understood, temperature effects on flavor compounds (esters, fusel alcohols), pH impact on fermentation, attenuation factors. Science informs all technique choices and troubleshooting."
+      }
+    },
+    {
+      "name": "Calculation Accuracy & Precision",
+      "description": "Are calculations (ABV, IBU, pitch rate, dilution) accurate and properly applied?",
+      "scoring": {
+        "1": "No calculations provided. Guessing at amounts. Incorrect formulas or misapplied math. No gravity readings recommended.",
+        "3": "Basic calculations present. ABV formula used correctly. Some precision (specific gravity to 3 decimal places). Could include more formulas or explain calculation methods.",
+        "5": "Comprehensive calculation approach: ABV (simple and accurate formulas), IBU (Tinseth with utilization factors), pitch rate (cells/mL/°P), priming sugar, dilution (C1V1=C2V2), water chemistry additions. All with worked examples and verification methods."
+      }
+    },
+    {
+      "name": "Temperature Control & Monitoring",
+      "description": "Is temperature management properly emphasized with specific ranges and monitoring guidance?",
+      "scoring": {
+        "1": "Temperature mentioned vaguely or not at all. No specific ranges. No monitoring protocol. Temperature impact on fermentation ignored.",
+        "3": "Temperature ranges provided for yeast strain. Some monitoring recommended. Could be more specific about temperature stability, logging, or correction strategies.",
+        "5": "Precise temperature guidance: strain-specific optimal ranges, stability goals (±2°F), impact of temperature on flavor compounds, monitoring protocol (frequency, logging), correction strategies (warming, cooling methods), temperature staging (e.g., diacetyl rest)."
+      }
+    },
+    {
+      "name": "Yeast Health & Pitch Rate",
+      "description": "Is yeast management properly addressed including pitch rate, starters, and viability?",
+      "scoring": {
+        "1": "Yeast treated as afterthought. No pitch rate calculation. No starter guidance. Yeast viability ignored. 'Just pitch a packet' approach.",
+        "3": "Pitch rate mentioned. Starter may be recommended for high-gravity. Some attention to yeast freshness. Could be more systematic in calculation and viability assessment.",
+        "5": "Comprehensive yeast management: pitch rate calculated (cells needed for OG and batch size), starter procedure detailed (DME ratio, stir plate benefits), viability calculation from manufacture date, oxygenation at pitch, yeast health indicators during fermentation."
+      }
+    },
+    {
+      "name": "Sanitation Protocol",
+      "description": "Is sanitation properly emphasized as critical to fermentation success?",
+      "scoring": {
+        "1": "Sanitation not mentioned or treated casually. No specific products or contact times. Risk of contamination not acknowledged.",
+        "3": "Sanitation mentioned as important. Some specific guidance (Star San, no-rinse). Could emphasize timing, thoroughness, or critical control points.",
+        "5": "Sanitation emphasized as non-negotiable: specific products and contact times, pre- vs. post-boil critical control points, cleaning vs. sanitizing distinction, equipment inspection, contamination signs and prevention."
+      }
+    },
+    {
+      "name": "Process Timing & Workflow",
+      "description": "Is the fermentation timeline clearly laid out with proper sequencing and checkpoints?",
+      "scoring": {
+        "1": "No timeline provided. Steps out of order. No checkpoints or milestones. Vague about when to proceed to next phase.",
+        "3": "Basic timeline present. Key phases identified. Some checkpoints (gravity stable). Could be more detailed about timing or decision points.",
+        "5": "Comprehensive timeline: all phases with durations, clear checkpoints (lag phase, active fermentation, terminal gravity), decision criteria for advancing (gravity stable 3+ days), timing for additions (nutrients, dry hops), conditioning duration by style."
+      }
+    },
+    {
+      "name": "Troubleshooting & Problem-Solving",
+      "description": "Are clear troubleshooting strategies provided for common issues (stuck fermentation, off-flavors, contamination)?",
+      "scoring": {
+        "1": "No troubleshooting guidance. If something goes wrong, no recovery strategy. Doesn't anticipate common problems.",
+        "3": "Basic troubleshooting. Some common problems addressed (e.g., 'warm and rouse for stuck fermentation'). Could be more systematic in diagnosis and correction.",
+        "5": "Comprehensive troubleshooting framework: diagnostic tree (temperature → yeast → fermentability → contamination), off-flavor identification with compound and cause, corrective actions with specifics, prevention strategies, when to accept vs. when to discard."
+      }
+    },
+    {
+      "name": "Style Appropriateness",
+      "description": "Is the guidance appropriate for the target style with correct parameters and techniques?",
+      "scoring": {
+        "1": "Style ignored or misunderstood. Parameters way off for style. Techniques inappropriate (e.g., heavy dry hopping a lager).",
+        "3": "Style basics correct. Parameters in range. Techniques generally appropriate. Could better emphasize style-specific requirements or traditions.",
+        "5": "Style mastery: parameters precisely targeted (OG, FG, IBU, SRM, ABV within style range), techniques matched to style (decoction for German lager, wild yeast for lambic), ingredient selection appropriate (noble hops for Pilsner, American hops for IPA), yeast character matched."
+      }
+    },
+    {
+      "name": "Measurement & Documentation",
+      "description": "Is proper measurement and record-keeping emphasized for reproducibility?",
+      "scoring": {
+        "1": "No measurements recommended. No logging. 'Eyeball it' approach. Results not reproducible.",
+        "3": "Key measurements mentioned (OG, FG). Some record-keeping suggested. Could be more thorough in what to log and when.",
+        "5": "Comprehensive measurement and documentation: gravity readings at key points, temperature logging, pH measurement (mash, fermentation), tasting notes, recipe recording with actual vs. planned values, process notes for future batches."
+      }
+    },
+    {
+      "name": "Safety & Legal Compliance",
+      "description": "Are safety considerations addressed and legal requirements acknowledged (especially for distillation)?",
+      "scoring": {
+        "1": "Safety ignored. Legal issues with distillation not mentioned. Dangerous practices not flagged. Bottle bomb risk not addressed.",
+        "3": "Basic safety mentioned. Distillation legality noted. Bottle conditioning safety addressed. Could be more thorough.",
+        "5": "Comprehensive safety approach: distillation legal disclaimer prominent, bottle conditioning safety (gravity stable before bottling), sanitation for health, temperature safety (burns, pressure), proper ventilation (CO2, distillation), equipment integrity."
+      }
+    }
+  ],
+  "minimum_score": 3.5,
+  "guidance_by_fermentation_type": {
+    "Beer Brewing": {
+      "target_score": 4.2,
+      "focus_criteria": [
+        "Fermentation Science & Rationale",
+        "Temperature Control & Monitoring",
+        "Yeast Health & Pitch Rate"
+      ],
+      "key_requirements": [
+        "OG/FG/IBU/SRM targets for style",
+        "Mash temperature and duration justified",
+        "Hop schedule with timing rationale",
+        "Yeast strain selection explained",
+        "Fermentation temperature plan",
+        "Pitch rate calculation",
+        "Carbonation method specified"
+      ],
+      "common_pitfalls": [
+        "Ignoring mash temperature impact on fermentability",
+        "Underpitching without starter for high-gravity",
+        "Fermenting too warm (fusel production)",
+        "Bottling before gravity stable (bombs)",
+        "No water chemistry consideration"
+      ]
+    },
+    "Winemaking": {
+      "target_score": 4.0,
+      "focus_criteria": [
+        "Process Timing & Workflow",
+        "Measurement & Documentation",
+        "Style Appropriateness"
+      ],
+      "key_requirements": [
+        "Starting Brix/SG and target ABV",
+        "Sulfite additions timed and quantified",
+        "MLF decision explained (if applicable)",
+        "Racking schedule",
+        "Oak treatment plan (if used)",
+        "Fining and stabilization approach",
+        "Aging timeline"
+      ],
+      "common_pitfalls": [
+        "Insufficient sulfite for preservation",
+        "Oxidation from headspace or transfer",
+        "Rushing aging timeline",
+        "Not testing for MLF completion",
+        "Over-oaking"
+      ]
+    },
+    "Mead Making": {
+      "target_score": 4.1,
+      "focus_criteria": [
+        "Yeast Health & Pitch Rate",
+        "Fermentation Science & Rationale",
+        "Troubleshooting & Problem-Solving"
+      ],
+      "key_requirements": [
+        "Honey quantity for target gravity",
+        "Nutrient schedule (TOSNA or equivalent)",
+        "Degassing protocol",
+        "Yeast strain selection for ABV",
+        "Aging expectations set (patience)",
+        "Backsweetening approach if applicable"
+      ],
+      "common_pitfalls": [
+        "No nutrient additions (honey lacks nutrients)",
+        "Not degassing during active fermentation",
+        "Expecting quick turnaround (mead needs time)",
+        "Underpitching for high-gravity musts",
+        "Stalled fermentation from stressed yeast"
+      ]
+    },
+    "Distillation (Educational)": {
+      "target_score": 4.0,
+      "focus_criteria": [
+        "Safety & Legal Compliance",
+        "Calculation Accuracy & Precision",
+        "Fermentation Science & Rationale"
+      ],
+      "key_requirements": [
+        "Legal disclaimer prominent",
+        "Wash fermentation complete before distillation",
+        "Cuts explained (foreshots, heads, hearts, tails)",
+        "Temperature monitoring guidance",
+        "Proofing calculation",
+        "Safety considerations (methanol, pressure, ventilation)"
+      ],
+      "common_pitfalls": [
+        "Missing legal disclaimer",
+        "Not discarding foreshots (methanol)",
+        "Poor cuts leading to harsh spirit",
+        "Distilling incompletely fermented wash",
+        "Dilution math errors"
+      ]
+    },
+    "Troubleshooting": {
+      "target_score": 4.3,
+      "focus_criteria": [
+        "Troubleshooting & Problem-Solving",
+        "Fermentation Science & Rationale",
+        "Temperature Control & Monitoring"
+      ],
+      "key_requirements": [
+        "Diagnostic framework (systematic approach)",
+        "Off-flavor compound identification",
+        "Cause linked to process issue",
+        "Corrective actions with specifics",
+        "Prevention strategy for future",
+        "When to save vs. dump decision guidance"
+      ],
+      "common_pitfalls": [
+        "Guessing without systematic diagnosis",
+        "Treating symptoms not causes",
+        "Missing obvious temperature issues",
+        "Not considering yeast health first",
+        "Providing false hope for contamination"
+      ]
+    }
+  },
+  "guidance_by_complexity": {
+    "Beginner": {
+      "target_score": 3.5,
+      "characteristics": "Extract brewing, kit wines, simple meads, basic equipment, forgiving styles",
+      "focus": "Sanitation fundamentals, temperature stability, gravity measurement, patience",
+      "examples": "Extract pale ale, wine kit, simple traditional mead",
+      "scoring_priorities": [
+        "Sanitation Protocol",
+        "Process Timing & Workflow",
+        "Measurement & Documentation"
+      ]
+    },
+    "Intermediate": {
+      "target_score": 4.0,
+      "characteristics": "All-grain brewing, fresh grape wines, complex meads, temperature control, multi-step processes",
+      "focus": "Mash optimization, yeast management, water chemistry basics, conditioning",
+      "examples": "All-grain IPA, country wine from fresh fruit, braggot",
+      "scoring_priorities": [
+        "Yeast Health & Pitch Rate",
+        "Temperature Control & Monitoring",
+        "Style Appropriateness"
+      ]
+    },
+    "Advanced": {
+      "target_score": 4.3,
+      "characteristics": "Complex multi-step processes, wild fermentation, barrel aging, distillation, commercial-adjacent quality",
+      "focus": "Advanced yeast management, wild/mixed fermentation, precise chemistry, blending",
+      "examples": "Mixed fermentation sour, barrel-aged imperial stout, traditional mead aged 2+ years, spirit distillation",
+      "scoring_priorities": [
+        "Fermentation Science & Rationale",
+        "Calculation Accuracy & Precision",
+        "All criteria should score 4+ for advanced work"
+      ]
+    }
+  },
+  "common_failure_modes": [
+    {
+      "failure": "Stuck fermentation (beer/mead)",
+      "symptom": "Gravity stalls above expected FG. Airlock stops bubbling. Yeast settles early.",
+      "detection": "Check gravity; if not dropping over 3+ days and above target FG, it's stuck.",
+      "fix": "Warm to upper range for yeast strain, swirl to rouse yeast, check for temperature crash. If truly stuck: repitch with fresh high-attenuating yeast (US-05 for beer, EC-1118 for mead). Prevention: adequate pitch rate, temperature stability, nutrients for mead."
+    },
+    {
+      "failure": "Diacetyl (butter/butterscotch off-flavor)",
+      "symptom": "Slick mouthfeel, butter or butterscotch taste, especially in lagers.",
+      "detection": "Taste sample warmed to 160°F for 15 min—diacetyl becomes more apparent.",
+      "fix": "Diacetyl rest: raise temperature to 65-68°F for 3-5 days at end of fermentation. Yeast will reabsorb precursor. Prevention: adequate pitch rate, don't crash too early."
+    },
+    {
+      "failure": "Acetaldehyde (green apple off-flavor)",
+      "symptom": "Green apple taste, sharp, cidery character.",
+      "detection": "Taste for green apple; common in young beer.",
+      "fix": "Condition longer at fermentation temperature. Yeast converts acetaldehyde to ethanol. Prevention: don't bottle/keg too early, adequate yeast health."
+    },
+    {
+      "failure": "Fusel alcohols (hot/solvent off-flavor)",
+      "symptom": "Hot, harsh, solvent-like alcohol burn. Warming sensation not from ABV.",
+      "detection": "Taste for harsh alcohol that doesn't match ABV.",
+      "fix": "Cannot remove fusels. Age helps slightly. Prevention: ferment cooler, adequate pitch rate, proper nutrients."
+    },
+    {
+      "failure": "Oxidation (cardboard/papery)",
+      "symptom": "Stale, cardboard, wet paper taste. Color darkens over time.",
+      "detection": "Off-flavor develops weeks/months after packaging.",
+      "fix": "Cannot reverse oxidation. Prevention: minimize splashing during transfer, purge vessels with CO2, reduce headspace, use O2-absorbing caps."
+    },
+    {
+      "failure": "Contamination (sourness/funk not intended)",
+      "symptom": "Unexpected sour taste, vinegar, or barnyard funk. Pellicle on surface.",
+      "detection": "Taste doesn't match style expectations; visible pellicle or strange surface growth.",
+      "fix": "Assess severity: mild contamination may be tolerable or even good (happy accidents). Severe acetic acid (vinegar) is usually irredeemable. Prevention: rigorous sanitation, inspect equipment."
+    },
+    {
+      "failure": "Bottle bombs",
+      "symptom": "Bottles over-carbonate and explode. Gushing when opened.",
+      "detection": "Bottles very hard, excessive foam, exploding.",
+      "fix": "Move to safe location, open carefully to vent. If caught early, refrigerate all bottles to slow yeast. Prevention: NEVER bottle until gravity stable 3+ days, use correct priming sugar amount."
+    },
+    {
+      "failure": "Mead nutrient deficiency",
+      "symptom": "Slow/stalled fermentation, sulfur production, stressed yeast.",
+      "detection": "Very slow fermentation; gravity barely moving; rotten egg smell.",
+      "fix": "Add nutrients (Fermaid-O, DAP) if in first 1/3 of fermentation. If late stage, just wait and let yeast clean up. Prevention: use proper nutrient schedule (TOSNA) for all meads."
+    },
+    {
+      "failure": "Wine oxidation (browning/sherried)",
+      "symptom": "Color browns, nutty/sherry character develops.",
+      "detection": "Visual browning, flat aroma, sherry taste.",
+      "fix": "Cannot reverse. May be acceptable for certain styles. Prevention: sulfite adequately, minimize headspace, top up vessels."
+    },
+    {
+      "failure": "Poor cuts in distillation",
+      "symptom": "Spirit tastes harsh, solvent-like, or oily.",
+      "detection": "Harsh taste that doesn't improve with dilution.",
+      "fix": "If mild, redistill and cut more aggressively. Prevention: cut by smell/taste not just temperature, collect small fractions, be conservative with hearts window."
+    }
+  ]
+}
