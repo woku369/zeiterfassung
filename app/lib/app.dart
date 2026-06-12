@@ -130,10 +130,13 @@ class _ZeiterfassungAppState extends State<ZeiterfassungApp>
     if (GeofencingService.instance.isTracking) {
       GeofencingService.instance.updateLocations(lp.locations);
     }
-    // Auto-start geofencing on fresh install (key never set = null).
+    // Auto-start geofencing if it was active before (or on fresh install).
+    // Covers: OS killed the background service (battery optimization) + fresh install.
+    // Does NOT restart if the user explicitly stopped it (geofencing_active == false).
     if (Platform.isAndroid && !GeofencingService.instance.isTracking) {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('geofencing_active') == null &&
+      final wasActive = prefs.getBool('geofencing_active');
+      if ((wasActive == null || wasActive == true) &&
           lp.activeLocations.isNotEmpty) {
         await GeofencingService.instance.startTracking(lp.locations);
       }
