@@ -801,7 +801,15 @@ class DatabaseHelper {
         where: 'name = ? AND id != ?',
         whereArgs: [loc.name, loc.id],
       );
-      await db.insert('tracked_locations', loc.toMap(),
+      // is_active is a device-local preference; preserve the local value so
+      // a sync never silently deactivates a zone the user enabled on this device.
+      final map = loc.toMap();
+      final existing = await db.query('tracked_locations',
+          columns: ['is_active'], where: 'id = ?', whereArgs: [loc.id], limit: 1);
+      if (existing.isNotEmpty) {
+        map['is_active'] = existing.first['is_active'];
+      }
+      await db.insert('tracked_locations', map,
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
