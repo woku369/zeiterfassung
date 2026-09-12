@@ -99,12 +99,17 @@ class _MonthTabState extends State<_MonthTab> {
     try {
       final tp = context.read<TimeEntryProvider>();
       final employer = context.read<EmployerProvider>().active;
+      final projectMap = _projectNameMap(context, employer?.id);
+      final splits = await DatabaseHelper.instance
+          .getSplitsForEntries(tp.entries.map((e) => e.id).toList());
       final file = await ExportService.instance.exportMonth(
         entries: List.from(tp.entries),
         year: tp.selectedYear,
         month: tp.selectedMonth,
         employerName: employer?.name ?? '',
         weeklyHours: employer?.weeklyHours ?? 40,
+        splits: splits,
+        projectNames: projectMap,
       );
       if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)], text: 'Zeiterfassung Export');
@@ -226,12 +231,17 @@ class _MonthTabState extends State<_MonthTab> {
         employerId: employer?.id,
       );
       if (!mounted) return;
+      final projectMap = _projectNameMap(context, employer?.id);
+      final splits = await DatabaseHelper.instance
+          .getSplitsForEntries(entries.map((e) => e.id).toList());
       final file = await ExportService.instance.exportRange(
         entries: entries,
         from: rangeStart,
         to: rangeEnd,
         employerName: employer?.name ?? '',
         weeklyHours: employer?.weeklyHours ?? 40,
+        splits: splits,
+        projectNames: projectMap,
       );
       if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)], text: 'Zeiterfassung Export');
@@ -956,6 +966,9 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         employerName: employer?.name ?? '',
         weeklyHours: weeklyHours,
         isSurchargeEmployer: SurchargeService.isSurchargeEmployer(employer),
+        splits: await DatabaseHelper.instance
+            .getSplitsForEntries(entries.map((e) => e.id).toList()),
+        projectNames: _projectNameMap(context, employer?.id),
       );
       if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)], text: 'Jahresbericht Export');
@@ -1623,6 +1636,12 @@ String _fmtH(double h) {
   final hh = abs.floor();
   final mm = ((abs - hh) * 60).round();
   return '${neg ? '-' : ''}${hh}h ${mm.toString().padLeft(2, '0')}m';
+}
+
+/// Builds a projectId → name map for the given employer, used by exports.
+Map<String, String> _projectNameMap(BuildContext context, String? employerId) {
+  final projects = context.read<ProjectProvider>().forEmployer(employerId);
+  return {for (final p in projects) p.id: p.name};
 }
 
 class _SummaryRow extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/time_entry.dart';
 import '../models/work_type.dart';
+import '../models/entry_project_split.dart';
 
 class ExportService {
   static final ExportService instance = ExportService._();
@@ -32,6 +33,8 @@ class ExportService {
     required int month,
     String employerName = '',
     double weeklyHours = 40,
+    Map<String, List<EntryProjectSplit>> splits = const {},
+    Map<String, String> projectNames = const {},
   }) async {
     final excel = Excel.createExcel();
     excel.rename('Sheet1', 'Zeiterfassung');
@@ -51,7 +54,9 @@ class ExportService {
     _writeInfoRow(sheet, row++, periodLabel, infoLine);
     row++; // blank separator
     _writeDetailHeaders(sheet, row++);
-    row = _writeDetailRows(sheet, row, entries, weeklyHours);
+    row = _writeDetailRows(sheet, row, entries, weeklyHours,
+        splits: splits, projectNames: projectNames);
+    row = _writeProjectSummary(sheet, row + 1, entries, splits, projectNames);
 
     _setDetailColumnWidths(sheet);
     return _save(excel, employerName, DateFormat('yyyy-MM').format(DateTime(year, month)));
@@ -64,6 +69,8 @@ class ExportService {
     String employerName = '',
     double weeklyHours = 40,
     bool isSurchargeEmployer = false,
+    Map<String, List<EntryProjectSplit>> splits = const {},
+    Map<String, String> projectNames = const {},
   }) async {
     final excel    = Excel.createExcel();
     excel.rename('Sheet1', 'Jahresübersicht');
@@ -175,7 +182,9 @@ class ExportService {
     // Re-do: write all entries in one pass (simpler, no month separators needed –
     // the date column makes it clear).
     dRow = 3; // reset to after headers
-    _writeDetailRows(detail, dRow, workEntries, weeklyHours);
+    final endDetailRow = _writeDetailRows(detail, dRow, workEntries, weeklyHours,
+        splits: splits, projectNames: projectNames);
+    _writeProjectSummary(detail, endDetailRow + 1, workEntries, splits, projectNames);
     _setDetailColumnWidths(detail);
 
     if (isSurchargeEmployer) {
@@ -192,6 +201,8 @@ class ExportService {
     required DateTime to,
     String employerName = '',
     double weeklyHours = 40,
+    Map<String, List<EntryProjectSplit>> splits = const {},
+    Map<String, String> projectNames = const {},
   }) async {
     final excel = Excel.createExcel();
     excel.rename('Sheet1', 'Zeiterfassung');
@@ -212,7 +223,9 @@ class ExportService {
     _writeInfoRow(sheet, row++, periodLabel, infoLine);
     row++; // blank
     _writeDetailHeaders(sheet, row++);
-    _writeDetailRows(sheet, row, entries, weeklyHours);
+    row = _writeDetailRows(sheet, row, entries, weeklyHours,
+        splits: splits, projectNames: projectNames);
+    _writeProjectSummary(sheet, row + 1, entries, splits, projectNames);
 
     _setDetailColumnWidths(sheet);
     return _save(excel, employerName,
@@ -254,7 +267,7 @@ class ExportService {
 
   void _writeDetailHeaders(Sheet sheet, int row) {
     final headers = ['Datum', 'Wochentag', 'Beginn', 'Ende', 'Pause (min)',
-                     'Netto (h)', 'Tätigkeit', 'Tagtyp', 'Notiz', 'km'];
+                     'Netto (h)', 'Tätigkeit', 'Tagtyp', 'Notiz', 'km', 'Projekte'];
     for (var c = 0; c < headers.length; c++) {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
       cell.value = TextCellValue(headers[c]);
@@ -262,8 +275,31 @@ class ExportService {
     }
   }
 
+  /// Formats project assignment for one entry as "Projekt1 30m, Projekt2 60m"
+  /// (or just names if no explicit split minutes). Falls back to legacy
+  /// entry.projectId if no splits exist.
+  String _formatProjects(
+    TimeEntry entry,
+    Map<String, List<EntryProjectSplit>> splits,
+    Map<String, String> projectNames,
+  ) {
+    final s = splits[entry.id];
+    if (s != null && s.isNotEmpty) {
+      return s.map((sp) {
+        final name = projectNames[sp.projectId] ?? '?';
+        return sp.minutes > 0 ? '$name ${sp.minutes}m' : name;
+      }).join(', ');
+    }
+    if (entry.projectId != null) {
+      return projectNames[entry.projectId!] ?? '';
+    }
+    return '';
+  }
+
   /// Writes entries with KW-Summen. Returns next free row index.
-  int _writeDetailRows(Sheet sheet, int startRow, List<TimeEntry> entries, double weeklyHours) {
+  int _writeDetailRows(Sheet sheet, int startRow, List<TimeEntry> entries, double weeklyHours,
+      {Map<String, List<EntryProjectSplit>> splits = const {},
+       Map<String, String> projectNames = const {}}) {
     final df  = DateFormat('dd.MM.yyyy');
     final tf  = DateFormat('HH:mm');
     final wdf = DateFormat('EEEE', 'de_AT');
@@ -310,6 +346,7 @@ class ExportService {
         entry.distanceKm != null && entry.distanceKm! > 0
             ? DoubleCellValue(entry.distanceKm!)
             : TextCellValue(''),
+        TextCellValue(_formatProjects(entry, splits, projectNames)),
       ];
 
       ExcelColor? bg;
@@ -338,8 +375,8 @@ class ExportService {
   void _addSubtotalRow(Sheet sheet, int row, double hours, String label,
       {bool bold = false, double? km}) {
     final values = [label, '', '', '', '',
-        TextCellValue(_fmtH(hours)), '', '', '', ''];
-    for (var c = 0; c < 10; c++) {
+        TextCellValue(_fmtH(hours)), '', '', '', '', ''];
+    for (var c = 0; c < 11; c++) {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
       final v = values[c];
       cell.value = v is String ? TextCellValue(v) : v as CellValue;
@@ -371,6 +408,80 @@ class ExportService {
     sheet.setColumnWidth(7, 12); // Tagtyp
     sheet.setColumnWidth(8, 35); // Notiz
     sheet.setColumnWidth(9,  8); // km
+    sheet.setColumnWidth(10, 30); // Projekte
+  }
+
+  /// Writes a project-time summary block. Returns next free row.
+  /// Aggregates minutes per project across all entries; entries without an
+  /// explicit split fall back to their legacy projectId (using entry.totalHours).
+  int _writeProjectSummary(
+    Sheet sheet,
+    int startRow,
+    List<TimeEntry> entries,
+    Map<String, List<EntryProjectSplit>> splits,
+    Map<String, String> projectNames,
+  ) {
+    final byProject = <String, double>{};
+    double unassigned = 0;
+    for (final e in entries) {
+      if (e.workType.isAbsence) continue;
+      final s = splits[e.id];
+      if (s != null && s.isNotEmpty) {
+        final splitTotal = s.fold<double>(0, (sum, sp) => sum + sp.minutes) / 60.0;
+        for (final sp in s) {
+          byProject[sp.projectId] =
+              (byProject[sp.projectId] ?? 0) + sp.minutes / 60.0;
+        }
+        unassigned += (e.totalHours - splitTotal).clamp(0, double.infinity);
+      } else if (e.projectId != null) {
+        byProject[e.projectId!] = (byProject[e.projectId!] ?? 0) + e.totalHours;
+      } else {
+        unassigned += e.totalHours;
+      }
+    }
+    if (byProject.isEmpty && unassigned <= 0.001) return startRow;
+
+    var row = startRow;
+    // Section title
+    final t = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    t.value = TextCellValue('PROJEKTZUORDNUNG');
+    t.cellStyle = CellStyle(bold: true, backgroundColorHex: _title, fontColorHex: _white);
+    for (var c = 1; c < 11; c++) {
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row))
+          .cellStyle = CellStyle(backgroundColorHex: _title);
+    }
+    row++;
+
+    // Header row
+    final hdrs = ['Projekt', 'Stunden'];
+    for (var c = 0; c < hdrs.length; c++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = TextCellValue(hdrs[c]);
+      cell.cellStyle = CellStyle(bold: true, backgroundColorHex: _blue, fontColorHex: _white);
+    }
+    row++;
+
+    final sortedKeys = byProject.keys.toList()
+      ..sort((a, b) => (byProject[b]!).compareTo(byProject[a]!));
+    for (final pid in sortedKeys) {
+      final nameCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      nameCell.value = TextCellValue(projectNames[pid] ?? '(gelöschtes Projekt)');
+      nameCell.cellStyle = CellStyle(backgroundColorHex: _grey);
+      final hCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+      hCell.value = TextCellValue(_fmtH(byProject[pid]!));
+      hCell.cellStyle = CellStyle(backgroundColorHex: _grey);
+      row++;
+    }
+    if (unassigned > 0.001) {
+      final nameCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      nameCell.value = TextCellValue('(ohne Projektzuordnung)');
+      nameCell.cellStyle = CellStyle(backgroundColorHex: _orange);
+      final hCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+      hCell.value = TextCellValue(_fmtH(unassigned));
+      hCell.cellStyle = CellStyle(backgroundColorHex: _orange);
+      row++;
+    }
+    return row;
   }
 
   // ── Zuschläge helpers ────────────────────────────────────────────────────────
