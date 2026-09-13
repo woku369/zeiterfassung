@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-05-30 – v1.32 abgeschlossen + Tätigkeitsart-Drilldown
+> Letztes Update: 2026-09-13 – v1.33 Geofencing-Persistenz + Projektzuordnung im Export
 
 ---
 
@@ -25,6 +25,31 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.33 – Geofencing-Persistenz + Projektzuordnung im Excel-Export
+
+- [x] **`is_active` bleibt lokal erhalten beim Sync (Bugfix):**
+  - `database_helper.dart: upsertLocationsFromServer()` überschrieb `is_active` blind mit dem NAS-Wert → Zonen, die auf dem NAS als inaktiv abgelegt waren, wurden bei jedem Sync-Zyklus wieder deaktiviert
+  - Fix: `is_active` wird wie `monthly_gross` bei Employers als gerätespezifischer Wert behandelt und beim Upsert aus der bestehenden Zeile übernommen
+
+- [x] **Auto-Restart des Geofencing-Dienstes nach OS-Kill (Bugfix):**
+  - `app.dart:_setupSync()` startete den Background-Service nur bei Erstinstallation (`geofencing_active == null`) neu
+  - Wenn Android den Foreground-Service via Akkuoptimierung beendete, blieb `geofencing_active = true` in den Prefs, aber der Service lief nicht mehr → Button zeigte „Inaktiv", keine automatische Wiederherstellung außer nach Telefon-Neustart
+  - Fix: Auto-Start greift jetzt auch bei `wasActive == true` — nur wenn der User den Dienst explizit über den Button gestoppt hat (`false`), bleibt er aus
+
+- [x] **Projektzuordnung in allen Excel-Exporten (`exportMonth`, `exportYear`, `exportRange`):**
+  - Neue Detail-Spalte „Projekte" pro Zeile: `Führungen 30m, Kräutergarten 60m` bei Splits, oder nur der Name bei Einzelzuordnung
+  - Neuer Summary-Block **PROJEKTZUORDNUNG** am Ende: Stunden pro Projekt, absteigend sortiert
+  - Extra-Zeile **(ohne Projektzuordnung)** (orange) für Einträge komplett ohne Projekt + Rest-Zeit bei unvollständigen Splits
+  - `reports_screen.dart`: Splits + Projektnamen werden vor jedem Export aus der DB nachgeladen und mitgegeben
+
+- [x] **Projektzuordnung im Formular auch ohne Minuten möglich:**
+  - `entry_form_screen.dart`: „Projekt ausgewählt" wird von „Minuten eingegeben" entkoppelt
+  - Einzelnes Projekt ohne Minuten → gesamte Terminlaufzeit gilt für das Projekt (legacy `project_id` gesetzt)
+  - Zwei Projekte, eines ohne Minuten → das minutenlose bekommt den Rest (`entry.totalMin − explicit`)
+  - Minuten-Hint zeigt bei Rest-Slot den berechneten Rest an
+
+---
 
 ### v1.32 – Zuschlagstabelle + automatische Zuschläge + Security + Tätigkeitsart-Drilldown
 
@@ -829,7 +854,7 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 
 ### Mittelfristig – Auswertung
 - [ ] **Statistik/Auswertung optimieren:** Aufschlüsselung nach Arbeitsort, nicht nur nach Typ
-- [ ] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei
+- [x] Jahresexport: alle Monate des Wirtschaftsjahres in einer XLSX-Datei *(bereits als „Details"-Sheet in `exportYear` umgesetzt)*
 
 ### Mittelfristig – Zuschläge-Reporting (Verhandlungsunterlage Gurktaler AG)
 
@@ -1008,7 +1033,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.30)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.33)
 
 ---
 
