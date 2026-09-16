@@ -71,6 +71,7 @@ class ExportService {
     bool isSurchargeEmployer = false,
     Map<String, List<EntryProjectSplit>> splits = const {},
     Map<String, String> projectNames = const {},
+    List<TimeEntry> history36Months = const [],
   }) async {
     final excel    = Excel.createExcel();
     excel.rename('Sheet1', 'Jahresübersicht');
@@ -189,6 +190,10 @@ class ExportService {
 
     if (isSurchargeEmployer) {
       _buildSurchargeSheet(excel, fyLabel, employerName, allEntries, weeklyHours);
+    }
+
+    if (history36Months.isNotEmpty) {
+      _buildTrendSheet(excel, history36Months, employerName);
     }
 
     return _save(excel, employerName, fyLabel.replaceAll('/', '-'));
@@ -819,6 +824,130 @@ class ExportService {
     sheet.setColumnWidth(9,  12); // Effektiv
     sheet.setColumnWidth(10,  8); // km
     sheet.setColumnWidth(11, 12); // Fahrzeit
+  }
+
+  // ── Trend-Sheet (Monatsstunden + lineare Regression) ────────────────────────
+
+  /// Builds a "Trend 36M" sheet with per-month hours over the last 36 months
+  /// plus a linear-regression trend column. Absences are excluded so seasonal
+  /// vacation months don't drag the trend down.
+  void _buildTrendSheet(Excel excel, List<TimeEntry> entries, String employerName) {
+    final sheet = excel['Trend 36M'];
+
+    // Aggregate hours per (year, month) — worked time only.
+    final byYm = <int, double>{}; // key: year*12 + month
+    for (final e in entries) {
+      if (e.workType.isAbsence) continue;
+      final key = e.date.year * 12 + e.date.month;
+      byYm[key] = (byYm[key] ?? 0) + e.totalHours;
+    }
+
+    // Build a continuous 36-month window ending at the last month with data
+    // (or current month if newer). Missing months are 0h so the trend fit
+    // treats gaps as real (no work done).
+    final now = DateTime.now();
+    var endYm = now.year * 12 + now.month;
+    if (byYm.isNotEmpty) {
+      final maxKey = byYm.keys.reduce((a, b) => a > b ? a : b);
+      if (maxKey > endYm) endYm = maxKey;
+    }
+    const window = 36;
+    final startYm = endYm - (window - 1);
+
+    final months = <({DateTime date, double h})>[];
+    for (var k = startYm; k <= endYm; k++) {
+      final m = k % 12 == 0 ? 12 : k % 12;
+      final y = k % 12 == 0 ? (k ~/ 12) - 1 : k ~/ 12;
+      months.add((date: DateTime(y, m), h: byYm[k] ?? 0));
+    }
+
+    // Linear regression h = a·x + b   (x = 0..N-1)
+    final n = months.length;
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (var i = 0; i < n; i++) {
+      final y = months[i].h;
+      sumX  += i;
+      sumY  += y;
+      sumXY += i * y;
+      sumX2 += i * i;
+    }
+    final denom = n * sumX2 - sumX * sumX;
+    final a = denom.abs() < 1e-9 ? 0.0 : (n * sumXY - sumX * sumY) / denom;
+    final b = (sumY - a * sumX) / n;
+
+    var row = 0;
+    _writeTitleRow(sheet, row++,
+        'TREND (36 Monate)  –  ${employerName.toUpperCase()}');
+    row++;
+
+    // Info line
+    final avg = sumY / n;
+    final firstTrend = b;
+    final lastTrend  = a * (n - 1) + b;
+    final deltaPct   = firstTrend.abs() < 0.01
+        ? 0.0
+        : (lastTrend - firstTrend) / firstTrend * 100;
+    final info = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    info.value = TextCellValue(
+        'Ø ${_fmtH(avg)}/Monat  ·  Trend Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(2)} h/Monat  ·  '
+        'Start-Trend ${_fmtH(firstTrend)}  →  End-Trend ${_fmtH(lastTrend)}  '
+        '(${deltaPct >= 0 ? '+' : ''}${deltaPct.toStringAsFixed(1)} %)');
+    info.cellStyle = CellStyle(backgroundColorHex: _blueLight, bold: true);
+    for (var c = 1; c < 5; c++) {
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row))
+          .cellStyle = CellStyle(backgroundColorHex: _blueLight);
+    }
+    row += 2;
+
+    // Table headers
+    const hdrs = ['Monat', 'Ist (h)', 'Trend (h)', 'Δ zum Trend'];
+    for (var c = 0; c < hdrs.length; c++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = TextCellValue(hdrs[c]);
+      cell.cellStyle = CellStyle(bold: true, backgroundColorHex: _blue, fontColorHex: _white);
+    }
+    row++;
+
+    final mfmt = DateFormat('MMM yyyy', 'de_AT');
+    for (var i = 0; i < n; i++) {
+      final ist   = months[i].h;
+      final trend = a * i + b;
+      final delta = ist - trend;
+
+      final values = <CellValue>[
+        TextCellValue(mfmt.format(months[i].date)),
+        DoubleCellValue(double.parse(ist.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(trend.toStringAsFixed(2))),
+        DoubleCellValue(double.parse(delta.toStringAsFixed(2))),
+      ];
+      final bg = i.isEven ? _white : _grey;
+      for (var c = 0; c < values.length; c++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        cell.value = values[c];
+        final cellBg = c == 3
+            ? (delta >= 0 ? _green : _red)
+            : bg;
+        cell.cellStyle = CellStyle(backgroundColorHex: cellBg);
+      }
+      row++;
+    }
+    row++;
+
+    // Instruction for building the chart in Excel
+    final tip = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    tip.value = TextCellValue(
+        'Chart in Excel: Spalten Monat, Ist (h), Trend (h) markieren → '
+        'Einfügen → Verbunddiagramm → Ist = Säule, Trend = Linie.');
+    tip.cellStyle = CellStyle(italic: true, backgroundColorHex: _argBg);
+    for (var c = 1; c < 5; c++) {
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row))
+          .cellStyle = CellStyle(backgroundColorHex: _argBg);
+    }
+
+    sheet.setColumnWidth(0, 14);
+    sheet.setColumnWidth(1, 12);
+    sheet.setColumnWidth(2, 12);
+    sheet.setColumnWidth(3, 14);
   }
 
   String _fmtH(double h) {

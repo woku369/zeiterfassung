@@ -960,6 +960,12 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         from, to,
         employerId: employer?.id,
       );
+      // 36-Monats-Historie bis zum WJ-Ende für das Trend-Sheet
+      final trendFrom = DateTime(to.year, to.month - 35, 1);
+      final history = await DatabaseHelper.instance.getEntriesForDateRange(
+        trendFrom, to,
+        employerId: employer?.id,
+      );
       final file = await ExportService.instance.exportYear(
         allEntries: entries,
         fyStart: _fyStart,
@@ -969,6 +975,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
         splits: await DatabaseHelper.instance
             .getSplitsForEntries(entries.map((e) => e.id).toList()),
         projectNames: _projectNameMap(context, employer?.id),
+        history36Months: history,
       );
       if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)], text: 'Jahresbericht Export');
