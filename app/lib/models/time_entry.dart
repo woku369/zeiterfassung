@@ -20,6 +20,9 @@ class TimeEntry {
   final bool isSpecialHours;
   final bool isSynced;
   final bool isClocking;
+  /// User marked this entry as intentionally without a project — hides it from
+  /// the "ohne Projektzuordnung" bucket in reports.
+  final bool noProjectIntended;
   final DateTime createdAt;
   // Populated from DB/NAS; null for freshly-constructed entries (DB sets DEFAULT).
   final DateTime? updatedAt;
@@ -44,6 +47,7 @@ class TimeEntry {
     this.isSpecialHours = false,
     this.isSynced = false,
     this.isClocking = false,
+    this.noProjectIntended = false,
     required this.createdAt,
     this.updatedAt,
   });
@@ -80,6 +84,7 @@ class TimeEntry {
     bool? isSpecialHours,
     bool? isSynced,
     bool? isClocking,
+    bool? noProjectIntended,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -103,6 +108,7 @@ class TimeEntry {
       isSpecialHours: isSpecialHours ?? this.isSpecialHours,
       isSynced: isSynced ?? this.isSynced,
       isClocking: isClocking ?? this.isClocking,
+      noProjectIntended: noProjectIntended ?? this.noProjectIntended,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -128,6 +134,7 @@ class TimeEntry {
     'is_special_hours': isSpecialHours ? 1 : 0,
     'is_synced': isSynced ? 1 : 0,
     'is_clocking': isClocking ? 1 : 0,
+    'no_project_intended': noProjectIntended ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
     // Omit updated_at when null so SQLite DEFAULT (datetime('now')) kicks in.
     if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
@@ -153,6 +160,7 @@ class TimeEntry {
     isSpecialHours: (m['is_special_hours'] as int? ?? 0) == 1,
     isSynced: (m['is_synced'] as int? ?? 0) == 1,
     isClocking: (m['is_clocking'] as int? ?? 0) == 1,
+    noProjectIntended: (m['no_project_intended'] as int? ?? 0) == 1,
     createdAt: DateTime.parse(m['created_at'] as String),
     updatedAt: m['updated_at'] != null ? DateTime.tryParse(m['updated_at'] as String) : null,
   );
@@ -167,6 +175,9 @@ class TimeEntry {
     if (m['is_synced'] is bool) m['is_synced'] = (m['is_synced'] as bool) ? 1 : 0;
     if (m['is_special_hours'] is bool) {
       m['is_special_hours'] = (m['is_special_hours'] as bool) ? 1 : 0;
+    }
+    if (m['no_project_intended'] is bool) {
+      m['no_project_intended'] = (m['no_project_intended'] as bool) ? 1 : 0;
     }
     return TimeEntry.fromMap(m);
   }

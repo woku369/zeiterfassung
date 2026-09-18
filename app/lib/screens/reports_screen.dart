@@ -726,6 +726,130 @@ class _ProjectBreakdownCard extends StatelessWidget {
     );
   }
 
+  void _showUnassignedEditor(BuildContext outerContext,
+      List<TimeEntry> initial, List projectsRaw) {
+    final df = DateFormat('EE dd.MM.yyyy', 'de_AT');
+    final tf = DateFormat('HH:mm');
+    final working = [...initial]
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final tp = outerContext.read<TimeEntryProvider>();
+
+    showModalBottomSheet(
+      context: outerContext,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, controller) => StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> assign(TimeEntry e, dynamic project) async {
+              final updated = e.copyWith(
+                projectId: project.id as String,
+                updatedAt: DateTime.now(),
+                isSynced: false,
+              );
+              await DatabaseHelper.instance.updateEntry(updated);
+              await tp.refresh();
+              setSheetState(() => working.remove(e));
+            }
+
+            Future<void> markIntentional(TimeEntry e) async {
+              final updated = e.copyWith(
+                noProjectIntended: true,
+                updatedAt: DateTime.now(),
+                isSynced: false,
+              );
+              await DatabaseHelper.instance.updateEntry(updated);
+              await tp.refresh();
+              setSheetState(() => working.remove(e));
+            }
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      const Text('Einträge ohne Projektzuordnung',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      const Spacer(),
+                      Text('${working.length}',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6))),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: working.isEmpty
+                      ? const Center(child: Text('Alle zugeordnet 🎉'))
+                      : ListView.separated(
+                          controller: controller,
+                          itemCount: working.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final e = working[i];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(children: [
+                                    Text(df.format(e.startTime),
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${tf.format(e.startTime)} – ${e.endTime != null ? tf.format(e.endTime!) : '?'}  ·  ${_fmtH(e.totalHours)}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ]),
+                                  if (e.note.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(e.note,
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      for (final p in projectsRaw)
+                                        ActionChip(
+                                          label: Text(p.name as String, style: const TextStyle(fontSize: 12)),
+                                          onPressed: () => assign(e, p),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ActionChip(
+                                        avatar: const Icon(Icons.block, size: 14, color: Colors.grey),
+                                        label: const Text('bewusst leer',
+                                            style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        onPressed: () => markIntentional(e),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (employer == null) return const SizedBox.shrink();
@@ -744,6 +868,7 @@ class _ProjectBreakdownCard extends StatelessWidget {
         final byProject = <String, double>{};
         final projectEntries = <String, List<({TimeEntry entry, double hours})>>{};
         double unassigned = 0;
+        final unassignedEntries = <TimeEntry>[];
 
         for (final e in entries) {
           if (e.workType.isAbsence) continue;
@@ -762,8 +887,9 @@ class _ProjectBreakdownCard extends StatelessWidget {
             final pid = e.projectId!;
             byProject[pid] = (byProject[pid] ?? 0) + e.totalHours;
             (projectEntries[pid] ??= []).add((entry: e, hours: e.totalHours));
-          } else {
+          } else if (!e.noProjectIntended) {
             unassigned += e.totalHours;
+            unassignedEntries.add(e);
           }
         }
 
@@ -786,8 +912,12 @@ class _ProjectBreakdownCard extends StatelessWidget {
                               context, p.name, projectEntries[p.id] ?? []),
                         )),
                 if (unassigned > 0)
-                  _SummaryRow('Kein Projekt', _fmtH(unassigned),
-                      color: Colors.grey.shade500),
+                  _TappableSummaryRow(
+                    label: 'Kein Projekt',
+                    value: _fmtH(unassigned),
+                    onTap: () => _showUnassignedEditor(
+                        context, unassignedEntries, projects),
+                  ),
               ],
             ),
           ),

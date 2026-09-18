@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(await getDatabasesPath(), 'zeiterfassung.db');
     return openDatabase(
       path,
-      version: 20,
+      version: 21,
       onCreate: _create,
       onUpgrade: _upgrade,
       onOpen: (db) async => db.rawQuery('PRAGMA journal_mode=WAL'),
@@ -64,6 +64,7 @@ class DatabaseHelper {
         is_special_hours INTEGER NOT NULL DEFAULT 0,
         is_synced INTEGER NOT NULL DEFAULT 0,
         is_clocking INTEGER NOT NULL DEFAULT 0,
+        no_project_intended INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'
       )
@@ -168,6 +169,12 @@ class DatabaseHelper {
       try {
         await db.execute(
             "ALTER TABLE time_entries ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z'");
+      } catch (_) {}
+    }
+    if (oldVersion < 21) {
+      try {
+        await db.execute(
+            'ALTER TABLE time_entries ADD COLUMN no_project_intended INTEGER NOT NULL DEFAULT 0');
       } catch (_) {}
     }
   }
