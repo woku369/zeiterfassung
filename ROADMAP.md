@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-09-18 – v1.34 Projekt-Nachzuordnung + 36-Monats-Trend
+> Letztes Update: 2026-09-18 – v1.34 Projekt-Nachzuordnung + 36-Monats-Trend (Excel + in-App)
 
 ---
 
@@ -50,6 +50,13 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Header-Zeile mit Ø-Stunden/Monat, Trend-Steigung (h/Monat), Start-Trend → End-Trend + Prozent-Änderung
   - Chart-Erstellung in Excel: 3-Klick-Anleitung als kursive Zeile im Sheet (Verbunddiagramm, `excel`-Dart-Package kann keine nativen Charts einbetten)
   - `_FiscalYearTabState._exportYearXlsx()`: lädt Historie via zweite `getEntriesForDateRange(trendFrom, to)`-Query
+
+- [x] **36-Monats-Trendkarte im Wirtschaftsjahr-Tab (in-App):**
+  - Neue `_TrendCard` direkt unter der `_SaisonmusterCard`
+  - Balkendiagramm (ein Balken je Monat) + rote Regressionslinie darüber, gezeichnet mit `CustomPainter` — keine neue Dependency
+  - Y-Achse mit 0/mid/max-Beschriftung + Gitterlinien, X-Achse alle 6 Monate + letzter Monat
+  - Header-Zeile identisch zum Excel-Sheet (Ø, Steigung, Prozent-Änderung), plus Legende
+  - `FutureBuilder` lädt Historie via `getEntriesForDateRange` beim Öffnen des Tabs
 
 ---
 
