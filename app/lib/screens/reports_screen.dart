@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -2184,7 +2185,7 @@ class _TrendPainter extends CustomPainter {
       final v = maxY * frac;
       final tp = TextPainter(
         text: TextSpan(text: v.toStringAsFixed(0), style: labelStyle),
-        textDirection: TextDirection.ltr,
+        textDirection: ui.TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(leftPad - tp.width - 3, y - tp.height / 2));
       if (frac > 0) {
@@ -2236,7 +2237,7 @@ class _TrendPainter extends CustomPainter {
       final label = '${_shortMonth(d.month)}${d.year % 100}';
       final tp = TextPainter(
         text: TextSpan(text: label, style: labelStyle),
-        textDirection: TextDirection.ltr,
+        textDirection: ui.TextDirection.ltr,
       )..layout();
       final cx = leftPad + slot * i + slot / 2;
       tp.paint(canvas, Offset(cx - tp.width / 2, topPad + chartH + 4));
