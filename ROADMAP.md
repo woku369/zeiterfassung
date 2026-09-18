@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-09-13 – v1.33 Geofencing-Persistenz + Projektzuordnung im Export
+> Letztes Update: 2026-09-18 – v1.34 Projekt-Nachzuordnung + 36-Monats-Trend
 
 ---
 
@@ -25,6 +25,33 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.34 – Projekt-Nachzuordnung via Drill-down + 36-Monats-Trend (DB v21)
+
+- [x] **Drill-down-Editor „Kein Projekt" in der Projektauswertung:**
+  - Zeile „Kein Projekt" im `_ProjectBreakdownCard` ist jetzt tap-bar
+  - Öffnet BottomSheet mit allen unzugeordneten Einträgen chronologisch (Datum, Uhrzeit, Dauer, Notiz)
+  - Pro Eintrag: eine Reihe ActionChips — ein Chip pro Projekt zum sofortigen Zuordnen + „bewusst leer"-Chip
+  - Zugeordnete/markierte Einträge verschwinden sofort aus der Liste (StatefulBuilder-Rebuild)
+  - Report-Karte aktualisiert sich beim Schließen (Parent `context.watch<TimeEntryProvider>()` rebuild)
+  - Bewährt: 2 Jahre Nacherfassung in einer Sitzung möglich (ohne Splitting, für Überblick völlig ausreichend)
+
+- [x] **Neuer DB-Flag `no_project_intended` (DB v21):**
+  - Spalte in `time_entries` mit Default `0`
+  - Einträge mit `no_project_intended = true` werden aus dem „ohne Projektzuordnung"-Bucket ausgeblendet, aber weiter im Bericht mitgezählt
+  - Löst das Kernproblem: legitime projektlose Einträge (Homeoffice-Verwaltung, private Fahrzeit etc.) blockieren die Drill-down-Liste nicht mehr
+  - Backend `server.js`: CREATE TABLE + idempotente ALTER-Migration + beide `upsertEntry`-Sync-Pfade aktualisiert
+  - Model `time_entry.dart`: neuer Bool `noProjectIntended` mit copyWith + toMap/fromMap + JSON-Bool-Normalisierung
+
+- [x] **36-Monats-Trendanalyse im Wirtschaftsjahr-Export (pro Arbeitgeber):**
+  - Neues Sheet „Trend 36M" in `exportYear`
+  - Aggregation der Arbeitsstunden pro Monat über die letzten 36 Monate (Absenzen ausgeschlossen, damit Urlaub die Kurve nicht drückt; leere Monate = 0h)
+  - Lineare Regression via Least-Squares-Fit — Trend-Spalte + Δ-Spalte (grün/rot vs. Trend)
+  - Header-Zeile mit Ø-Stunden/Monat, Trend-Steigung (h/Monat), Start-Trend → End-Trend + Prozent-Änderung
+  - Chart-Erstellung in Excel: 3-Klick-Anleitung als kursive Zeile im Sheet (Verbunddiagramm, `excel`-Dart-Package kann keine nativen Charts einbetten)
+  - `_FiscalYearTabState._exportYearXlsx()`: lädt Historie via zweite `getEntriesForDateRange(trendFrom, to)`-Query
+
+---
 
 ### v1.33 – Geofencing-Persistenz + Projektzuordnung im Excel-Export
 
@@ -1033,7 +1060,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.33)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.34)
 
 ---
 

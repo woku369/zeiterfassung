@@ -622,6 +622,30 @@ class HelpScreen extends StatelessWidget {
                 'Aufschlüsselung der Stunden nach Projekt. '
                 '"Kein Projekt" fasst alle nicht zugeordneten Einträge zusammen.',
               ),
+              _SubHeading('Nachzuordnen (Drill-down)'),
+              _Para(
+                'Die Zeile "Kein Projekt" ist tap-bar. Sie öffnet eine Liste '
+                'aller unzugeordneten Einträge des Monats. Pro Zeile: Datum, '
+                'Uhrzeit, Dauer, Notiz und eine Reihe Chips – ein Chip je '
+                'Projekt zum sofortigen Zuordnen plus "bewusst leer" für '
+                'Einträge, die absichtlich ohne Projekt bleiben sollen '
+                '(z.B. Homeoffice-Verwaltungszeit). Zugeordnete oder als '
+                'bewusst leer markierte Einträge verschwinden sofort aus '
+                'der Liste, der Report aktualisiert sich beim Schließen.',
+              ),
+              _Hint(
+                'Für die Rückerfassung großer Zeiträume: Monat für Monat '
+                'durchklicken – ohne Splitting reicht das für den Überblick. '
+                'Splits kann man später bei Bedarf im Formular einzelner '
+                'Einträge nachziehen.',
+              ),
+              _SubHeading('Excel-Export mit Projektzuordnung'),
+              _Para(
+                'Monats-, Wirtschaftsjahr- und Zeitraum-Exporte enthalten '
+                'eine Spalte "Projekte" pro Eintrag und einen Summary-Block '
+                '"PROJEKTZUORDNUNG" am Ende mit Stunden pro Projekt. '
+                'Restzeit ohne Zuordnung (orange) wird separat ausgewiesen.',
+              ),
               _SubHeading('Vorhandene Projekte (Gurktaler AG)'),
               _KeyValue(label: 'Führungen', value: 'Besucherführungen Kräutergarten'),
               _KeyValue(label: 'Kräutergarten', value: 'Allgemeine Gartenarbeit'),
