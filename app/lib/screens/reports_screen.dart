@@ -1245,6 +1245,11 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
                 monthSpecialDays: List.unmodifiable(_monthSpecialDays),
                 weeklyHours: weeklyHours,
               ),
+              const SizedBox(height: 12),
+              _TrendCard(
+                fyEnd: DateTime(_fyEnd.year, _fyEnd.month, 0),
+                employerId: employer?.id,
+              ),
               if (_showEquivalent) ...[
                 const SizedBox(height: 12),
                 _PauschaleCard(
@@ -2018,6 +2023,235 @@ class _SaisonmusterCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── 36-Monats-Trend (Balken + Regressionslinie) ──────────────────────────────
+
+class _TrendCard extends StatelessWidget {
+  final DateTime fyEnd;
+  final String? employerId;
+  const _TrendCard({required this.fyEnd, required this.employerId});
+
+  @override
+  Widget build(BuildContext context) {
+    final trendFrom = DateTime(fyEnd.year, fyEnd.month - 35, 1);
+    return FutureBuilder<List<TimeEntry>>(
+      future: DatabaseHelper.instance
+          .getEntriesForDateRange(trendFrom, fyEnd, employerId: employerId),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Card(
+              child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator())));
+        }
+        // Monate aggregieren (Absenzen ausgeschlossen)
+        final byYm = <int, double>{};
+        for (final e in snap.data!) {
+          if (e.workType.isAbsence) continue;
+          final k = e.date.year * 12 + e.date.month;
+          byYm[k] = (byYm[k] ?? 0) + e.totalHours;
+        }
+        final endYm = fyEnd.year * 12 + fyEnd.month;
+        const window = 36;
+        final startYm = endYm - (window - 1);
+
+        final months = <({DateTime date, double h})>[];
+        for (var k = startYm; k <= endYm; k++) {
+          final m = k % 12 == 0 ? 12 : k % 12;
+          final y = k % 12 == 0 ? (k ~/ 12) - 1 : k ~/ 12;
+          months.add((date: DateTime(y, m), h: byYm[k] ?? 0));
+        }
+
+        // Lineare Regression h = a·i + b
+        final n = months.length;
+        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        for (var i = 0; i < n; i++) {
+          sumX  += i;
+          sumY  += months[i].h;
+          sumXY += i * months[i].h;
+          sumX2 += i * i;
+        }
+        final denom = n * sumX2 - sumX * sumX;
+        final a = denom.abs() < 1e-9 ? 0.0 : (n * sumXY - sumX * sumY) / denom;
+        final b = (sumY - a * sumX) / n;
+
+        final avg   = sumY / n;
+        final tStart = b;
+        final tEnd   = a * (n - 1) + b;
+        final dPct   = tStart.abs() < 0.01 ? 0.0 : (tEnd - tStart) / tStart * 100;
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Trend (36 Monate)',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Ø ${_fmtH(avg)}/Monat  ·  Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(2)} h/Monat  ·  '
+                  '${dPct >= 0 ? '+' : ''}${dPct.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                const Divider(),
+                SizedBox(
+                  height: 200,
+                  child: CustomPaint(
+                    painter: _TrendPainter(
+                      months: months,
+                      slope: a,
+                      intercept: b,
+                      barColor: Theme.of(context).colorScheme.primary,
+                      trendColor: Colors.deepOrange.shade600,
+                      axisColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+                      labelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                    child: Container(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _LegendItem(color: Theme.of(context).colorScheme.primary, label: 'Monat'),
+                    const SizedBox(width: 12),
+                    _LegendItem(color: Colors.deepOrange.shade600, label: 'Trend (lin. Regression)'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TrendPainter extends CustomPainter {
+  final List<({DateTime date, double h})> months;
+  final double slope;
+  final double intercept;
+  final Color barColor;
+  final Color trendColor;
+  final Color axisColor;
+  final Color labelColor;
+
+  _TrendPainter({
+    required this.months,
+    required this.slope,
+    required this.intercept,
+    required this.barColor,
+    required this.trendColor,
+    required this.axisColor,
+    required this.labelColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const leftPad = 32.0;
+    const rightPad = 8.0;
+    const topPad = 8.0;
+    const bottomPad = 22.0;
+
+    final chartW = size.width - leftPad - rightPad;
+    final chartH = size.height - topPad - bottomPad;
+
+    // Max: höchster Balken oder höchster Trendpunkt, damit die Linie im Bild bleibt
+    double maxY = 1.0;
+    for (final m in months) if (m.h > maxY) maxY = m.h;
+    for (var i = 0; i < months.length; i++) {
+      final t = slope * i + intercept;
+      if (t > maxY) maxY = t;
+    }
+    // 10% Kopfraum
+    maxY *= 1.1;
+
+    // Y-Achse (0-Linie + Max-Linie)
+    final axisPaint = Paint()..color = axisColor..strokeWidth = 1;
+    canvas.drawLine(Offset(leftPad, topPad + chartH),
+        Offset(size.width - rightPad, topPad + chartH), axisPaint);
+    canvas.drawLine(Offset(leftPad, topPad),
+        Offset(leftPad, topPad + chartH), axisPaint);
+
+    // Y-Labels (0, max/2, max)
+    final labelStyle = TextStyle(color: labelColor, fontSize: 9);
+    for (final frac in [0.0, 0.5, 1.0]) {
+      final y = topPad + chartH * (1 - frac);
+      final v = maxY * frac;
+      final tp = TextPainter(
+        text: TextSpan(text: v.toStringAsFixed(0), style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(leftPad - tp.width - 3, y - tp.height / 2));
+      if (frac > 0) {
+        // Gitterlinie
+        final gp = Paint()
+          ..color = axisColor.withOpacity(0.3)
+          ..strokeWidth = 0.5;
+        canvas.drawLine(Offset(leftPad, y),
+            Offset(size.width - rightPad, y), gp);
+      }
+    }
+
+    // Balken
+    final n = months.length;
+    final slot = chartW / n;
+    final barW = slot * 0.7;
+    final barPaint = Paint()..color = barColor;
+    for (var i = 0; i < n; i++) {
+      final h = months[i].h;
+      final bh = h / maxY * chartH;
+      final x = leftPad + slot * i + (slot - barW) / 2;
+      final y = topPad + chartH - bh;
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, y, barW, bh),
+        const Radius.circular(2),
+      );
+      canvas.drawRRect(rect, barPaint);
+    }
+
+    // Trendlinie
+    final trendPaint = Paint()
+      ..color = trendColor
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    Offset ptFor(int i) {
+      final t = slope * i + intercept;
+      final x = leftPad + slot * i + slot / 2;
+      final y = topPad + chartH - (t.clamp(0.0, maxY) / maxY * chartH);
+      return Offset(x, y);
+    }
+    final path = Path()..moveTo(ptFor(0).dx, ptFor(0).dy);
+    for (var i = 1; i < n; i++) path.lineTo(ptFor(i).dx, ptFor(i).dy);
+    canvas.drawPath(path, trendPaint);
+
+    // X-Labels (jeden 6. Monat, immer den letzten)
+    for (var i = 0; i < n; i++) {
+      if (i % 6 != 0 && i != n - 1) continue;
+      final d = months[i].date;
+      final label = '${_shortMonth(d.month)}${d.year % 100}';
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final cx = leftPad + slot * i + slot / 2;
+      tp.paint(canvas, Offset(cx - tp.width / 2, topPad + chartH + 4));
+    }
+  }
+
+  String _shortMonth(int m) {
+    const names = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    return names[m];
+  }
+
+  @override
+  bool shouldRepaint(_TrendPainter old) =>
+      old.months != months || old.slope != slope || old.intercept != intercept;
 }
 
 // ── So/FT-Pauschale ───────────────────────────────────────────────────────────
