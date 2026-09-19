@@ -1250,6 +1250,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
               _TrendCard(
                 fyEnd: DateTime(_fyEnd.year, _fyEnd.month, 0),
                 employerId: employer?.id,
+                weeklyHoursHistory: _weeklyHoursHistoryFor(employer, weeklyHours),
               ),
               if (_showEquivalent) ...[
                 const SizedBox(height: 12),
@@ -1787,6 +1788,20 @@ Map<String, String> _projectNameMap(BuildContext context, String? employerId) {
   return {for (final p in projects) p.id: p.name};
 }
 
+/// Historical weekly-hours targets for the trend chart.
+/// Gurktaler AG: 4 h/Woche bis WJ 24/25, ab April 2025 (WJ 25/26) 8 h/Woche.
+/// Andere Arbeitgeber: konstant aktueller Vertragswert.
+List<({DateTime from, double h})> _weeklyHoursHistoryFor(
+    Employer? employer, double current) {
+  if (employer != null && employer.name.toLowerCase().contains('gurktaler')) {
+    return [
+      (from: DateTime(1970, 1, 1), h: 4.0),
+      (from: DateTime(2025, 4, 1), h: 8.0),
+    ];
+  }
+  return [(from: DateTime(1970, 1, 1), h: current)];
+}
+
 class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
@@ -2031,7 +2046,20 @@ class _SaisonmusterCard extends StatelessWidget {
 class _TrendCard extends StatelessWidget {
   final DateTime fyEnd;
   final String? employerId;
-  const _TrendCard({required this.fyEnd, required this.employerId});
+  final List<({DateTime from, double h})> weeklyHoursHistory;
+  const _TrendCard({
+    required this.fyEnd,
+    required this.employerId,
+    required this.weeklyHoursHistory,
+  });
+
+  double _sollFor(DateTime d) {
+    var value = weeklyHoursHistory.first.h;
+    for (final e in weeklyHoursHistory) {
+      if (!e.from.isAfter(d)) value = e.h;
+    }
+    return value;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2046,7 +2074,9 @@ class _TrendCard extends StatelessWidget {
                   padding: EdgeInsets.all(24),
                   child: Center(child: CircularProgressIndicator())));
         }
-        // Monate aggregieren (Absenzen ausgeschlossen)
+        // Monate aggregieren (Absenzen ausgeschlossen), umgerechnet in
+        // Ø Wochenstunden (Monatsstunden / 4.33).
+        const weeksPerMonth = 4.33;
         final byYm = <int, double>{};
         for (final e in snap.data!) {
           if (e.workType.isAbsence) continue;
@@ -2057,20 +2087,25 @@ class _TrendCard extends StatelessWidget {
         const window = 36;
         final startYm = endYm - (window - 1);
 
-        final months = <({DateTime date, double h})>[];
+        final months = <({DateTime date, double weekly, double soll})>[];
         for (var k = startYm; k <= endYm; k++) {
           final m = k % 12 == 0 ? 12 : k % 12;
           final y = k % 12 == 0 ? (k ~/ 12) - 1 : k ~/ 12;
-          months.add((date: DateTime(y, m), h: byYm[k] ?? 0));
+          final d = DateTime(y, m);
+          months.add((
+            date: d,
+            weekly: (byYm[k] ?? 0) / weeksPerMonth,
+            soll: _sollFor(d),
+          ));
         }
 
-        // Lineare Regression h = a·i + b
+        // Lineare Regression über Wochenstunden: h = a·i + b
         final n = months.length;
         double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
         for (var i = 0; i < n; i++) {
           sumX  += i;
-          sumY  += months[i].h;
-          sumXY += i * months[i].h;
+          sumY  += months[i].weekly;
+          sumXY += i * months[i].weekly;
           sumX2 += i * i;
         }
         final denom = n * sumX2 - sumX * sumX;
@@ -2092,7 +2127,7 @@ class _TrendCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Ø ${_fmtH(avg)}/Monat  ·  Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(2)} h/Monat  ·  '
+                  'Ø ${avg.toStringAsFixed(1)} h/Woche  ·  Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(3)} h/Woche pro Monat  ·  '
                   '${dPct >= 0 ? '+' : ''}${dPct.toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 11,
@@ -2109,6 +2144,7 @@ class _TrendCard extends StatelessWidget {
                       intercept: b,
                       barColor: Theme.of(context).colorScheme.primary,
                       trendColor: Colors.deepOrange.shade600,
+                      sollColor: Colors.green.shade500,
                       axisColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
                       labelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
@@ -2116,11 +2152,13 @@ class _TrendCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
                   children: [
-                    _LegendItem(color: Theme.of(context).colorScheme.primary, label: 'Monat'),
-                    const SizedBox(width: 12),
+                    _LegendItem(color: Theme.of(context).colorScheme.primary, label: 'Ø h/Woche'),
                     _LegendItem(color: Colors.deepOrange.shade600, label: 'Trend (lin. Regression)'),
+                    _LegendItem(color: Colors.green.shade500, label: 'Vertragssoll'),
                   ],
                 ),
               ],
@@ -2133,11 +2171,12 @@ class _TrendCard extends StatelessWidget {
 }
 
 class _TrendPainter extends CustomPainter {
-  final List<({DateTime date, double h})> months;
+  final List<({DateTime date, double weekly, double soll})> months;
   final double slope;
   final double intercept;
   final Color barColor;
   final Color trendColor;
+  final Color sollColor;
   final Color axisColor;
   final Color labelColor;
 
@@ -2147,6 +2186,7 @@ class _TrendPainter extends CustomPainter {
     required this.intercept,
     required this.barColor,
     required this.trendColor,
+    required this.sollColor,
     required this.axisColor,
     required this.labelColor,
   });
@@ -2161,24 +2201,23 @@ class _TrendPainter extends CustomPainter {
     final chartW = size.width - leftPad - rightPad;
     final chartH = size.height - topPad - bottomPad;
 
-    // Max: höchster Balken oder höchster Trendpunkt, damit die Linie im Bild bleibt
     double maxY = 1.0;
-    for (final m in months) if (m.h > maxY) maxY = m.h;
+    for (final m in months) {
+      if (m.weekly > maxY) maxY = m.weekly;
+      if (m.soll   > maxY) maxY = m.soll;
+    }
     for (var i = 0; i < months.length; i++) {
       final t = slope * i + intercept;
       if (t > maxY) maxY = t;
     }
-    // 10% Kopfraum
     maxY *= 1.1;
 
-    // Y-Achse (0-Linie + Max-Linie)
     final axisPaint = Paint()..color = axisColor..strokeWidth = 1;
     canvas.drawLine(Offset(leftPad, topPad + chartH),
         Offset(size.width - rightPad, topPad + chartH), axisPaint);
     canvas.drawLine(Offset(leftPad, topPad),
         Offset(leftPad, topPad + chartH), axisPaint);
 
-    // Y-Labels (0, max/2, max)
     final labelStyle = TextStyle(color: labelColor, fontSize: 9);
     for (final frac in [0.0, 0.5, 1.0]) {
       final y = topPad + chartH * (1 - frac);
@@ -2189,7 +2228,6 @@ class _TrendPainter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(leftPad - tp.width - 3, y - tp.height / 2));
       if (frac > 0) {
-        // Gitterlinie
         final gp = Paint()
           ..color = axisColor.withOpacity(0.3)
           ..strokeWidth = 0.5;
@@ -2198,13 +2236,12 @@ class _TrendPainter extends CustomPainter {
       }
     }
 
-    // Balken
     final n = months.length;
     final slot = chartW / n;
     final barW = slot * 0.7;
     final barPaint = Paint()..color = barColor;
     for (var i = 0; i < n; i++) {
-      final h = months[i].h;
+      final h = months[i].weekly;
       final bh = h / maxY * chartH;
       final x = leftPad + slot * i + (slot - barW) / 2;
       final y = topPad + chartH - bh;
@@ -2214,6 +2251,31 @@ class _TrendPainter extends CustomPainter {
       );
       canvas.drawRRect(rect, barPaint);
     }
+
+    // Soll-Linie (Stufenverlauf)
+    final sollPaint = Paint()
+      ..color = sollColor
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final sollPath = Path();
+    for (var i = 0; i < n; i++) {
+      final s = months[i].soll;
+      final xL = leftPad + slot * i;
+      final xR = xL + slot;
+      final y  = topPad + chartH - (s.clamp(0.0, maxY) / maxY * chartH);
+      if (i == 0) {
+        sollPath.moveTo(xL, y);
+      } else {
+        final prev = months[i - 1].soll;
+        if (prev != s) {
+          // vertikaler Sprung an der Monatsgrenze
+          sollPath.lineTo(xL, topPad + chartH - (prev.clamp(0.0, maxY) / maxY * chartH));
+          sollPath.lineTo(xL, y);
+        }
+      }
+      sollPath.lineTo(xR, y);
+    }
+    canvas.drawPath(sollPath, sollPaint);
 
     // Trendlinie
     final trendPaint = Paint()
@@ -2230,7 +2292,6 @@ class _TrendPainter extends CustomPainter {
     for (var i = 1; i < n; i++) path.lineTo(ptFor(i).dx, ptFor(i).dy);
     canvas.drawPath(path, trendPaint);
 
-    // X-Labels (jeden 6. Monat, immer den letzten)
     for (var i = 0; i < n; i++) {
       if (i % 6 != 0 && i != n - 1) continue;
       final d = months[i].date;
