@@ -2110,26 +2110,53 @@ class _TrendCardState extends State<_TrendCard> {
           ));
         }
 
-        final n = months.length;
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-        for (var i = 0; i < n; i++) {
-          sumX  += i;
-          sumY  += months[i].weekly;
-          sumXY += i * months[i].weekly;
-          sumX2 += i * i;
+        // Regression nur über eligible Monate:
+        //   • Vertragssoll == aktuelles Soll (frühere Verträge ausklammern)
+        //   • Monat vollständig abgeschlossen (< aktueller Monat)
+        // Der laufende Monat und alle Zukunftsmonate verzerren die Steigung
+        // sonst massiv nach unten.
+        final currentSoll = widget.weeklyHoursHistory.last.h;
+        final now = DateTime.now();
+        final firstOfThisMonth = DateTime(now.year, now.month, 1);
+        var trendStart = -1;
+        var trendEnd = -1;
+        for (var i = 0; i < months.length; i++) {
+          final m = months[i];
+          if (m.soll != currentSoll) continue;
+          if (!m.date.isBefore(firstOfThisMonth)) continue;
+          if (trendStart == -1) trendStart = i;
+          trendEnd = i;
         }
-        final denom = n * sumX2 - sumX * sumX;
-        final a = denom.abs() < 1e-9 ? 0.0 : (n * sumXY - sumX * sumY) / denom;
-        final b = (sumY - a * sumX) / n;
+        final nElig = trendStart == -1 ? 0 : trendEnd - trendStart + 1;
 
-        final avg   = sumY / n;
-        final tStart = b;
-        final tEnd   = a * (n - 1) + b;
-        final dPct   = tStart.abs() < 0.01 ? 0.0 : (tEnd - tStart) / tStart * 100;
+        double a = 0, b = 0, avg = 0, dPct = 0;
+        if (nElig >= 2) {
+          double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+          for (var i = trendStart; i <= trendEnd; i++) {
+            final x = (i - trendStart).toDouble();
+            final y = months[i].weekly;
+            sumX  += x;
+            sumY  += y;
+            sumXY += x * y;
+            sumX2 += x * x;
+          }
+          final denom = nElig * sumX2 - sumX * sumX;
+          a = denom.abs() < 1e-9 ? 0.0 : (nElig * sumXY - sumX * sumY) / denom;
+          b = (sumY - a * sumX) / nElig;
+          avg = sumY / nElig;
+          final tStart = b;
+          final tEnd   = a * (nElig - 1) + b;
+          dPct = tStart.abs() < 0.01 ? 0.0 : (tEnd - tStart) / tStart * 100;
+        }
 
         final barColor = _effektiv
             ? Colors.amber.shade700
             : Theme.of(context).colorScheme.primary;
+
+        final mfmt = DateFormat('MMM yy', 'de_AT');
+        final trendRangeLabel = nElig >= 2
+            ? '${mfmt.format(months[trendStart].date)} – ${mfmt.format(months[trendEnd].date)}'
+            : 'zu wenig Daten';
 
         return Card(
           child: Padding(
@@ -2164,14 +2191,22 @@ class _TrendCardState extends State<_TrendCard> {
                 const SizedBox(height: 4),
                 Text(
                   '${_effektiv ? "Effektiv (mit Zuschlägen)" : "Ist (netto)"}  ·  '
-                  'Ø ${avg.toStringAsFixed(1)} h/Woche  ·  '
-                  'Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(3)} h/Woche pro Monat  ·  '
-                  '${dPct >= 0 ? '+' : ''}${dPct.toStringAsFixed(1)}%',
+                  'Trend über $nElig Monate ($trendRangeLabel)',
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
+                if (nElig >= 2)
+                  Text(
+                    'Ø ${avg.toStringAsFixed(1)} h/Woche  ·  '
+                    'Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(3)} h/Woche pro Monat  ·  '
+                    '${dPct >= 0 ? '+' : ''}${dPct.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
                 const Divider(),
                 SizedBox(
                   height: 200,
@@ -2180,6 +2215,8 @@ class _TrendCardState extends State<_TrendCard> {
                       months: months,
                       slope: a,
                       intercept: b,
+                      trendStart: trendStart,
+                      trendEnd: trendEnd,
                       barColor: barColor,
                       trendColor: Colors.deepOrange.shade600,
                       sollColor: Colors.green.shade500,
@@ -2212,6 +2249,10 @@ class _TrendPainter extends CustomPainter {
   final List<({DateTime date, double weekly, double soll})> months;
   final double slope;
   final double intercept;
+  /// Indices into [months] over which the regression was fit; used to
+  /// clip the trend line so it only spans the eligible range.
+  final int trendStart;
+  final int trendEnd;
   final Color barColor;
   final Color trendColor;
   final Color sollColor;
@@ -2222,6 +2263,8 @@ class _TrendPainter extends CustomPainter {
     required this.months,
     required this.slope,
     required this.intercept,
+    required this.trendStart,
+    required this.trendEnd,
     required this.barColor,
     required this.trendColor,
     required this.sollColor,
@@ -2244,9 +2287,11 @@ class _TrendPainter extends CustomPainter {
       if (m.weekly > maxY) maxY = m.weekly;
       if (m.soll   > maxY) maxY = m.soll;
     }
-    for (var i = 0; i < months.length; i++) {
-      final t = slope * i + intercept;
-      if (t > maxY) maxY = t;
+    if (trendEnd >= trendStart && trendStart >= 0) {
+      for (var i = trendStart; i <= trendEnd; i++) {
+        final t = slope * (i - trendStart) + intercept;
+        if (t > maxY) maxY = t;
+      }
     }
     maxY *= 1.1;
 
@@ -2278,6 +2323,9 @@ class _TrendPainter extends CustomPainter {
     final slot = chartW / n;
     final barW = slot * 0.7;
     final barPaint = Paint()..color = barColor;
+    final barPaintFaded = Paint()..color = barColor.withOpacity(0.35);
+    final now = DateTime.now();
+    final firstOfThisMonth = DateTime(now.year, now.month, 1);
     for (var i = 0; i < n; i++) {
       final h = months[i].weekly;
       final bh = h / maxY * chartH;
@@ -2287,7 +2335,10 @@ class _TrendPainter extends CustomPainter {
         Rect.fromLTWH(x, y, barW, bh),
         const Radius.circular(2),
       );
-      canvas.drawRRect(rect, barPaint);
+      // Laufender + zukünftige Monate abgeblendet, damit sichtbar ist,
+      // dass sie nicht in die Regression eingehen.
+      final isFuture = !months[i].date.isBefore(firstOfThisMonth);
+      canvas.drawRRect(rect, isFuture ? barPaintFaded : barPaint);
     }
 
     // Soll-Linie (Stufenverlauf)
@@ -2306,7 +2357,6 @@ class _TrendPainter extends CustomPainter {
       } else {
         final prev = months[i - 1].soll;
         if (prev != s) {
-          // vertikaler Sprung an der Monatsgrenze
           sollPath.lineTo(xL, topPad + chartH - (prev.clamp(0.0, maxY) / maxY * chartH));
           sollPath.lineTo(xL, y);
         }
@@ -2315,20 +2365,25 @@ class _TrendPainter extends CustomPainter {
     }
     canvas.drawPath(sollPath, sollPaint);
 
-    // Trendlinie
-    final trendPaint = Paint()
-      ..color = trendColor
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    Offset ptFor(int i) {
-      final t = slope * i + intercept;
-      final x = leftPad + slot * i + slot / 2;
-      final y = topPad + chartH - (t.clamp(0.0, maxY) / maxY * chartH);
-      return Offset(x, y);
+    // Trendlinie — nur über den eligible Bereich [trendStart..trendEnd]
+    if (trendEnd > trendStart && trendStart >= 0) {
+      final trendPaint = Paint()
+        ..color = trendColor
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      Offset ptFor(int globalIdx) {
+        final localX = (globalIdx - trendStart).toDouble();
+        final t = slope * localX + intercept;
+        final x = leftPad + slot * globalIdx + slot / 2;
+        final y = topPad + chartH - (t.clamp(0.0, maxY) / maxY * chartH);
+        return Offset(x, y);
+      }
+      final path = Path()..moveTo(ptFor(trendStart).dx, ptFor(trendStart).dy);
+      for (var i = trendStart + 1; i <= trendEnd; i++) {
+        path.lineTo(ptFor(i).dx, ptFor(i).dy);
+      }
+      canvas.drawPath(path, trendPaint);
     }
-    final path = Path()..moveTo(ptFor(0).dx, ptFor(0).dy);
-    for (var i = 1; i < n; i++) path.lineTo(ptFor(i).dx, ptFor(i).dy);
-    canvas.drawPath(path, trendPaint);
 
     for (var i = 0; i < n; i++) {
       if (i % 6 != 0 && i != n - 1) continue;
@@ -2351,7 +2406,11 @@ class _TrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TrendPainter old) =>
-      old.months != months || old.slope != slope || old.intercept != intercept;
+      old.months != months ||
+      old.slope != slope ||
+      old.intercept != intercept ||
+      old.trendStart != trendStart ||
+      old.trendEnd != trendEnd;
 }
 
 // ── So/FT-Pauschale ───────────────────────────────────────────────────────────
