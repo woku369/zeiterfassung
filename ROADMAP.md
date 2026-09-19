@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-09-18 – v1.34 Projekt-Nachzuordnung + 36-Monats-Trend (Excel + in-App)
+> Letztes Update: 2026-09-19 – v1.34 Trendkarte: Wochenstunden + Vertragssoll + Ist/Effektiv-Toggle
 
 ---
 
@@ -57,6 +57,9 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
   - Y-Achse mit 0/mid/max-Beschriftung + Gitterlinien, X-Achse alle 6 Monate + letzter Monat
   - Header-Zeile identisch zum Excel-Sheet (Ø, Steigung, Prozent-Änderung), plus Legende
   - `FutureBuilder` lädt Historie via `getEntriesForDateRange` beim Öffnen des Tabs
+  - **Bezugsgröße Ø h/Woche** (Monatssumme / 4.33) statt Monatsstunden — passt zur Vertragslogik
+  - **Grüne Stufenlinie "Vertragssoll"** überlagert den Chart; für Gurktaler AG hardcodiert: 4 h/Woche bis WJ 24/25, 8 h/Woche ab April 2025 (weitere Stufen jederzeit in `_weeklyHoursHistoryFor()` ergänzbar)
+  - **SegmentedButton "Ist / Effektiv"** oben rechts (nur bei Zuschlags-Arbeitgebern): Ist = `entry.totalHours` (blau), Effektiv = `SurchargeService.equivalentHours` (amber) — Regression rechnet sich beim Umschalten neu
 
 ---
 
