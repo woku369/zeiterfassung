@@ -1249,7 +1249,7 @@ class _FiscalYearTabState extends State<_FiscalYearTab> {
               const SizedBox(height: 12),
               _TrendCard(
                 fyEnd: DateTime(_fyEnd.year, _fyEnd.month, 0),
-                employerId: employer?.id,
+                employer: employer,
                 weeklyHoursHistory: _weeklyHoursHistoryFor(employer, weeklyHours),
               ),
               if (_showEquivalent) ...[
@@ -2043,19 +2043,26 @@ class _SaisonmusterCard extends StatelessWidget {
 
 // ── 36-Monats-Trend (Balken + Regressionslinie) ──────────────────────────────
 
-class _TrendCard extends StatelessWidget {
+class _TrendCard extends StatefulWidget {
   final DateTime fyEnd;
-  final String? employerId;
+  final Employer? employer;
   final List<({DateTime from, double h})> weeklyHoursHistory;
   const _TrendCard({
     required this.fyEnd,
-    required this.employerId,
+    required this.employer,
     required this.weeklyHoursHistory,
   });
 
+  @override
+  State<_TrendCard> createState() => _TrendCardState();
+}
+
+class _TrendCardState extends State<_TrendCard> {
+  bool _effektiv = false;
+
   double _sollFor(DateTime d) {
-    var value = weeklyHoursHistory.first.h;
-    for (final e in weeklyHoursHistory) {
+    var value = widget.weeklyHoursHistory.first.h;
+    for (final e in widget.weeklyHoursHistory) {
       if (!e.from.isAfter(d)) value = e.h;
     }
     return value;
@@ -2063,10 +2070,13 @@ class _TrendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trendFrom = DateTime(fyEnd.year, fyEnd.month - 35, 1);
+    final isSurcharge = SurchargeService.isSurchargeEmployer(widget.employer);
+    final trendFrom =
+        DateTime(widget.fyEnd.year, widget.fyEnd.month - 35, 1);
     return FutureBuilder<List<TimeEntry>>(
-      future: DatabaseHelper.instance
-          .getEntriesForDateRange(trendFrom, fyEnd, employerId: employerId),
+      future: DatabaseHelper.instance.getEntriesForDateRange(
+          trendFrom, widget.fyEnd,
+          employerId: widget.employer?.id),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Card(
@@ -2074,16 +2084,17 @@ class _TrendCard extends StatelessWidget {
                   padding: EdgeInsets.all(24),
                   child: Center(child: CircularProgressIndicator())));
         }
-        // Monate aggregieren (Absenzen ausgeschlossen), umgerechnet in
-        // Ø Wochenstunden (Monatsstunden / 4.33).
         const weeksPerMonth = 4.33;
         final byYm = <int, double>{};
         for (final e in snap.data!) {
           if (e.workType.isAbsence) continue;
           final k = e.date.year * 12 + e.date.month;
-          byYm[k] = (byYm[k] ?? 0) + e.totalHours;
+          final h = _effektiv
+              ? SurchargeService.equivalentHours(e, isSurchargeEmployer: isSurcharge)
+              : e.totalHours;
+          byYm[k] = (byYm[k] ?? 0) + h;
         }
-        final endYm = fyEnd.year * 12 + fyEnd.month;
+        final endYm = widget.fyEnd.year * 12 + widget.fyEnd.month;
         const window = 36;
         final startYm = endYm - (window - 1);
 
@@ -2099,7 +2110,6 @@ class _TrendCard extends StatelessWidget {
           ));
         }
 
-        // Lineare Regression über Wochenstunden: h = a·i + b
         final n = months.length;
         double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
         for (var i = 0; i < n; i++) {
@@ -2117,17 +2127,45 @@ class _TrendCard extends StatelessWidget {
         final tEnd   = a * (n - 1) + b;
         final dPct   = tStart.abs() < 0.01 ? 0.0 : (tEnd - tStart) / tStart * 100;
 
+        final barColor = _effektiv
+            ? Colors.amber.shade700
+            : Theme.of(context).colorScheme.primary;
+
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Trend (36 Monate)',
-                    style: Theme.of(context).textTheme.titleMedium),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Trend (36 Monate)',
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
+                    if (isSurcharge)
+                      SegmentedButton<bool>(
+                        style: ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                          textStyle: WidgetStateProperty.all(
+                              const TextStyle(fontSize: 11)),
+                        ),
+                        segments: const [
+                          ButtonSegment(value: false, label: Text('Ist')),
+                          ButtonSegment(value: true,  label: Text('Effektiv')),
+                        ],
+                        selected: {_effektiv},
+                        onSelectionChanged: (s) =>
+                            setState(() => _effektiv = s.first),
+                        showSelectedIcon: false,
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  'Ø ${avg.toStringAsFixed(1)} h/Woche  ·  Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(3)} h/Woche pro Monat  ·  '
+                  '${_effektiv ? "Effektiv (mit Zuschlägen)" : "Ist (netto)"}  ·  '
+                  'Ø ${avg.toStringAsFixed(1)} h/Woche  ·  '
+                  'Steigung ${a >= 0 ? '+' : ''}${a.toStringAsFixed(3)} h/Woche pro Monat  ·  '
                   '${dPct >= 0 ? '+' : ''}${dPct.toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 11,
@@ -2142,7 +2180,7 @@ class _TrendCard extends StatelessWidget {
                       months: months,
                       slope: a,
                       intercept: b,
-                      barColor: Theme.of(context).colorScheme.primary,
+                      barColor: barColor,
                       trendColor: Colors.deepOrange.shade600,
                       sollColor: Colors.green.shade500,
                       axisColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
@@ -2156,7 +2194,7 @@ class _TrendCard extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 4,
                   children: [
-                    _LegendItem(color: Theme.of(context).colorScheme.primary, label: 'Ø h/Woche'),
+                    _LegendItem(color: barColor, label: 'Ø h/Woche'),
                     _LegendItem(color: Colors.deepOrange.shade600, label: 'Trend (lin. Regression)'),
                     _LegendItem(color: Colors.green.shade500, label: 'Vertragssoll'),
                   ],
