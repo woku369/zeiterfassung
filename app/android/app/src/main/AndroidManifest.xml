@@ -94,6 +94,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- Watchdog: alle ~15 min Service-Zustand prüfen und ggf. restart.
+             HyperOS/Xiaomi killt den Foreground-Service trotz „Keine
+             Einschränkungen"-Setting; nur ein externer Trigger kann ihn
+             dann wieder beleben, ohne dass der Nutzer die App öffnet. -->
+        <receiver
+            android:name=".ZeiterfassungWatchdogReceiver"
+            android:exported="false" />
+
         <!-- Bluetooth-Fahrtenbuch: ACL connect/disconnect Events empfangen -->
         <receiver
             android:name=".BluetoothTripReceiver"

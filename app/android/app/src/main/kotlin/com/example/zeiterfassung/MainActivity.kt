@@ -11,8 +11,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val navChannel = "zeiterfassung/navigation"
-    private val btChannel  = "zeiterfassung/bluetooth"
+    private val navChannel      = "zeiterfassung/navigation"
+    private val btChannel       = "zeiterfassung/bluetooth"
+    private val watchdogChannel = "zeiterfassung/watchdog"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -24,6 +25,21 @@ class MainActivity : FlutterActivity() {
                     result.success(getPairedDevices())
                 } else {
                     result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, watchdogChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "schedule" -> {
+                        ZeiterfassungWatchdogReceiver.schedule(applicationContext)
+                        result.success(true)
+                    }
+                    "cancel" -> {
+                        ZeiterfassungWatchdogReceiver.cancel(applicationContext)
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
                 }
             }
     }

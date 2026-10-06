@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
@@ -11,6 +12,8 @@ typedef GeofenceCallback = void Function(TrackedLocation location, bool entered)
 class GeofencingService {
   GeofencingService._();
   static final GeofencingService instance = GeofencingService._();
+
+  static const _watchdogChannel = MethodChannel('zeiterfassung/watchdog');
 
   GeofenceCallback? onZoneChange;
 
@@ -68,6 +71,10 @@ class GeofencingService {
     // Flag für BootReceiver: Service war aktiv, nach Neustart wieder starten.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('geofencing_active', true);
+    // Watchdog: alle ~15 min prüft ein AlarmReceiver, ob der Foreground-
+    // Service noch läuft, und startet ihn ggf. neu (HyperOS killt ihn
+    // trotz „Keine Einschränkungen"-Setting zuverlässig).
+    await _scheduleWatchdog();
     return true;
   }
 
@@ -77,6 +84,7 @@ class GeofencingService {
     _isRunning = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('geofencing_active', false);
+    await _cancelWatchdog();
   }
 
   /// Push updated location list to the running background service.
@@ -86,6 +94,18 @@ class GeofencingService {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  Future<void> _scheduleWatchdog() async {
+    try {
+      await _watchdogChannel.invokeMethod('schedule');
+    } catch (_) {/* Platform-Call auf iOS/Debug einfach ignorieren */}
+  }
+
+  Future<void> _cancelWatchdog() async {
+    try {
+      await _watchdogChannel.invokeMethod('cancel');
+    } catch (_) {}
+  }
 
   void _sendLocations(List<TrackedLocation> locs) {
     FlutterBackgroundService().invoke('setLocations', {

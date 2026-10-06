@@ -42,6 +42,10 @@ class ZeiterfassungBootReceiver : BroadcastReceiver() {
         } else {
             context.startService(serviceIntent)
         }
+
+        // Watchdog scharfschalten: hält den Service auch dann am Leben,
+        // wenn HyperOS/Xiaomi ihn später wegräumt.
+        ZeiterfassungWatchdogReceiver.schedule(context)
     }
 
     private fun createChannels(context: Context) {
