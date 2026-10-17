@@ -88,9 +88,18 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     if (!mounted) return;
     setState(() {
       if (saved.isNotEmpty) {
-        _splits.addAll(saved.map((s) => _SplitDraft(
-            projectId: s.projectId,
-            minutes: s.minutes)));
+        // Spezialfall: genau EIN Split, dessen Minuten die Gesamtdauer des
+        // Eintrags abdecken → als Catch-all laden (leeres Minutenfeld).
+        // Damit extendiert eine spätere Verlängerung des Eintrags das Projekt
+        // automatisch mit — statt bei den alten Minuten festzukleben.
+        final total = _entryMinutes;
+        if (saved.length == 1 && total != null && saved.first.minutes == total) {
+          _splits.add(_SplitDraft(projectId: saved.first.projectId, minutes: 0));
+        } else {
+          _splits.addAll(saved.map((s) => _SplitDraft(
+              projectId: s.projectId,
+              minutes: s.minutes)));
+        }
       } else if (fallbackProjectId != null) {
         // Migrate single project_id → split with 0 min (user fills in)
         _splits.add(_SplitDraft(projectId: fallbackProjectId, minutes: 0));
