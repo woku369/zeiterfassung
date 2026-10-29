@@ -1,7 +1,7 @@
 # Zeiterfassung – Roadmap
 
 > Automatisch gepflegt via `/roadmap`. Manuell aktualisieren nach größeren Änderungen.
-> Letztes Update: 2026-09-19 – v1.34 Trendkarte: Wochenstunden + Vertragssoll + Ist/Effektiv-Toggle
+> Letztes Update: 2026-10-29 – v1.35 Geofencing-Watchdog + Zonen-Cache + Projekt-Autoscale
 
 ---
 
@@ -25,6 +25,28 @@ für einen Kräutergarten-Betrieb (Gurk/Wien/Salzburg).
 ---
 
 ## Erledigt
+
+### v1.35 – Geofencing-Robustheit (HyperOS) + Projekt-Autoscale
+
+- [x] **AlarmManager-Watchdog für den Geofencing-Service:**
+  - Neue `ZeiterfassungWatchdogReceiver.kt` feuert via `AlarmManager.setAndAllowWhileIdle` alle ~15 min (überlebt Doze)
+  - Prüft `geofencing_active` in SharedPreferences und ruft `startForegroundService()` auf — No-Op wenn der Service läuft, sanfter Restart wenn HyperOS/Xiaomi ihn weggeräumt hat
+  - Scharfgeschaltet via `ZeiterfassungBootReceiver` nach Boot und via neuem MethodChannel `zeiterfassung/watchdog` beim `startTracking` aus Dart
+  - Reschedule nach jedem Tick, saubere Deaktivierung in `stopTracking`
+  - Löst das „Gurk-nicht-erfasst"-Problem bei mehrtägig durchlaufendem Handy (bisher nur BootReceiver + App-Open-Restart aus v1.33)
+
+- [x] **Zonen-Cache überlebt Service-Cold-Starts (Bugfix):**
+  - Symptom: Auto-Clock-in funktionierte ein paar Mal, dann nicht mehr — App öffnen in der Zone stempelte sofort ein
+  - Ursache: `locations` lebte nur im RAM des Background-Isolate und wurde per `setLocations` vom UI-Isolate gepusht. Watchdog-Restart startete den Service ohne Zonen → GPS lief weiter, aber `[ENTER]`/`[CLOCK-IN]` wurden nie gefeuert, bis die App geöffnet wurde
+  - Fix: `_kLocationsCacheKey` persistiert die Zonen-JSON bei jedem `setLocations`-Event in SharedPreferences; `_onStartInner` rehydriert sie vor dem GPS-Stream-Start. Erste GPS-Fix nach Watchdog-Revival trifft sofort auf eine gültige Zonenliste
+  - Neue Log-Zeile `[INIT] Aktiv (Cache): ...` nach watchdog/boot-Restarts (vs. `[INIT] Aktiv: ...` nach App-Push)
+
+- [x] **Projekt-Split skaliert automatisch mit Eintragsdauer (Bugfix):**
+  - Symptom: Entry 70 min mit einzelnem Projekt zu 70 min; Dauer auf 120 min erhöht → Projekt blieb bei 70 min, 50 min landeten in „ohne Projektzuordnung"
+  - Fix in `entry_form_screen.dart:_loadSplits()`: hat ein Eintrag genau einen Split dessen Minuten exakt der Nettodauer entsprechen, wird er als Catch-all geladen (Minutenfeld bleibt leer, zeigt Rest). Beim Speichern greift die bestehende Catch-all-Logik → volle neue Dauer wird gespeichert
+  - Nicht betroffen: Multi-Splits und Splits die die Dauer nicht abdecken (bleiben literal)
+
+---
 
 ### v1.34 – Projekt-Nachzuordnung via Drill-down + 36-Monats-Trend (DB v21)
 
@@ -1070,7 +1092,7 @@ fix_worktypes.py       Korrektur-Script für falsch gemappte Arbeitstypen
 
 **Branches:**
 - `main` – stabiler Stand (v1.2)
-- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.34)
+- `claude/add-call-tracking-FyBFV` – aktueller Entwicklungsstand (v1.35)
 
 ---
 
