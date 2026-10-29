@@ -136,6 +136,7 @@ Future<void> configureGeofencingBackground() async {
 const _kAutoEntryKey         = 'geofence_auto_entry_id';
 const _kAutoEntryEmployerKey = 'geofence_auto_entry_employer_id';
 const _kInsideZonesKey       = 'geofence_inside_zones'; // persisted CSV of zone IDs
+const _kLocationsCacheKey    = 'geofence_locations_cache'; // JSON array; survives OS kills
 const kTripTrackingKey       = 'trip_tracking_active';
 const _kOpenTripKey          = 'trip_open_id';
 const _kSpeedStartMs         = 4.2;  // 15 km/h – trip begins
@@ -192,6 +193,32 @@ Future<void> _onStartInner(ServiceInstance service) async {
   }
   var locations = <Map<String, dynamic>>[];    // active zones only (for detection)
   var allLocations = <Map<String, dynamic>>[]; // all zones incl. inactive (for logging)
+  // Rehydrate zones from cache so a watchdog/boot restart has a working set
+  // even before the UI isolate pushes setLocations. Without this, HyperOS-
+  // triggered restarts logged GPS fixes but never fired [ENTER]/[CLOCK-IN]
+  // until the user opened the app.
+  {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_kLocationsCacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        final list = (jsonDecode(cached) as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        allLocations = list;
+        locations = list.where((l) => l['isActive'] as bool? ?? true).toList();
+        final inactive = list
+            .where((l) => !(l['isActive'] as bool? ?? true))
+            .map((l) => l['name'])
+            .join(', ');
+        await _log('INIT',
+            'Aktiv (Cache): ${locations.map((l) => l['name']).join(', ')}'
+            '${inactive.isNotEmpty ? '  Inaktiv: $inactive' : ''}');
+      } catch (e) {
+        await _log('INIT', 'Zonen-Cache fehlerhaft: $e');
+      }
+    }
+  }
   final timers = <String, Timer>{}; // locationId → pending clock-out timer
   unawaited(_cleanupOldLogs());
   DateTime? outsideZonesSince = DateTime.now();
@@ -266,6 +293,10 @@ Future<void> _onStartInner(ServiceInstance service) async {
     _log('INIT',
         'Aktiv: ${activeIncoming.map((l) => l['name']).join(', ')}'
         '${inactive.isNotEmpty ? '  Inaktiv: $inactive' : ''}');
+    // Persist for the next cold start (watchdog/boot restart without UI).
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(_kLocationsCacheKey, jsonEncode(incoming));
+    });
   });
 
   service.on('setTripTracking').listen((data) {
